@@ -26,30 +26,45 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     TypeOrmModule.forRootAsync({
+      name: 'postgresql',
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        type: 'mssql',
-        host: 'COMPU-DE-FRAN',
-        port: 1433,
-        username: 'sa',
-        password: 'Admin123!',
-        database: 'PowerAppDb',
-        entities: [BodyWeight, ExerciseCategory, Exercise, ExercisedMuscle, FavoriteExercise, MuscleGroup, Muscle, SystemCron, UserCron, UserRM, User],
-        synchronize: false,
-        options: {
-          instanceName: 'SQLEXPRESS',  // Maneja la instancia nombrada
-          trustServerCertificate: true,  // Útil para certificados self-signed en dev local
-          encrypt: false,  // Desactiva si no usas SSL (común en local)
-        },
+        type: 'postgres',
+        host: "postgresql://power_app_user:bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul@dpg-d7bf5geuk2gs738pg1cg-a/powerappdb",
+        port: 5432,
+        username: "power_app_user",
+        password: "bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul",
+        database: "powerappdb",
+        // entities: [Estudiante, Libro, Reserva],
+        synchronize: true,
       }),
       inject: [ConfigService],
     }),
-    AuthenticationModule, 
-    ExerciseModule, 
-    UserRmModule, 
-    UsersModule, 
-    MusclesModule, 
-    MuscleGroupsModule
+    // TypeOrmModule.forRootAsync({
+    //   imports: [ConfigModule],
+    //   useFactory: (configService: ConfigService) => ({
+    //     type: 'mssql',
+    //     host: 'COMPU-DE-FRAN',
+    //     port: 1433,
+    //     username: 'sa',
+    //     password: 'Admin123!',
+    //     database: 'PowerAppDb',
+    //     entities: [BodyWeight, ExerciseCategory, Exercise, ExercisedMuscle, FavoriteExercise, MuscleGroup, Muscle, SystemCron, UserCron, UserRM, User],
+    //     synchronize: false,
+    //     options: {
+    //       instanceName: 'SQLEXPRESS',  // Maneja la instancia nombrada
+    //       trustServerCertificate: true,  // Útil para certificados self-signed en dev local
+    //       encrypt: false,  // Desactiva si no usas SSL (común en local)
+    //     },
+    //   }),
+    //   inject: [ConfigService],
+    // }),
+    // AuthenticationModule, 
+    // ExerciseModule, 
+    // UserRmModule, 
+    // UsersModule, 
+    // MusclesModule, 
+    // MuscleGroupsModule
   ],
   controllers: [],
   providers: [],

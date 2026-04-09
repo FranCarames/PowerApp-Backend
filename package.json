@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "material-icon-theme": "^5.23.0"
+    "material-icon-theme": "^5.23.0",
+    "typeorm": "^0.3.28"
   }
 }
