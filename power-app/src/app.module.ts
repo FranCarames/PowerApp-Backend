@@ -30,16 +30,33 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: "postgresql://power_app_user:bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul@dpg-d7bf5geuk2gs738pg1cg-a/powerappdb",
-        port: 5432,
-        username: "power_app_user",
-        password: "bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul",
-        database: "powerappdb",
+        host: "dpg-d7bf5geuk2gs738pg1cg-a.virginia-postgres.render.com",//configService.get<string>('POSTGRES_HOST'),
+        port: 5432,//configService.get<number>('POSTGRES_PORT'),
+        username: "power_app_user",//configService.get<string>('POSTGRES_USER'),
+        password: "bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul",//configService.get<string>('POSTGRES_PASSWORD'),
+        database: "powerappdb",//configService.get<string>('POSTGRES_DB'),
         // entities: [Estudiante, Libro, Reserva],
         synchronize: true,
       }),
       inject: [ConfigService],
     }),
+
+
+    // TypeOrmModule.forRootAsync({
+    //   name: 'postgresql',
+    //   imports: [ConfigModule],
+    //   useFactory: (configService: ConfigService) => ({
+    //     type: 'postgres',
+    //     host: "postgresql://power_app_user:bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul@dpg-d7bf5geuk2gs738pg1cg-a/powerappdb",
+    //     port: 5432,
+    //     username: "power_app_user",
+    //     password: "bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul",
+    //     database: "powerappdb",
+    //     // entities: [Estudiante, Libro, Reserva],
+    //     synchronize: true,
+    //   }),
+    //   inject: [ConfigService],
+    // }),
     // TypeOrmModule.forRootAsync({
     //   imports: [ConfigModule],
     //   useFactory: (configService: ConfigService) => ({
