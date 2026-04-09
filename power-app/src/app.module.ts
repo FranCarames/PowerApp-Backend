@@ -36,7 +36,16 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
         password: "bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul",//configService.get<string>('POSTGRES_PASSWORD'),
         database: "powerappdb",//configService.get<string>('POSTGRES_DB'),
         // entities: [Estudiante, Libro, Reserva],
-        synchronize: true,
+        // synchronize: true,
+
+        ssl: {
+          rejectUnauthorized: false,   // Necesario porque Render usa certificados que Node no verifica por defecto
+        },
+
+        // Opcional pero recomendado:
+        logging: true,                 // Para ver las consultas y posibles errores
+        synchronize: true,             // Solo en desarrollo! (cuidado en producción)
+        autoLoadEntities: true,        // Muy útil en NestJS + TypeORM
       }),
       inject: [ConfigService],
     }),
