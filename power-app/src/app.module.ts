@@ -30,22 +30,18 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: "dpg-d7bf5geuk2gs738pg1cg-a.virginia-postgres.render.com",//configService.get<string>('POSTGRES_HOST'),
-        port: 5432,//configService.get<number>('POSTGRES_PORT'),
-        username: "power_app_user",//configService.get<string>('POSTGRES_USER'),
-        password: "bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul",//configService.get<string>('POSTGRES_PASSWORD'),
-        database: "powerappdb",//configService.get<string>('POSTGRES_DB'),
+        host: configService.get<string>('POSTGRES_HOST'),
+        port: configService.get<number>('POSTGRES_PORT'),
+        username: configService.get<string>('POSTGRES_USER'),
+        password: configService.get<string>('POSTGRES_PASSWORD'),
+        database: configService.get<string>('POSTGRES_DB'),
         // entities: [Estudiante, Libro, Reserva],
-        // synchronize: true,
-
         ssl: {
-          rejectUnauthorized: false,   // Necesario porque Render usa certificados que Node no verifica por defecto
+          rejectUnauthorized: false,
         },
-
-        // Opcional pero recomendado:
-        logging: true,                 // Para ver las consultas y posibles errores
-        synchronize: true,             // Solo en desarrollo! (cuidado en producción)
-        autoLoadEntities: true,        // Muy útil en NestJS + TypeORM
+        logging: true,                 
+        synchronize: true, // Solo en desarrollo! (cuidado en producción)
+        autoLoadEntities: true, // Muy útil en NestJS + TypeORM
       }),
       inject: [ConfigService],
     }),
