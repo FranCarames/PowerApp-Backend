@@ -3,14 +3,15 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 // Entities imports
+import { User } from './entities/user.entity';
+import { UserRM } from './entities/user_rm.entity';
 import { Exercise } from './entities/exercise.entity';
-import { ExercisedMuscle } from './entities/ParaValidar/exercised_muscle.entity';
-import { MuscleGroup } from './entities/ParaValidar/muscle_group.entity';
-import { Muscle } from './entities/ParaValidar/muscle.entity';
+import { ExercisedMuscle } from './entities/exercised_muscle.entity';
+import { MuscleGroup } from './entities/muscle_group.entity';
+import { Muscle } from './entities/muscle.entity';
 import { SystemCron } from './entities/ParaValidar/system_cron.entity';
 import { UserCron } from './entities/ParaValidar/user_cron.entity';
-import { UserRM } from './entities/ParaValidar/user_rm.entity';
-import { User } from './entities/user.entity';
+
 
 import { UsersModule } from './users/users.module';
 import { AuthenticationModule } from './authentication/authetication.module';
@@ -31,7 +32,7 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
         username: configService.get<string>('POSTGRES_USER'),
         password: configService.get<string>('POSTGRES_PASSWORD'),
         database: configService.get<string>('POSTGRES_DB'),
-        entities: [User],
+        entities: [User, UserRM, Muscle, MuscleGroup, Exercise, ExercisedMuscle],
         ssl: {
           rejectUnauthorized: false,
         },

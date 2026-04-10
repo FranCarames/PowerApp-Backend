@@ -1,7 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn  } from 'typeorm';
-import { UserRM } from './ParaValidar/user_rm.entity';
+import { UserRM } from './user_rm.entity';
+import { ExercisedMuscle } from './exercised_muscle.entity';
 
-@Entity()
+@Entity('Exercise')
 export class Exercise {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
@@ -37,6 +38,12 @@ export class Exercise {
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS
-    // @OneToMany(() => UserRM, userRM => userRM.exercise)
-    // userRMs: UserRM[];
+    @OneToMany(() => UserRM, userRM => userRM.exercise)
+    userRMs!: UserRM[];
+
+    @OneToMany(() => ExercisedMuscle, exercisedMuscle => exercisedMuscle.exercise, { 
+        cascade: true,
+        eager: false   // Recomendado: no cargar automáticamente todos los músculos
+    })
+    exercisedMuscles!: ExercisedMuscle[];
 }

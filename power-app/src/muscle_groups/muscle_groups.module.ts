@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { MuscleGroupsController } from './muscle_groups.controller';
 import { MuscleGroupsService } from './muscle_groups.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MuscleGroup } from '../entities/ParaValidar/muscle_group.entity';
+import { MuscleGroup } from '../entities/muscle_group.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([MuscleGroup])],
