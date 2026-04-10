@@ -1,5 +1,4 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { BodyWeight } from './ParaValidar/body_weight.entity';
 import { FavoriteExercise } from './ParaValidar/favorite_exercise.entity';
 import { UserCron } from './ParaValidar/user_cron.entity';
 import { UserRM } from './ParaValidar/user_rm.entity';
@@ -59,15 +58,6 @@ export class User {
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS
-    // @OneToMany(() => BodyWeight, bodyWeight => bodyWeight.user)
-    // bodyWeights: BodyWeight[];
-
-    // @OneToMany(() => FavoriteExercise, favoriteExercise => favoriteExercise.user)
-    // favoriteExercises: FavoriteExercise[];
-
-    // @OneToMany(() => UserCron, userCron => userCron.user)
-    // userCrons: UserCron[];
-
     // @OneToMany(() => UserRM, userRM => userRM.user)
     // userRMs: UserRM[];
 }

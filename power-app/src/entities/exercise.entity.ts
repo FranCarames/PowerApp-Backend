@@ -1,7 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn  } from 'typeorm';
-import { FavoriteExercise } from './ParaValidar/favorite_exercise.entity';
 import { UserRM } from './ParaValidar/user_rm.entity';
-import { ExerciseCategory } from './ParaValidar/exercise_category.entity';
 
 @Entity()
 export class Exercise {
@@ -39,13 +37,6 @@ export class Exercise {
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS
-    // @ManyToOne(() => ExerciseCategory, category => category.exercises)
-    // @JoinColumn({ name: 'category_id' })
-    // exerciseCategory: ExerciseCategory;
-    
     // @OneToMany(() => UserRM, userRM => userRM.exercise)
     // userRMs: UserRM[];
-
-    // @OneToMany(() => FavoriteExercise, favoriteExercise => favoriteExercise.user)
-    // favoriteExercises: FavoriteExercise[];
 }

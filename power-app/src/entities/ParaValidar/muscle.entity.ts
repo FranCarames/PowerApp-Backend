@@ -3,32 +3,32 @@ import { MuscleGroup } from './muscle_group.entity';
 
 @Entity()
 export class Muscle {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+    // @PrimaryGeneratedColumn('uuid')
+    // id: string;
 
-    @Column({ type: 'uuid', nullable: false })
-    muscle_group_id: string;
+    // @Column({ type: 'uuid', nullable: false })
+    // muscle_group_id: string;
 
-    @Column({ length: 50, nullable: false })
-    name: string;
+    // @Column({ length: 50, nullable: false })
+    // name: string;
 
-    @Column({ type: 'text', nullable: true })
-    description: string;
+    // @Column({ type: 'text', nullable: true })
+    // description: string;
 
-    @Column({ length: 150, nullable: true })
-    image_url: string;
+    // @Column({ length: 150, nullable: true })
+    // image_url: string;
 
-    @Column({ length: 150, nullable: true })
-    preview_image: string;
+    // @Column({ length: 150, nullable: true })
+    // preview_image: string;
 
-    @Column({ type: 'datetime', nullable: false })
-    created_at: Date;
+    // @Column({ type: 'datetime', nullable: false })
+    // created_at: Date;
 
-    @Column({ type: 'datetime', nullable: false })
-    updated_at: Date;
+    // @Column({ type: 'datetime', nullable: false })
+    // updated_at: Date;
 
-    // JOIN RELATIONSHIPS
-    @ManyToOne(() => MuscleGroup, muscleGroup => muscleGroup.muscles)
-    @JoinColumn({ name: 'muscle_group_id' })
-    muscle_group: MuscleGroup;
+    // // JOIN RELATIONSHIPS
+    // @ManyToOne(() => MuscleGroup, muscleGroup => muscleGroup.muscles)
+    // @JoinColumn({ name: 'muscle_group_id' })
+    // muscle_group: MuscleGroup;
 }
