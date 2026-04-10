@@ -42,31 +42,13 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
       }),
       inject: [ConfigService],
     }),
-    // TypeOrmModule.forRootAsync({
-    //   imports: [ConfigModule],
-    //   useFactory: (configService: ConfigService) => ({
-    //     type: 'mssql',
-    //     host: 'COMPU-DE-FRAN',
-    //     port: 1433,
-    //     username: 'sa',
-    //     password: 'Admin123!',
-    //     database: 'PowerAppDb',
-    //     entities: [Exercise, ExercisedMuscle, MuscleGroup, Muscle, SystemCron, UserCron, UserRM, User],
-    //     synchronize: false,
-    //     options: {
-    //       instanceName: 'SQLEXPRESS',  // Maneja la instancia nombrada
-    //       trustServerCertificate: true,  // Útil para certificados self-signed en dev local
-    //       encrypt: false,  // Desactiva si no usas SSL (común en local)
-    //     },
-    //   }),
-    //   inject: [ConfigService],
-    // }),
-    // AuthenticationModule, 
-    // ExerciseModule, 
-    // UserRmModule, 
     UsersModule, 
-    // MusclesModule, 
-    // MuscleGroupsModule
+    UserRmModule,
+    MusclesModule, 
+    MuscleGroupsModule
+    // ExerciseModule,  
+    
+    
   ],
   controllers: [],
   providers: [],

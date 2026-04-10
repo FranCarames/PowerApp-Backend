@@ -3,7 +3,6 @@ import {
   IsString,
   IsOptional,
   IsEmail,
-  IsDate,
   MinLength,
   MaxLength,
   IsEnum
