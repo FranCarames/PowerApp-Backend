@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { MusclesService } from './muscles.service';
 import { Response } from 'express';
-import { ParameterIdDto } from 'src/dtos/parameter_id.dto';
+import { ParameterIdDto } from '../dtos/parameter_id.dto';
 
 @Controller('muscles')
 export class MusclesController {

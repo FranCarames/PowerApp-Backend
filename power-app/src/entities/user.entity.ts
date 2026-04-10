@@ -1,60 +1,73 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { BodyWeight } from './body_weight.entity';
-import { FavoriteExercise } from './favorite_exercise.entity';
-import { UserCron } from './user_cron.entity';
-import { UserRM } from './user_rm.entity';
+import { BodyWeight } from './ParaValidar/body_weight.entity';
+import { FavoriteExercise } from './ParaValidar/favorite_exercise.entity';
+import { UserCron } from './ParaValidar/user_cron.entity';
+import { UserRM } from './ParaValidar/user_rm.entity';
 
-@Entity()
+export enum UserRole {
+    user  = 'user',
+    admin = 'admin',
+}
+
+@Entity('User')
 export class User {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column({ length: 50, nullable: false })
-    first_name: string;
+    first_name!: string;
 
     @Column({ length: 50, nullable: false })
-    last_name: string;
+    last_name!: string;
 
     @Column({ length: 50, nullable: false, unique: true })
-    email: string;
+    email!: string;
 
-    @Column({ nullable: false })
-    email_verified: boolean;
+    @Column({ nullable: false, default: false })
+    email_verified!: boolean;
 
     @Column({ length: 255, nullable: false })
-    password: string;
+    password!: string;
 
-    @Column({ length: 20, nullable: false })
-    role: string;
+    @Column({ length: 255, nullable: true })
+    temp_password!: string;
+
+    @Column({
+        type: 'enum',
+        enum: UserRole,
+        default: UserRole.user,
+        nullable: false
+    })
+    role!: UserRole;
 
     @Column({ length: 150, nullable: true })
-    profile_picture: string;
+    profile_picture?: string;
 
     @Column({ length: 10, nullable: true })
-    phone_prefix: string;
+    phone_prefix?: string;
 
     @Column({ length: 20, nullable: true })
-    phone_number: string;
+    phone_number?: string;
 
-    @Column({ nullable: false })
-    phone_verified: boolean;
+    @Column({ nullable: false, default: false })
+    phone_verified!: boolean;
 
-    @Column({ type: 'datetime', nullable: false })
-    created_at: Date;
+    @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+    created_at!: Date;
 
-    @Column({ type: 'datetime', nullable: false })
-    updated_at: Date;
+    @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+    updated_at!: Date;
 
     // JOIN RELATIONSHIPS
-    @OneToMany(() => BodyWeight, bodyWeight => bodyWeight.user)
-    bodyWeights: BodyWeight[];
+    // @OneToMany(() => BodyWeight, bodyWeight => bodyWeight.user)
+    // bodyWeights: BodyWeight[];
 
-    @OneToMany(() => FavoriteExercise, favoriteExercise => favoriteExercise.user)
-    favoriteExercises: FavoriteExercise[];
+    // @OneToMany(() => FavoriteExercise, favoriteExercise => favoriteExercise.user)
+    // favoriteExercises: FavoriteExercise[];
 
-    @OneToMany(() => UserCron, userCron => userCron.user)
-    userCrons: UserCron[];
+    // @OneToMany(() => UserCron, userCron => userCron.user)
+    // userCrons: UserCron[];
 
-    @OneToMany(() => UserRM, userRM => userRM.user)
-    userRMs: UserRM[];
+    // @OneToMany(() => UserRM, userRM => userRM.user)
+    // userRMs: UserRM[];
 }

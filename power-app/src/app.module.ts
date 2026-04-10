@@ -3,16 +3,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 // Entities imports
-import { BodyWeight } from './entities/body_weight.entity';
-import { ExerciseCategory } from './entities/exercise_category.entity';
+import { BodyWeight } from './entities/ParaValidar/body_weight.entity';
+import { ExerciseCategory } from './entities/ParaValidar/exercise_category.entity';
 import { Exercise } from './entities/exercise.entity';
-import { ExercisedMuscle } from './entities/exercised_muscle.entity';
-import { FavoriteExercise } from './entities/favorite_exercise.entity';
-import { MuscleGroup } from './entities/muscle_group.entity';
-import { Muscle } from './entities/muscle.entity';
-import { SystemCron } from './entities/system_cron.entity';
-import { UserCron } from './entities/user_cron.entity';
-import { UserRM } from './entities/user_rm.entity';
+import { ExercisedMuscle } from './entities/ParaValidar/exercised_muscle.entity';
+import { FavoriteExercise } from './entities/ParaValidar/favorite_exercise.entity';
+import { MuscleGroup } from './entities/ParaValidar/muscle_group.entity';
+import { Muscle } from './entities/ParaValidar/muscle.entity';
+import { SystemCron } from './entities/ParaValidar/system_cron.entity';
+import { UserCron } from './entities/ParaValidar/user_cron.entity';
+import { UserRM } from './entities/ParaValidar/user_rm.entity';
 import { User } from './entities/user.entity';
 
 import { AuthenticationModule } from './authentication/authetication.module';
@@ -26,7 +26,6 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     TypeOrmModule.forRootAsync({
-      name: 'postgresql',
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
@@ -36,6 +35,7 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
         password: configService.get<string>('POSTGRES_PASSWORD'),
         database: configService.get<string>('POSTGRES_DB'),
         // entities: [Estudiante, Libro, Reserva],
+        entities: [User],
         ssl: {
           rejectUnauthorized: false,
         },
@@ -45,23 +45,6 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
       }),
       inject: [ConfigService],
     }),
-
-
-    // TypeOrmModule.forRootAsync({
-    //   name: 'postgresql',
-    //   imports: [ConfigModule],
-    //   useFactory: (configService: ConfigService) => ({
-    //     type: 'postgres',
-    //     host: "postgresql://power_app_user:bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul@dpg-d7bf5geuk2gs738pg1cg-a/powerappdb",
-    //     port: 5432,
-    //     username: "power_app_user",
-    //     password: "bXeRFcp8tYKWY8ZyEFQJ43vYA9cajrul",
-    //     database: "powerappdb",
-    //     // entities: [Estudiante, Libro, Reserva],
-    //     synchronize: true,
-    //   }),
-    //   inject: [ConfigService],
-    // }),
     // TypeOrmModule.forRootAsync({
     //   imports: [ConfigModule],
     //   useFactory: (configService: ConfigService) => ({
@@ -84,7 +67,7 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
     // AuthenticationModule, 
     // ExerciseModule, 
     // UserRmModule, 
-    // UsersModule, 
+    UsersModule, 
     // MusclesModule, 
     // MuscleGroupsModule
   ],

@@ -3,7 +3,7 @@ import { Response } from 'express';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { MuscleGroup } from 'src/entities/muscle_group.entity';
+import { MuscleGroup } from '../entities/ParaValidar/muscle_group.entity';
 
 @Injectable()
 export class MuscleGroupsService {

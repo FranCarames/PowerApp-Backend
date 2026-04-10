@@ -9,8 +9,9 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { Response } from 'express';
-// import { ParameterIdDto } from 'src/Dtos/parameter_id.dto';
-// import { CreateEstudianteDto } from 'src/Dtos/Estudiantes/create_estudiante.dto';
+import { ParameterIdDto } from '../dtos/parameter_id.dto';
+import { CreateUserDto } from '../dtos/user/create_user.dto';
+import { LoginUserDto } from '../dtos/user/login_user.dto';
 // import { EditEstudianteDto } from 'src/Dtos/Estudiantes/edit_estudiante.dto';
 
 @Controller('users')
@@ -24,35 +25,28 @@ export class UsersController {
     ) {
         this.usersService.getAllUsers(res);
     }
+
+    @Get('/get/:id')
+    async getUserId(@Param() idUser: ParameterIdDto, @Res() res: Response) {
+        this.usersService.getUserId(idUser.id, res);
+    }
+
+    @Post('/register')
+    async createUser(
+        @Body() createUserDto: CreateUserDto,
+        @Res() res: Response,
+    ) {
+        this.usersService.createUser(createUserDto, res);
+    }
+
+    @Post('/login')
+    async loginUser(
+        @Body() loginUserDto: LoginUserDto,
+        @Res() res: Response,
+    ) {
+        this.usersService.loginUser(loginUserDto, res);
+    }
 }
-
-
-
-// import { SqlEstudianteService } from './sql_estudiante.service';
-
-
-// @Controller('mysql/estudiante')
-// export class SqlEstudianteController {
-
-    
-
-//     @Get('/get/:id')
-//     async getEstudianteId(@Param() idEstudiante: ParameterIdDto, @Res() res: Response) {
-//         this.sqlEstudianteService.getEstudianteId(idEstudiante.id, res);
-//     }
-
-//     @Get('/get/:id/reservas')
-//     async getEstudianteIdReservas(@Param() idEstudiante: ParameterIdDto, @Res() res: Response) {
-//         this.sqlEstudianteService.getEstudianteIdReservas(idEstudiante.id, res);
-//     }
-
-//     @Post('/create')
-//     async createEstudiante(
-//         @Body() createEstudianteDto: CreateEstudianteDto,
-//         @Res() res: Response,
-//     ) {
-//         this.sqlEstudianteService.createEstudiante(createEstudianteDto, res);
-//     }
 
 //     @Post('/edit')
 //     async editEstudiante(
@@ -69,4 +63,3 @@ export class UsersController {
 //     ) {
 //         this.sqlEstudianteService.deleteEstudiante(idEstudiante.id, res);
 //     }
-// }

@@ -3,15 +3,18 @@ import { Response } from 'express';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-// import { CreateEstudianteDto } from 'src/Dtos/Estudiantes/create_estudiante.dto';
+import { CreateUserDto } from '../dtos/user/create_user.dto';
+import { LoginUserDto } from '../dtos/user/login_user.dto';
 // import { EditEstudianteDto } from 'src/Dtos/Estudiantes/edit_estudiante.dto';
-import { User } from 'src/entities/user.entity';
+import { User } from '../entities/user.entity';
+import { AuthService } from '../authentication/auth.service';
 
 @Injectable()
 export class UsersService {
     constructor(
         @InjectRepository(User)
         private usersRepository: Repository<User>,
+        private authService: AuthService
     ) {
     }
 
@@ -26,6 +29,65 @@ export class UsersService {
             res.status(500).send({ error: 'Error al obtener los usuarios' });
         }
     }
+
+    async getUserId(
+        idUser: string,
+        res: Response
+    ) {
+        try {
+            const user = await this.usersRepository.findOne({ where: { id: idUser } });
+            
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+            res.status(200).send(user);
+        } catch (error) {
+            console.error(error);
+            res.status(404).send({ error: 'Error al obtener el usuario' });
+        }
+    }
+
+    async createUser(
+        createUserDto: CreateUserDto,
+        res: Response
+    ) {
+        const userEmailActivo = await this.usersRepository.findOne( { 
+            where: { email: createUserDto.email }
+        });
+        
+        if (userEmailActivo) {
+            res.status(409).send({ error: 'Ya existe un usuario con ese email' });
+        } else {
+            const hashedPassword = await this.authService.hashPassword(createUserDto.password);
+
+            const newUser = this.usersRepository.create(createUserDto);
+
+            newUser.password = hashedPassword;
+
+            await this.usersRepository.save(newUser);
+
+            res.status(201).send(newUser);
+        }
+    }
+
+    async loginUser(
+        loginUserDto: LoginUserDto, 
+        res: Response
+    ) {
+        const authenticatedUser = await this.authService.authenticateUser(loginUserDto);
+
+        if (authenticatedUser) {
+            res.status(201).send(authenticatedUser);
+        }else {
+            const authenticatedTempUser = await this.authService.authenticateTemporaryPassword(loginUserDto);
+            
+            if (authenticatedTempUser) {
+                res.status(201).send(authenticatedTempUser);
+            } else {
+                res.status(401).send({ error: 'Credenciales inválidas' });
+            }
+        }
+    }
 }
 
 
@@ -35,25 +97,6 @@ export class UsersService {
 // export class SqlEstudianteService {
 
     
-
-    
-
-//     async getEstudianteId(
-//         idEstudiante: number,
-//         res: Response
-//     ) {
-//         try {
-//             const estudiante = await this.estudiantesRepository.findOne({ where: { id: idEstudiante } });
-            
-//             if (!estudiante) {
-//                 return res.status(404).send({ error: 'Estudiante no encontrado' });
-//             }
-//             res.status(200).send(estudiante);
-//         } catch (error) {
-//             console.error(error);
-//             res.status(404).send({ error: 'Error al obtener el estudiante' });
-//         }
-//     }
 
 //     async getEstudianteIdReservas(
 //         idEstudiante: number,
@@ -91,32 +134,7 @@ export class UsersService {
 //         }
 //     }
 
-//     async createEstudiante(
-//         createEstudianteDto: CreateEstudianteDto,
-//         res: Response
-//     ) {
-//         const estudianteMatriculaActiva = await this.estudiantesRepository.findOne( { 
-//             where: { matricula: createEstudianteDto.matricula }
-//         });
-
-//         const estudianteEmailActiva = await this.estudiantesRepository.findOne( { 
-//             where: { email: createEstudianteDto.email }
-//         });
-
-//         if (estudianteMatriculaActiva) {
-//             res.status(409).send({ error: 'Ya existe un estudiante con esa matrícula' });
-//         } else if (estudianteEmailActiva) {
-//             res.status(409).send({ error: 'Ya existe un estudiante con ese email' });
-//         } else {
-//             const newEstudiante = this.estudiantesRepository.create(createEstudianteDto);
-
-//             newEstudiante.fecha_inscripcion = createEstudianteDto.fecha_inscripcion || new Date();
-
-//             await this.estudiantesRepository.save(newEstudiante);
-
-//             res.status(201).send(newEstudiante);
-//         }
-//     }
+    
 
 //     async editEstudiante(
 //         editEstudianteDto: EditEstudianteDto,
