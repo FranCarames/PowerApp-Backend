@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { JwtModule } from '@nestjs/jwt/dist/jwt.module';
 
 // Entities imports
 import { User } from './entities/user.entity';
@@ -12,13 +13,14 @@ import { Muscle } from './entities/muscle.entity';
 import { SystemCron } from './entities/ParaValidar/system_cron.entity';
 import { UserCron } from './entities/ParaValidar/user_cron.entity';
 
-
 import { UsersModule } from './users/users.module';
-import { AuthenticationModule } from './authentication/authetication.module';
-import { ExerciseModule } from './exercise/exercise.module';
-import { UserRmModule } from './user_rm/user_rm.module';
+import { MembershipModule } from './membership/membership.module';
+import { CoachModule } from './coach/coach.module';
 import { MusclesModule } from './muscles/muscles.module';
-import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
+import { ExerciseModule } from './exercise/exercise.module';
+import { PlanificationModule } from './planification/planification.module';
+import { RoutineModule } from './routine/routine.module';
+import { UserRmModule } from './user_rm/user_rm.module';
 
 @Module({
   imports: [
@@ -42,13 +44,25 @@ import { MuscleGroupsModule } from './muscle_groups/muscle_groups.module';
       }),
       inject: [ConfigService],
     }),
+    JwtModule.registerAsync({
+      global: true,                            
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { 
+          expiresIn: '365d',
+        },
+      }),
+      inject: [ConfigService],
+    }),
     UsersModule, 
-    UserRmModule,
-    MusclesModule, 
-    MuscleGroupsModule
-    // ExerciseModule,  
-    
-    
+    MembershipModule,
+    CoachModule,
+    MusclesModule,
+    ExerciseModule,
+    PlanificationModule,
+    RoutineModule,
+    UserRmModule    
   ],
   controllers: [],
   providers: [],

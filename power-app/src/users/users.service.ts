@@ -7,6 +7,7 @@ import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
 // import { EditEstudianteDto } from 'src/Dtos/Estudiantes/edit_estudiante.dto';
 import { User } from '../entities/user.entity';
+import { UserResponse } from '../dtos/responses/user_response.dto';
 import { AuthService } from '../authentication/auth.service';
 
 @Injectable()
@@ -41,6 +42,11 @@ export class UsersService {
                 return res.status(404).send({ error: 'Usuario no encontrado' });
             }
             res.status(200).send(user);
+
+            // const userResponse = new UserResponse(user);
+
+            // res.status(200).send(userResponse);
+
         } catch (error) {
             console.error(error);
             res.status(404).send({ error: 'Error al obtener el usuario' });
@@ -66,7 +72,12 @@ export class UsersService {
 
             await this.usersRepository.save(newUser);
 
-            res.status(201).send(newUser);
+            const userResponse = new UserResponse(newUser);
+
+            const accessToken = await this.authService.generateJwtToken(newUser.id);
+            userResponse.addAccessToken(accessToken);
+
+            res.status(201).send(userResponse);
         }
     }
 
@@ -77,12 +88,22 @@ export class UsersService {
         const authenticatedUser = await this.authService.authenticateUser(loginUserDto);
 
         if (authenticatedUser) {
-            res.status(201).send(authenticatedUser);
-        }else {
+                const userResponse = new UserResponse(authenticatedUser);
+
+                const accessToken = await this.authService.generateJwtToken(authenticatedUser.id);
+                userResponse.addAccessToken(accessToken);
+
+                res.status(201).send(userResponse);
+        } else {
             const authenticatedTempUser = await this.authService.authenticateTemporaryPassword(loginUserDto);
             
             if (authenticatedTempUser) {
-                res.status(201).send(authenticatedTempUser);
+                const userResponse = new UserResponse(authenticatedTempUser);
+
+                const accessToken = await this.authService.generateJwtToken(authenticatedTempUser.id);
+                userResponse.addAccessToken(accessToken);
+
+                res.status(201).send(userResponse);
             } else {
                 res.status(401).send({ error: 'Credenciales inválidas' });
             }

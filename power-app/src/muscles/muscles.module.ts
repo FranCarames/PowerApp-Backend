@@ -3,9 +3,10 @@ import { MusclesController } from './muscles.controller';
 import { MusclesService } from './muscles.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Muscle } from '../entities/muscle.entity';
+import { MuscleGroup } from '../entities/muscle_group.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Muscle])],
+  imports: [TypeOrmModule.forFeature([Muscle, MuscleGroup])],
   controllers: [MusclesController],
   providers: [MusclesService]
 })

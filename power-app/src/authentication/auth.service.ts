@@ -1,24 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import * as jwt from 'jsonwebtoken';
+// import * as jwt from 'jsonwebtoken';
 // import { jwtConstants } from 'config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { User } from '../entities/user.entity';
 import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt/dist/jwt.service';
 
 @Injectable()
 export class AuthService {
     constructor(
         @InjectRepository(User)
-        private usersRepository: Repository<User>
+        private usersRepository: Repository<User>,
+        private readonly jwtService: JwtService,
     ) {
     }
 
-//   async generateJwtToken(userId: string): Promise<string> {
-//     const payload = { sub: userId };
-//     return jwt.sign(payload, jwtConstants.secret, { expiresIn: '7d' });
-//   }
+  async generateJwtToken(userId: string): Promise<string> {
+    const payload = { sub: userId };
+    // return jwt.sign(payload, jwtConstants.secret, { expiresIn: '7d' });
+    return this.jwtService.sign(payload)
+    
+  }
 
 //   async verifyJwtToken(token: string): Promise<string | null> {
 //     try {
