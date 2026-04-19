@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsEmail, IsString, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class AuthenticableDTO {
     @IsNotEmpty()

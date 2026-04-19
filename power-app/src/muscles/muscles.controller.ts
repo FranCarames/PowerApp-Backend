@@ -11,6 +11,7 @@ import { MusclesService } from './muscles.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { CreateMuscleGroupDto } from '../dtos/muscle_groups/create_muscle_group.dto';
+import { EditMuscleGroupDto } from '../dtos/muscle_groups/edit_muscle_group.dto';
 
 @Controller('muscles')
 export class MusclesController {
@@ -28,23 +29,40 @@ export class MusclesController {
         this.musclesService.getMuscleById(muscleId.id, res);
     }
 
-    @Get('muscle-groups/all')
+    @Get('mg/all')
     async getAllMuscleGroups(
         @Res() res: Response
     ) {
         this.musclesService.getAllMuscleGroups(res);
     }
 
-    @Get('muscle-groups/get/:id')
+    @Get('mg/get/:id')
     async getMuscleGroupId(@Param() idMuscleGroup: ParameterIdDto, @Res() res: Response) {
         this.musclesService.getMuscleGroupId(idMuscleGroup.id, res);
     }
 
-    @Post('muscle-groups/create')
+    @Post('mg/create')
     async createMuscleGroup(
         @Body() createMuscleGroupDto: CreateMuscleGroupDto,
         @Res() res: Response,
     ) {
         this.musclesService.createMuscleGroup(createMuscleGroupDto, res);
+    }
+
+    @Post('mg/edit/:id')
+    async editMuscleGroup(
+        @Param() idMuscleGroup: ParameterIdDto,
+        @Body() editMuscleGroupDto: EditMuscleGroupDto,
+        @Res() res: Response,
+    ) {
+        this.musclesService.editMuscleGroup(idMuscleGroup.id, editMuscleGroupDto, res);
+    }
+
+    @Delete('mg/:id')
+    async deleteMuscleGroup(
+        @Param() idMuscleGroup: ParameterIdDto,
+        @Res() res: Response,
+    ) {
+        this.musclesService.deleteMuscleGroup(idMuscleGroup.id, res);
     }
 }

@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { Muscle } from '../entities/muscle.entity';
 import { MuscleGroup } from '../entities/muscle_group.entity';
 import { CreateMuscleGroupDto } from '../dtos/muscle_groups/create_muscle_group.dto';
+import { EditMuscleGroupDto } from '../dtos/muscle_groups/edit_muscle_group.dto';
 
 @Injectable()
 export class MusclesService {
@@ -103,6 +104,47 @@ export class MusclesService {
             res.status(500).send({ error: 'Error al crear el grupo muscular' });
         }
     }
+
+    async editMuscleGroup(
+        idMuscleGroup: string,
+        editMuscleGroupDto: EditMuscleGroupDto,
+        res: Response
+    ) {
+        try {
+            const muscleGroup = await this.muscleGroupsRepository.findOne({ where: { id: idMuscleGroup } });
+            if (!muscleGroup) {
+                return res.status(404).send({ error: 'Grupo muscular no encontrado' });
+            }
+
+            muscleGroup.name = editMuscleGroupDto.name;
+            muscleGroup.image_url = editMuscleGroupDto.image_url;
+            muscleGroup.preview_image = editMuscleGroupDto.preview_image;
+            muscleGroup.updated_at = new Date();
+
+            const savedMuscleGroup = await this.muscleGroupsRepository.save(muscleGroup);
+            res.status(201).send(savedMuscleGroup);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al crear el grupo muscular' });
+        }
+    }
+    
+    async deleteMuscleGroup(
+        muscleGroupId: string,
+        res: Response
+    ) {
+        try {
+            const muscleGroup = await this.muscleGroupsRepository.findOne({ where: { id: muscleGroupId } });
+            if (!muscleGroup) {
+                return res.status(404).send({ error: 'Grupo muscular no encontrado' });
+            }
+            await this.muscleGroupsRepository.remove(muscleGroup);
+            res.status(200).send({ message: 'Grupo muscular eliminado correctamente' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al eliminar el grupo muscular' });
+        }
+    }   
 }
 
 
