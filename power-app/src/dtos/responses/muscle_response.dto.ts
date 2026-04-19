@@ -8,7 +8,7 @@ export class MuscleResponse {
     id!: string;
     muscle_group_id!: string;
     name!: string;
-    description!: string;
+    description?: string;
     image_url?: string;
     preview_image?: string;
     created_at!: Date;

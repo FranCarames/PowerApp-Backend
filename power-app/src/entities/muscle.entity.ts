@@ -14,7 +14,7 @@ export class Muscle {
     name!: string;
 
     @Column({ type: 'text', nullable: true })
-    description!: string;
+    description?: string;
 
     @Column({ length: 150, nullable: true })
     image_url?: string;
