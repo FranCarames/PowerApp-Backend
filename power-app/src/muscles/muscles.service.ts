@@ -24,7 +24,20 @@ export class MusclesService {
         res: Response
     ) {
         try {
-            const muscles = await this.muscleRepository.find();
+            const muscles = await this.muscleRepository.find({
+                relations: ['muscle_group'],
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    image_url: true,
+                    preview_image: true,
+                    muscle_group: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            });
 
             res.status(200).send(muscles);
         } catch (error) {
@@ -138,7 +151,21 @@ export class MusclesService {
         res: Response
     ) {
         try {
-            const muscleGroups = await this.muscleGroupsRepository.find();
+            const muscleGroups = await this.muscleGroupsRepository.find({
+                relations: ['muscles'],
+                select: {
+                    id: true,
+                    name: true,
+                    image_url: true,
+                    preview_image: true,
+                    muscles: {
+                        id: true,
+                        name: true,
+                        description: true
+                    },
+                },
+            });
+
             res.status(200).send(muscleGroups);
         } catch (error) {
             console.error(error);
@@ -151,7 +178,21 @@ export class MusclesService {
         res: Response
     ) {
         try {
-            const muscleGroup = await this.muscleGroupsRepository.findOne({ where: { id: idMuscleGroup } });
+            const muscleGroup = await this.muscleGroupsRepository.findOne({ 
+                where: { id: idMuscleGroup },
+                relations: ['muscles'],
+                select: {
+                    id: true,
+                    name: true,
+                    image_url: true,
+                    preview_image: true,
+                    muscles: {
+                        id: true,
+                        name: true,
+                        description: true
+                    },
+                },
+            });
 
             if (!muscleGroup) {
                 throw new Error('Grupo muscular no encontrado');
