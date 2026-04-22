@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThanOrEqual } from 'typeorm';
 import { Membership } from '../entities/membership.entity';
 import { MembershipPayment } from '../entities/membership_payment.entity';
 import { User } from '../entities/user.entity';
@@ -20,6 +20,12 @@ export class MembershipService {
         @InjectRepository(User)
         private userRepository: Repository<User>,
     ) {
+        const cron = require('node-cron');
+
+        cron.schedule('00 3 * * *', () => { // Every day at 03:00:00 of Arg (UTC-3), 00:00 UTC-0
+            this.updateFinishedMembershipPayments();
+            console.log('Updated finished membership payments');
+        });
     }
 
     async getAllMemberships(
@@ -99,33 +105,24 @@ export class MembershipService {
         idUser: string,
         res: Response
     ) {
-        // try {
-        //     const user = await this.userRepository.findOne({ 
-        //         where: { id: idUser }, relations: ['membership_payment'] });
+        try {
+            const user = await this.userRepository.findOne({ 
+                where: { id: idUser }, relations: ['userMembershipPayments'] });
 
-        //     if (!user) {
-        //         return res.status(404).send({ error: 'Usuario no encontrado' });
-        //     }
-        //     res.status(200).send(user.userMembershipPayments);
-        // //     const membership = await this.membershipRepository.findOne({ where: { id: idMembership } });
-            
-        // //     if (!membership) {
-        // //         return res.status(404).send({ error: 'Membresía no encontrada' });
-        // //     }
-        // //     res.status(200).send(membership);
-        // } catch (error) {
-        //     console.error(error);
-            // res.status(404).send({ error: 'Error al obtener las membresías del usuario' });
-        // }
-        res.status(404).send({ error: 'Todavia no lo codeaste campeon' });
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+            res.status(200).send(user.userMembershipPayments);
+        } catch (error) {
+            console.error(error);
+            res.status(404).send({ error: 'Error al obtener las membresías del usuario' });
+        }
     }
 
     async registerMembershipPayment(
         registerMembershipPaymentDto: RegisterMembershipPaymentDto,
         res: Response
     ) {
-        res.status(404).send({ error: 'Todavia no lo probaste campeon' });
-
         try {
             const user = await this.userRepository.findOne({ where: { id: registerMembershipPaymentDto.user_id } });
 
@@ -164,5 +161,14 @@ export class MembershipService {
         expiration.setHours(23, 59, 59, 999);
     
         return expiration;
+    }
+
+    async updateFinishedMembershipPayments() {
+        const currentDate = new Date();
+
+        await this.membershipPaymentRepository.update(
+            { active: true, expired_at: LessThanOrEqual(currentDate) },
+            { active: false }
+        );
     }
 }

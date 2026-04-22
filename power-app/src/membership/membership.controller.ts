@@ -47,7 +47,15 @@ export class MembershipController {
         this.membershipService.editMembership(idMembership.id, editMembershipDto, res);
     }
 
-    @Post('register-payment')
+    @Get('payment/user/:id')
+    async getUserMembershipPayments(
+        @Param() userId: ParameterIdDto,
+        @Res() res: Response,
+    ) {
+        this.membershipService.getUserMembershipPayments(userId.id, res);
+    }
+
+    @Post('payment/register')
     async registerMembershipPayment(
         @Body() registerMembershipPaymentDto: RegisterMembershipPaymentDto,
         @Res() res: Response,
