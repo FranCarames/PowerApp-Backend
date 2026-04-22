@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { FavoriteExercise } from './ParaValidar/favorite_exercise.entity';
 import { UserCron } from './ParaValidar/user_cron.entity';
 import { UserRM } from './user_rm.entity';
+import { MembershipPayment } from './membership_payment.entity';
 
 export enum UserRole {
     user  = 'user',
@@ -60,4 +61,7 @@ export class User {
     // JOIN RELATIONSHIPS
     @OneToMany(() => UserRM, userRM => userRM.user)
     userRMs!: UserRM[];
+
+    @OneToMany(() => MembershipPayment, membershipPayment => membershipPayment.user)
+    userMembershipPayments!: MembershipPayment[];
 }

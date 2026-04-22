@@ -7,9 +7,6 @@ export class Exercise {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
 
-    @Column({ type: 'uuid', nullable: true })
-    category_id?: string;
-
     @Column({ length: 50, nullable: false })
     name!: string;
 

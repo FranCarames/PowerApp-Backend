@@ -9,6 +9,9 @@ import {
   Res,
 } from '@nestjs/common';
 import { ExerciseService } from './exercise.service';
+import { Response } from 'express';
+import { ParameterIdDto } from '../dtos/parameter_id.dto';
+import { CreateExerciseDto } from '../dtos/exercise/create_exercise.dto';
 
 @Controller('exercise')
 export class ExerciseController {
@@ -19,34 +22,42 @@ export class ExerciseController {
         return "Tu mama me mama la mema"
     }
 
-    // @Post('create')
-    // async createExercise(
-    //   @Headers() header: AuthenticableDTO,
-    //   @Body() userReview: AddEditUserReviewDto,
-    //   @Res() res: Response,
+    // @Get('/all')
+    // async getAllMuscles(
+    //     @Res() res: Response
     // ) {
-    //   const accessToken = header.authorization;
-
-    //   if (accessToken) {
-    //     this.reviewService.addEditUserReview(accessToken, userReview, res);
-    //   } else {
-    //     res.status(401).send(getErrorObject(ErrorCodes.noAccessTokenInput));
-    //   }
+    //     this.musclesService.getAllMuscles(res);
     // }
-//     @Get('user')
-//   async getUserReviews(
-//     @Headers() header: AuthenticableDTO,
-//     @Query() parameters: GetUserReviewDto,
-//     @Res() res: Response,
-//   ) {
-//     const accessToken = header.authorization;
 
-//     if (accessToken) {
-//       this.reviewService.getUserReviews(accessToken, parameters, res);
-//     } else {
-//       res.status(401).send(getErrorObject(ErrorCodes.noAccessTokenInput));
-//     }
-//   }
+    // @Get('/get/:id')
+    // async getMuscleById(@Param() muscleId: ParameterIdDto, @Res() res: Response) {
+    //     this.musclesService.getMuscleById(muscleId.id, res);
+    // }
+
+    @Post('create')
+    async createExercise(
+        @Body() createExerciseDto: CreateExerciseDto,
+        @Res() res: Response,
+    ) {
+        this.exerciseService.createExercise(createExerciseDto, res);
+    }
+
+    // @Post('edit/:id')
+    // async editMuscle(
+    //     @Param() idMuscle: ParameterIdDto,
+    //     @Body() editMuscleDto: EditMuscleDto,
+    //     @Res() res: Response,
+    // ) {
+    //     this.musclesService.editMuscle(idMuscle.id, editMuscleDto, res);
+    // }
+
+    // @Delete(':id')
+    // async deleteMuscle(
+    //     @Param() idMuscle: ParameterIdDto,
+    //     @Res() res: Response,
+    // ) {
+    //     this.musclesService.deleteMuscle(idMuscle.id, res);
+    // }
 }
 
 
