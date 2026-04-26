@@ -36,6 +36,7 @@ export class Exercise {
 
     // JOIN RELATIONSHIPS
     @OneToMany(() => UserRM, userRM => userRM.exercise)
+    // TODO: revisar que no tiene declarada el @JoinColumn({ name: 'exercise_id' })
     userRMs!: UserRM[];
 
     @OneToMany(() => ExercisedMuscle, exercisedMuscle => exercisedMuscle.exercise, { 

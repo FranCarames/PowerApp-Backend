@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Exercise } from './exercise.entity';
 import { Muscle } from './muscle.entity';
 
@@ -21,8 +21,10 @@ export class ExercisedMuscle {
 
     // JOIN RELATIONSHIPS
     @ManyToOne(() => Exercise, exercise => exercise.exercisedMuscles, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'exercise_id' })
     exercise!: Exercise;
 
     @ManyToOne(() => Muscle, muscle => muscle.exercisedMuscles, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'muscle_id' })
     muscle!: Muscle;
 }

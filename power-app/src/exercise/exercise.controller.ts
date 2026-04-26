@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Param,
   Delete,
   Body,
   Headers,
@@ -12,27 +13,18 @@ import { ExerciseService } from './exercise.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { CreateExerciseDto } from '../dtos/exercise/create_exercise.dto';
+import { EditExerciseDto } from '../dtos/exercise/edit_exercise.dto';
 
 @Controller('exercise')
 export class ExerciseController {
     constructor(private exerciseService: ExerciseService) {}
 
-    @Get('all')
-    async getAllExercises() {
-        return "Tu mama me mama la mema"
+    @Get('/all')
+    async getAllExercises(
+        @Res() res: Response
+    ) {
+        this.exerciseService.getAllExercises(res);
     }
-
-    // @Get('/all')
-    // async getAllMuscles(
-    //     @Res() res: Response
-    // ) {
-    //     this.musclesService.getAllMuscles(res);
-    // }
-
-    // @Get('/get/:id')
-    // async getMuscleById(@Param() muscleId: ParameterIdDto, @Res() res: Response) {
-    //     this.musclesService.getMuscleById(muscleId.id, res);
-    // }
 
     @Post('create')
     async createExercise(
@@ -42,22 +34,29 @@ export class ExerciseController {
         this.exerciseService.createExercise(createExerciseDto, res);
     }
 
-    // @Post('edit/:id')
-    // async editMuscle(
-    //     @Param() idMuscle: ParameterIdDto,
-    //     @Body() editMuscleDto: EditMuscleDto,
-    //     @Res() res: Response,
-    // ) {
-    //     this.musclesService.editMuscle(idMuscle.id, editMuscleDto, res);
-    // }
+    @Post('edit/:id')
+    async editExercise(
+        @Param() idExercise: ParameterIdDto,
+        @Body() editExerciseDto: EditExerciseDto,
+        @Res() res: Response,
+    ) {
+        this.exerciseService.editExercise(idExercise.id, editExerciseDto, res);
+    }
 
-    // @Delete(':id')
-    // async deleteMuscle(
-    //     @Param() idMuscle: ParameterIdDto,
-    //     @Res() res: Response,
-    // ) {
-    //     this.musclesService.deleteMuscle(idMuscle.id, res);
-    // }
+    @Delete(':id')
+    async deleteExercise(
+        @Param() idMuscle: ParameterIdDto,
+        @Res() res: Response,
+    ) {
+        this.exerciseService.deleteExercise(idMuscle.id, res);
+    }
+
+    @Get('ExMuscles/all')
+    async getAllExercisedMuscles(
+        @Res() res: Response
+    ) {
+        this.exerciseService.getAllExercisedMuscles(res);
+    }
 }
 
 

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Muscle } from '../entities/muscle.entity';
 import { MuscleGroup } from '../entities/muscle_group.entity';
 import { CreateMuscleDto } from '../dtos/muscles/create_muscle.dto';
@@ -77,6 +77,10 @@ export class MusclesService {
         }
     }
 
+    async getMusclesByIds(ids: string[]): Promise<Muscle[]> {
+        return this.muscleRepository.findBy({ id: In(ids) });
+    }
+
     async createMuscle(
         createMuscleDto: CreateMuscleDto,
         res: Response
@@ -126,7 +130,7 @@ export class MusclesService {
             res.status(201).send(savedMuscle);
         } catch (error) {
             console.error(error);
-            res.status(500).send({ error: 'Error al crear el grupo muscular' });
+            res.status(500).send({ error: 'Error al crear el músculo' });
         }
     }
 
@@ -238,7 +242,7 @@ export class MusclesService {
             res.status(201).send(savedMuscleGroup);
         } catch (error) {
             console.error(error);
-            res.status(500).send({ error: 'Error al crear el grupo muscular' });
+            res.status(500).send({ error: 'Error al editar el grupo muscular' });
         }
     }
     
