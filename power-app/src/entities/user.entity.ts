@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, OneToOne } from 'typeorm';
+import { Coach } from './coach.entity';
 import { FavoriteExercise } from './ParaValidar/favorite_exercise.entity';
 import { UserCron } from './ParaValidar/user_cron.entity';
 import { UserRM } from './user_rm.entity';
@@ -6,6 +7,7 @@ import { MembershipPayment } from './membership_payment.entity';
 
 export enum UserRole {
     user  = 'user',
+    coach = 'coach',
     admin = 'admin',
 }
 
@@ -64,4 +66,7 @@ export class User {
 
     @OneToMany(() => MembershipPayment, membershipPayment => membershipPayment.user)
     userMembershipPayments!: MembershipPayment[];
+
+    @OneToOne(() => Coach, coach => coach.user, { nullable: true })
+    coach?: Coach;
 }

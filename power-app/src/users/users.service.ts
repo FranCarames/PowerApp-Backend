@@ -5,7 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
-import { User } from '../entities/user.entity';
+import { User, UserRole } from '../entities/user.entity';
 import { UserResponse } from '../dtos/responses/user_response.dto';
 import { AuthService } from '../authentication/auth.service';
 
@@ -30,6 +30,21 @@ export class UsersService {
         }
     }
 
+    async getUserById(idUser: string): Promise<User | null> {
+        return this.usersRepository.findOne({ where: { id: idUser } });
+    }
+
+    async updateUserRole(idUser: string, newRole: UserRole): Promise<User | null> {
+        const user = await this.usersRepository.findOne({ where: { id: idUser } });
+
+        if (user) {
+            user.role = newRole;
+            return await this.usersRepository.save(user);
+        } else {
+            return null;
+        }
+    }
+
     async getUserId(
         idUser: string,
         res: Response
@@ -41,11 +56,6 @@ export class UsersService {
                 return res.status(404).send({ error: 'Usuario no encontrado' });
             }
             res.status(200).send(user);
-
-            // const userResponse = new UserResponse(user);
-
-            // res.status(200).send(userResponse);
-
         } catch (error) {
             console.error(error);
             res.status(404).send({ error: 'Error al obtener el usuario' });
@@ -109,87 +119,3 @@ export class UsersService {
         }
     }
 }
-
-
-
-
-// @Injectable()
-// export class SqlEstudianteService {
-
-    
-
-//     async getEstudianteIdReservas(
-//         idEstudiante: number,
-//         res: Response
-//     ) {
-//         try {
-//             const estudiante = await this.estudiantesRepository.findOne({
-//                 where: { id: idEstudiante },
-//                 relations: ['reservas', 'reservas.libro'],
-//                 select: {
-//                     id: true,
-//                     nombre: true,
-//                     apellido: true,
-//                     email: true,
-//                     matricula: true,
-//                     carrera: true,
-//                     fecha_inscripcion: true,
-//                     reservas: {
-//                         id: true,
-//                         fecha_inicio: true,
-//                         fecha_fin: true,
-//                         fecha_devolucion: true,
-//                         libro: { id: true, nombre: true, nombre_autor: true, apellido_autor: true, fecha_publicacion: true }
-//                     },
-//                 },
-//             });
-
-//             if (!estudiante) {
-//                 return res.status(404).send({ error: 'Estudiante no encontrado' });
-//             }
-//             res.status(200).send(estudiante);
-//         } catch (error) {
-//             console.error(error);
-//             res.status(404).send({ error: 'Error al obtener las reservas del estudiante' });
-//         }
-//     }
-
-    
-
-//     async editEstudiante(
-//         editEstudianteDto: EditEstudianteDto,
-//         res: Response
-//     ) {
-//         const editedEstudiante = await this.estudiantesRepository.findOne({ 
-//             where: { id: editEstudianteDto.id } 
-//         });
-
-//         if (!editedEstudiante) {
-//             return res.status(404).send({ error: 'Estudiante no encontrado' });
-//         } else {
-//             // Actualizar los campos del estudiante
-//             editedEstudiante.nombre = editEstudianteDto.nombre || editedEstudiante.nombre;
-//             editedEstudiante.apellido = editEstudianteDto.apellido || editedEstudiante.apellido;
-//             editedEstudiante.carrera = editEstudianteDto.carrera || editedEstudiante.carrera;
-
-//             await this.estudiantesRepository.save(editedEstudiante);
-            
-//             res.status(200).send(editedEstudiante);
-//         }
-//     }
-
-//     async deleteEstudiante(
-//         idEstudiante: number,
-//         res: Response
-//     ) {
-//         const estudiante = await this.estudiantesRepository.findOne({ where: { id: idEstudiante } });
-
-//         if (!estudiante) {
-//             return res.status(404).send({ error: 'Estudiante no encontrado' });
-//         }
-
-//         await this.estudiantesRepository.remove(estudiante);
-
-//         res.status(200).send({ message: 'Estudiante eliminado correctamente' });
-//     }
-// }

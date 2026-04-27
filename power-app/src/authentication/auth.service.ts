@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
-// import * as jwt from 'jsonwebtoken';
-// import { jwtConstants } from 'config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
-import { User } from '../entities/user.entity';
+import { User, UserRole } from '../entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt/dist/jwt.service';
 
@@ -24,46 +22,54 @@ export class AuthService {
     
   }
 
-//   async verifyJwtToken(token: string): Promise<string | null> {
-//     try {
-//       const decoded = jwt.verify(token, jwtConstants.secret, {
-//         ignoreExpiration: false,
-//       });
+  async verifyJwtToken(token: string): Promise<string | null> {
+    try {
+      const decoded = this.jwtService.verify(token, {
+        ignoreExpiration: false,
+      });
 
-//       const userId = decoded.sub;
+      const userId = decoded.sub;
 
-//       if (typeof userId === 'string') {
-//         // console.log(userId)
-//         return userId; // Token válido
-//       } else {
-//         console.error('Token decodificado no contiene el userId.');
-//       }
-//     } catch (error) {
-//       if (error instanceof jwt.TokenExpiredError) {
-//         console.error('Token expirado:', error);
-//       } else if (error instanceof jwt.JsonWebTokenError) {
-//         console.error('Error en el token JWT:', error);
-//       } else {
-//         console.error('Error al verificar el token:', error);
-//       }
-//       throw error;
-//     }
+      if (typeof userId === 'string') {
+        // console.log(userId)
+        return userId; // Token válido
+      } else {
+        console.error('Token decodificado no contiene el userId.');
+      }
+    } catch (error) {
+      // if (error instanceof jwt.TokenExpiredError) {
+      //   console.error('Token expirado:', error);
+      // } else if (error instanceof jwt.JsonWebTokenError) {
+      //   console.error('Error en el token JWT:', error);
+      // } else {
+      //   console.error('Error al verificar el token:', error);
+      // }
+      // throw error;
+      return null;
+    }
 
-//     return null;
-//   }
+    return null;
+  }
 
-//   // TODO revisar validacion
-//   async verifyAdminJwtToken(token: string): Promise<string | null> {
-//     const userId = await this.verifyJwtToken(token);
+  async verifyAdminJwtToken(token: string): Promise<string | null> {
+    const userId = await this.verifyJwtToken(token);
 
-//     const user = await this.userModel.findById(userId).select(['_id', 'type']).exec();
+    if(userId) {
+      const user = await this.usersRepository.findOne({ 
+          where: { id: userId },
+          select: { id: true, role: true }
+        }
+      );
 
-//     if(user.type == 'admin') {
-//       return userId;
-//     } else {
-//       return null;
-//     }
-//   }
+      if(user?.role == UserRole.admin) {
+        return userId;
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
 
   async authenticateUser(userCredentials: LoginUserDto): Promise<User | null> {
     const { email, password } = userCredentials;
