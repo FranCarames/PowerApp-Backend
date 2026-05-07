@@ -30,7 +30,7 @@ export class UsersService {
         }
     }
 
-    async getUserById(idUser: string): Promise<User | null> {
+    async _getUserById(idUser: string): Promise<User | null> {
         return this.usersRepository.findOne({ where: { id: idUser } });
     }
 

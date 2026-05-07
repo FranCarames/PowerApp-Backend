@@ -63,7 +63,7 @@ export class CoachService {
             const adminId = await this.authService.verifyAdminJwtToken(accessToken);
 
             if (adminId) {
-                const user = await this.userService.getUserById(promoteCoachDto.user_id);
+                const user = await this.userService._getUserById(promoteCoachDto.user_id);
 
                 if (!user) {
                     return res.status(404).send({ error: 'Usuario no encontrado' });
@@ -122,7 +122,7 @@ export class CoachService {
             const adminId = await this.authService.verifyAdminJwtToken(accessToken);
 
             if (adminId) {
-                const userCoach = await this.userService.getUserById(idCoach);
+                const userCoach = await this.userService._getUserById(idCoach);
 
                 if (!userCoach) {
                     return res.status(404).send({ error: 'Usuario no encontrado' });

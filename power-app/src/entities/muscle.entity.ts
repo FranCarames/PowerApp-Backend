@@ -36,8 +36,5 @@ export class Muscle {
     @OneToMany(() => ExercisedMuscle, exercisedMuscle => exercisedMuscle.muscle, { cascade: true })
     exercisedMuscles!: ExercisedMuscle[];
 
-    
-
     // TODO Agregar relación con Exercise a través de ExercisedMuscle
-
 }

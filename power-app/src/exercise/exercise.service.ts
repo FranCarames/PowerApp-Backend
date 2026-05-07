@@ -66,6 +66,10 @@ export class ExerciseService {
         }
     }
 
+    async _getExerciseById(idExercise: string): Promise<Exercise | null> {
+        return this.exerciseRepository.findOne({ where: { id: idExercise } });
+    }
+
     async getExerciseById(
         idExercise: string,
         res: Response
