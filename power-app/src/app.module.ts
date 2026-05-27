@@ -34,12 +34,10 @@ import { UserRmModule } from './user_rm/user_rm.module';
         username: configService.get<string>('POSTGRES_USER'),
         password: configService.get<string>('POSTGRES_PASSWORD'),
         database: configService.get<string>('POSTGRES_DB'),
-        entities: [User, UserRM, Muscle, MuscleGroup, Exercise, ExercisedMuscle],
         ssl: {
           rejectUnauthorized: false,
         },
-        logging: true,                 
-        synchronize: true, // Solo en desarrollo! (cuidado en producción)
+        logging: true,
         autoLoadEntities: true, // Muy útil en NestJS + TypeORM
       }),
       inject: [ConfigService],
