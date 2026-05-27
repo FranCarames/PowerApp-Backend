@@ -10,7 +10,7 @@ export class Exercise {
     @Column({ length: 50, nullable: false })
     name!: string;
 
-    @Column({ type: 'text', nullable: false })
+    @Column({ length: 2000,  nullable: false })
     description!: string;
 
     @Column({ length: 500, nullable: true })
