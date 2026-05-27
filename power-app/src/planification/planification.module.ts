@@ -1,8 +1,21 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { PlanificationController } from './planification.controller';
 import { PlanificationService } from './planification.service';
+import { Planification } from '../entities/planification.entity';
+import { RoutineAsignation } from '../entities/routine_asignation.entity';
+import { UserPlanification } from '../entities/user_planification.entity';
+import { RoutineAsignationUser } from '../entities/routine_asignation_user.entity';
+import { UserRoutine } from '../entities/user_routine.entity';
 
 @Module({
+  imports: [TypeOrmModule.forFeature([
+    Planification,
+    RoutineAsignation,
+    UserPlanification,
+    RoutineAsignationUser,
+    UserRoutine,
+  ])],
   controllers: [PlanificationController],
   providers: [PlanificationService]
 })
