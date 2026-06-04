@@ -15,6 +15,9 @@ export class RoutineAsignation {
     @Column({ type: 'uuid', nullable: false })
     routine_plan_id!: string;
 
+    @Column({ type: 'integer', nullable: false })
+    order!: number;
+
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     created_at!: Date;
 

@@ -17,6 +17,9 @@ export class RoutineAsignationUser {
     @Column({ type: 'uuid', nullable: false })
     routine_asignation_id!: string;
 
+    @Column({ type: 'integer', nullable: false })
+    order!: number;
+
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     created_at!: Date;
 
