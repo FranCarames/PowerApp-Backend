@@ -25,7 +25,7 @@ export class ExerciseSet {
     rep_count!: number;
 
     @ApiPropertyOptional({ example: 80.5 })
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true, transformer: { to: (v) => v, from: (v) => v != null ? parseFloat(v) : null } })
     weight?: number;
 
     @ApiPropertyOptional({ example: 7 })

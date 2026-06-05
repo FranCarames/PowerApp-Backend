@@ -30,7 +30,7 @@ export class MembershipPayment {
     active!: boolean;
 
     @ApiProperty({ example: 9999.99 })
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: false })
+    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: false, transformer: { to: (v) => v, from: (v) => parseFloat(v) } })
     price!: number;
 
     @ApiProperty()

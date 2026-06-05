@@ -8,16 +8,18 @@ import {
   Headers,
   Res,
 } from '@nestjs/common';
-import { ApiTags, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiResponse, ApiBearerAuth, ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
 import { CoachService } from './coach.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { PromoteCoachDto } from '../dtos/coach/promote_coach.dto';
 import { AuthenticableDTO } from '../dtos/authenticable.dto';
 import { Coach } from '../entities/coach.entity';
+import { User } from '../entities/user.entity';
 
 @ApiTags('Coach')
 @ApiBearerAuth()
+@ApiExtraModels(User, Coach)
 @Controller('coach')
 export class CoachController {
 
@@ -38,7 +40,7 @@ export class CoachController {
     }
 
     @Post('/promote_user')
-    @ApiResponse({ status: 201, type: Coach })
+    @ApiResponse({ status: 200, type: User })
     async promoteUserToCoach(
         @Headers() header: AuthenticableDTO,
         @Body() promoteCoachDto: PromoteCoachDto,
@@ -54,7 +56,24 @@ export class CoachController {
     }
 
     @Post('/delete_coach/:id')
-    @ApiResponse({ status: 200 })
+    @ApiResponse({
+        status: 200,
+        schema: {
+            allOf: [
+                { $ref: getSchemaPath(User) },
+                {
+                    properties: {
+                        coach: {
+                            allOf: [
+                                { $ref: getSchemaPath(Coach) },
+                                { properties: { active: { type: 'boolean', example: false } } }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    })
     async deleteCoach(
         @Headers() header: AuthenticableDTO,
         @Param() idCoach: ParameterIdDto,

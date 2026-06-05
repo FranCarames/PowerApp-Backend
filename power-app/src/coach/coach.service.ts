@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import e, { Response } from 'express';
+import { instanceToPlain } from 'class-transformer';
+import { Response } from 'express';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -26,7 +27,7 @@ export class CoachService {
     ) {
         try {
             const coaches = await this.coachRepository.find();
-            res.status(200).send(coaches);
+            res.status(200).send(instanceToPlain(coaches));
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener los entrenadores' });
@@ -47,7 +48,7 @@ export class CoachService {
             if (!coach) {
                 return res.status(404).send({ error: 'Entrenador no encontrado' });
             }
-            res.status(200).send(coach);
+            res.status(200).send(instanceToPlain(coach));
         } catch (error) {
             console.error(error);
             res.status(404).send({ error: 'Error al obtener el entrenador' });
@@ -107,7 +108,7 @@ export class CoachService {
     private handleCoachPromotionResponse(res: Response, coachUser?: (User | null), coachRegister?: (Coach | null)) {
         if (coachUser && coachRegister) {
             coachUser.coach = coachRegister;
-            return res.status(200).send(coachUser);
+            return res.status(200).send(instanceToPlain(coachUser));
         } else {
             return res.status(500).send({ error: 'Error al promover al entrenador' });
         }

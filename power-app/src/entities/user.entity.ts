@@ -78,6 +78,7 @@ export class User {
     @OneToMany(() => MembershipPayment, membershipPayment => membershipPayment.user)
     userMembershipPayments!: MembershipPayment[];
 
+    @ApiPropertyOptional({ type: () => Coach })
     @OneToOne(() => Coach, coach => coach.user, { nullable: true })
     coach?: Coach;
 }

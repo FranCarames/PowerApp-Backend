@@ -18,7 +18,7 @@ export class UserRM {
     exercise_id!: string;
 
     @ApiProperty({ example: 100.5 })
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: false })
+    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: false, transformer: { to: (v) => v, from: (v) => parseFloat(v) } })
     weight!: number;
 
     @ApiProperty({ example: 5 })
