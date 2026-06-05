@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, OneToOne } from 'typeorm';
+import { Exclude } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Coach } from './coach.entity';
 import { FavoriteExercise } from './ParaValidar/favorite_exercise.entity';
@@ -34,11 +35,11 @@ export class User {
     @Column({ nullable: false, default: false })
     email_verified!: boolean;
 
-    @ApiProperty({ maxLength: 255 })
+    @Exclude()
     @Column({ length: 255, nullable: false })
     password!: string;
 
-    @ApiPropertyOptional({ maxLength: 255 })
+    @Exclude()
     @Column({ length: 255, nullable: true })
     temp_password!: string;
 

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { instanceToPlain } from 'class-transformer';
 import { Response } from 'express';
 
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,7 +23,7 @@ export class UsersService {
     ) {
         try {
             const users = await this.usersRepository.find();
-            res.status(200).send(users);
+            res.status(200).send(instanceToPlain(users));
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener los usuarios' });
@@ -54,7 +55,7 @@ export class UsersService {
             if (!user) {
                 return res.status(404).send({ error: 'Usuario no encontrado' });
             }
-            res.status(200).send(user);
+            res.status(200).send(instanceToPlain(user));
         } catch (error) {
             console.error(error);
             res.status(404).send({ error: 'Error al obtener el usuario' });
@@ -83,7 +84,7 @@ export class UsersService {
             const accessToken = await this.authService.generateJwtToken(newUser.id);
             res.setHeader('Authorization', `Bearer ${accessToken}`);
 
-            res.status(201).send(newUser);
+            res.status(201).send(instanceToPlain(newUser));
         }
     }
 
@@ -96,14 +97,14 @@ export class UsersService {
         if (authenticatedUser) {
             const accessToken = await this.authService.generateJwtToken(authenticatedUser.id);
             res.setHeader('Authorization', `Bearer ${accessToken}`);
-            res.status(200).send(authenticatedUser);
+            res.status(200).send(instanceToPlain(authenticatedUser));
         } else {
             const authenticatedTempUser = await this.authService.authenticateTemporaryPassword(loginUserDto);
 
             if (authenticatedTempUser) {
                 const accessToken = await this.authService.generateJwtToken(authenticatedTempUser.id);
                 res.setHeader('Authorization', `Bearer ${accessToken}`);
-                res.status(200).send(authenticatedTempUser);
+                res.status(200).send(instanceToPlain(authenticatedTempUser));
             } else {
                 res.status(401).send({ error: 'Credenciales inválidas' });
             }
