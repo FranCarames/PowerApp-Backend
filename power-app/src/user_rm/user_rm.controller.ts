@@ -5,21 +5,23 @@ import {
   Param,
   Delete,
   Body,
-  Headers,
-  Query,
   Res,
 } from '@nestjs/common';
+import { ApiTags, ApiResponse } from '@nestjs/swagger';
 import { UserRmService } from './user_rm.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { CreateUserRmDto } from '../dtos/user_rm/create_user_rm.dto';
 import { EditUserRmDto } from '../dtos/user_rm/edit_user_rm.dto';
+import { UserRM } from '../entities/user_rm.entity';
 
+@ApiTags('User RM')
 @Controller('user_rm')
 export class UserRmController {
     constructor(private userRmService: UserRmService) {}
 
     @Get('/all')
+    @ApiResponse({ status: 200, type: [UserRM] })
     async getAllUserRms(
         @Res() res: Response
     ) {
@@ -27,6 +29,7 @@ export class UserRmController {
     }
 
     @Get(':id')
+    @ApiResponse({ status: 200, type: UserRM })
     async getUserRmById(
         @Param() idUserRm: ParameterIdDto,
         @Res() res: Response
@@ -35,6 +38,7 @@ export class UserRmController {
     }
 
     @Get('/user/:id')
+    @ApiResponse({ status: 200, type: [UserRM] })
     async getAllUserRmsByUserId(
         @Param() idUser: ParameterIdDto,
         @Res() res: Response
@@ -43,6 +47,7 @@ export class UserRmController {
     }
 
     @Get('/exercise/:id')
+    @ApiResponse({ status: 200, type: [UserRM] })
     async getAllUserRmsByExerciseId(
         @Param() idExercise: ParameterIdDto,
         @Res() res: Response
@@ -51,6 +56,7 @@ export class UserRmController {
     }
 
     @Post('create')
+    @ApiResponse({ status: 201, type: UserRM })
     async createUserRm(
         @Body() createUserRmDto: CreateUserRmDto,
         @Res() res: Response,
@@ -59,6 +65,7 @@ export class UserRmController {
     }
 
     @Post('edit/:id')
+    @ApiResponse({ status: 200, type: UserRM })
     async editUserRm(
         @Param() idUserRm: ParameterIdDto,
         @Body() editUserRmDto: EditUserRmDto,
@@ -68,6 +75,7 @@ export class UserRmController {
     }
 
     @Delete(':id')
+    @ApiResponse({ status: 200 })
     async deleteUserRm(
         @Param() idUserRm: ParameterIdDto,
         @Res() res: Response,

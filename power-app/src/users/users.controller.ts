@@ -7,19 +7,22 @@ import {
   Param,
   Res,
 } from '@nestjs/common';
+import { ApiTags, ApiResponse, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
-// import { EditEstudianteDto } from 'src/Dtos/Estudiantes/edit_estudiante.dto';
+import { User } from '../entities/user.entity';
 
+@ApiTags('Users')
 @Controller('users')
 export class UsersController {
 
     constructor(private usersService: UsersService) { }
 
     @Get('/all')
+    @ApiResponse({ status: 200, type: [User] })
     async getAllUsers(
         @Res() res: Response
     ) {
@@ -27,11 +30,13 @@ export class UsersController {
     }
 
     @Get('/get/:id')
+    @ApiResponse({ status: 200, type: User })
     async getUserId(@Param() idUser: ParameterIdDto, @Res() res: Response) {
         this.usersService.getUserId(idUser.id, res);
     }
 
     @Post('/register')
+    @ApiResponse({ status: 201, type: User, headers: { Authorization: { description: 'Bearer JWT token', schema: { type: 'string' } } } })
     async createUser(
         @Body() createUserDto: CreateUserDto,
         @Res() res: Response,
@@ -40,6 +45,7 @@ export class UsersController {
     }
 
     @Post('/login')
+    @ApiResponse({ status: 200, type: User, headers: { Authorization: { description: 'Bearer JWT token', schema: { type: 'string' } } } })
     async loginUser(
         @Body() loginUserDto: LoginUserDto,
         @Res() res: Response,
@@ -47,19 +53,3 @@ export class UsersController {
         this.usersService.loginUser(loginUserDto, res);
     }
 }
-
-//     @Post('/edit')
-//     async editEstudiante(
-//         @Body() editEstudianteDto: EditEstudianteDto,
-//         @Res() res: Response,
-//     ) {
-//         this.sqlEstudianteService.editEstudiante(editEstudianteDto, res);
-//     }
-
-//     @Delete('/delete/:id')
-//     async deleteEstudiante(
-//         @Param() idEstudiante: ParameterIdDto,
-//         @Res() res: Response,
-//     ) {
-//         this.sqlEstudianteService.deleteEstudiante(idEstudiante.id, res);
-//     }

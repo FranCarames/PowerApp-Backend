@@ -6,7 +6,6 @@ import { Repository } from 'typeorm';
 import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { User, UserRole } from '../entities/user.entity';
-import { UserResponse } from '../dtos/responses/user_response.dto';
 import { AuthService } from '../authentication/auth.service';
 
 @Injectable()
@@ -81,12 +80,10 @@ export class UsersService {
 
             await this.usersRepository.save(newUser);
 
-            const userResponse = new UserResponse(newUser);
-
             const accessToken = await this.authService.generateJwtToken(newUser.id);
-            userResponse.addAccessToken(accessToken);
+            res.setHeader('Authorization', `Bearer ${accessToken}`);
 
-            res.status(201).send(userResponse);
+            res.status(201).send(newUser);
         }
     }
 
@@ -97,22 +94,16 @@ export class UsersService {
         const authenticatedUser = await this.authService.authenticateUser(loginUserDto);
 
         if (authenticatedUser) {
-                const userResponse = new UserResponse(authenticatedUser);
-
-                const accessToken = await this.authService.generateJwtToken(authenticatedUser.id);
-                userResponse.addAccessToken(accessToken);
-
-                res.status(201).send(userResponse);
+            const accessToken = await this.authService.generateJwtToken(authenticatedUser.id);
+            res.setHeader('Authorization', `Bearer ${accessToken}`);
+            res.status(200).send(authenticatedUser);
         } else {
             const authenticatedTempUser = await this.authService.authenticateTemporaryPassword(loginUserDto);
-            
+
             if (authenticatedTempUser) {
-                const userResponse = new UserResponse(authenticatedTempUser);
-
                 const accessToken = await this.authService.generateJwtToken(authenticatedTempUser.id);
-                userResponse.addAccessToken(accessToken);
-
-                res.status(201).send(userResponse);
+                res.setHeader('Authorization', `Bearer ${accessToken}`);
+                res.status(200).send(authenticatedTempUser);
             } else {
                 res.status(401).send({ error: 'Credenciales inválidas' });
             }

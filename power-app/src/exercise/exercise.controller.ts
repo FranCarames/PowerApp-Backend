@@ -5,21 +5,24 @@ import {
   Param,
   Delete,
   Body,
-  Headers,
-  Query,
   Res,
 } from '@nestjs/common';
+import { ApiTags, ApiResponse } from '@nestjs/swagger';
 import { ExerciseService } from './exercise.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { CreateExerciseDto } from '../dtos/exercise/create_exercise.dto';
 import { EditExerciseDto } from '../dtos/exercise/edit_exercise.dto';
+import { Exercise } from '../entities/exercise.entity';
+import { ExercisedMuscle } from '../entities/exercised_muscle.entity';
 
+@ApiTags('Exercise')
 @Controller('exercise')
 export class ExerciseController {
     constructor(private exerciseService: ExerciseService) {}
 
     @Get('/all')
+    @ApiResponse({ status: 200, type: [Exercise] })
     async getAllExercises(
         @Res() res: Response
     ) {
@@ -27,6 +30,7 @@ export class ExerciseController {
     }
 
     @Post('create')
+    @ApiResponse({ status: 201, type: Exercise })
     async createExercise(
         @Body() createExerciseDto: CreateExerciseDto,
         @Res() res: Response,
@@ -35,6 +39,7 @@ export class ExerciseController {
     }
 
     @Post('edit/:id')
+    @ApiResponse({ status: 200, type: Exercise })
     async editExercise(
         @Param() idExercise: ParameterIdDto,
         @Body() editExerciseDto: EditExerciseDto,
@@ -44,6 +49,7 @@ export class ExerciseController {
     }
 
     @Delete(':id')
+    @ApiResponse({ status: 200 })
     async deleteExercise(
         @Param() idMuscle: ParameterIdDto,
         @Res() res: Response,
@@ -52,6 +58,7 @@ export class ExerciseController {
     }
 
     @Get('ExMuscles/all')
+    @ApiResponse({ status: 200, type: [ExercisedMuscle] })
     async getAllExercisedMuscles(
         @Res() res: Response
     ) {
