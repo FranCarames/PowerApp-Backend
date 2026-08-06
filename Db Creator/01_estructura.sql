@@ -25,6 +25,7 @@ CREATE TABLE public."User" (
     phone_prefix 	VARCHAR(10),
     phone_number    VARCHAR(20),
     phone_verified  BOOLEAN      NOT NULL DEFAULT false,
+    active          BOOLEAN      NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT "User_email_key" UNIQUE (email)

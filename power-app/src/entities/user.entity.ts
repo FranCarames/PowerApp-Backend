@@ -63,6 +63,10 @@ export class User {
     @Column({ nullable: false, default: false })
     phone_verified!: boolean;
 
+    @ApiProperty({ example: true, description: 'Cuenta activa (no relacionado con si la membresía está vigente)' })
+    @Column({ nullable: false, default: true })
+    active!: boolean;
+
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     created_at!: Date;

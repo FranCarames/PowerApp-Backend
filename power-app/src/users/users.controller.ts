@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Res,
 } from '@nestjs/common';
 import { ApiTags, ApiResponse, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
@@ -13,6 +14,8 @@ import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
+import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
+import { PaginatedUsersResponseDto } from '../dtos/user/paginated_users_response.dto';
 import { User } from '../entities/user.entity';
 
 @ApiTags('Users')
@@ -22,11 +25,12 @@ export class UsersController {
     constructor(private usersService: UsersService) { }
 
     @Get('/all')
-    @ApiResponse({ status: 200, type: [User] })
+    @ApiResponse({ status: 200, type: PaginatedUsersResponseDto })
     async getAllUsers(
+        @Query() query: GetUsersQueryDto,
         @Res() res: Response
     ) {
-        this.usersService.getAllUsers(res);
+        this.usersService.getAllUsers(query, res);
     }
 
     @Get('/get/:id')

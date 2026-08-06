@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
+import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
 import { User, UserRole } from '../entities/user.entity';
 import { AuthService } from '../authentication/auth.service';
 
@@ -19,11 +20,43 @@ export class UsersService {
     }
 
     async getAllUsers(
+        query: GetUsersQueryDto,
         res: Response
     ) {
         try {
-            const users = await this.usersRepository.find();
-            res.status(200).send(instanceToPlain(users));
+            const page = query.page ?? 1;
+            const limit = query.limit ?? 20;
+
+            const qb = this.usersRepository.createQueryBuilder('user');
+
+            if (query.role) {
+                qb.andWhere('user.role = :role', { role: query.role });
+            }
+
+            if (query.active !== undefined) {
+                qb.andWhere('user.active = :active', { active: query.active });
+            }
+
+            if (query.keyword) {
+                qb.andWhere(
+                    "(user.first_name ILIKE :kw OR user.last_name ILIKE :kw OR (user.first_name || ' ' || user.last_name) ILIKE :kw OR user.email ILIKE :kw)",
+                    { kw: `%${query.keyword}%` },
+                );
+            }
+
+            qb.orderBy('user.created_at', 'DESC')
+                .skip((page - 1) * limit)
+                .take(limit);
+
+            const [users, total] = await qb.getManyAndCount();
+
+            res.status(200).send({
+                data: instanceToPlain(users),
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            });
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener los usuarios' });

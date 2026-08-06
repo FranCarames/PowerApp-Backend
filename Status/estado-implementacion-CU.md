@@ -7,21 +7,21 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 35 | 49% | Endpoint existe y su service ejecuta lógica real |
-| 🟡 Parcial | 3 | 4% | Funciona a medias / resuelto dentro de otro endpoint |
+| ✅ Implementado | 37 | 51% | Endpoint existe y su service ejecuta lógica real |
+| 🟡 Parcial | 2 | 3% | Funciona a medias / resuelto dentro de otro endpoint |
 | 🔵 Andamiaje | 14 | 19% | Ruta declarada pero service vacío y llamada comentada |
-| ⬜ No implementado | 20 | 28% | Sin endpoint, service ni módulo |
+| ⬜ No implementado | 19 | 26% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
 
-**38 de 72 CU con código implementado o parcial (~53%).** Los otros 34 son trabajo pendiente (andamiaje + no implementado).
-> **Nota:** CU-A-23 quedó implementado en código pero requiere crear la columna `active` en la DB para funcionar (ver *Cambios recientes*).
+**39 de 72 CU con código implementado o parcial (~54%).** Los otros 33 son trabajo pendiente (andamiaje + no implementado).
+> **Nota:** varios cambios recientes (columnas `active` en `Membership` y `User`) requieren **regenerar la DB** para funcionar; hasta entonces esos endpoints fallan (ver *Cambios recientes*).
 
 ### Cobertura por rol
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 8 | 2 | 2 | 8 | 40% |
-| Entrenador | 29 | 4 | 1 | 12 | 12 | 14% |
+| Entrenador | 29 | 6 | 0 | 12 | 11 | 21% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
 
 ## Cambios recientes (2026-08-06)
@@ -35,6 +35,8 @@
   - Los listados (`GET /membership/all`) siguen devolviendo activas e inactivas (sin filtro).
   - **Schema:** se agregó `active BOOLEAN NOT NULL DEFAULT true` a la tabla `Membership` en `Db Creator/ddl.py` (fuente del DDL, generado por `build_sql.py`), `Db Creator/01_estructura.sql` y `db/Re-creacion DB.sql`. Los INSERT de seed usan lista de columnas explícita, así que el `DEFAULT true` los cubre. **Falta regenerar la base** para aplicarlo; hasta entonces los endpoints de membresía fallarán (TypeORM seleccionará una columna inexistente).
 - **CU-A-02 / CU-A-03** reclasificados a ✅ **Implementado**: la asignación/desasignación de músculos se gestiona dentro de la creación y edición de ejercicios (`POST /exercise/create` y `POST /exercise/edit/:id`), no como endpoints separados. **Admin queda 23/23 (100%).**
+- **Filtros + paginación en `GET /users/all`** (cierra **CU-E-01** y **CU-E-02**): query params `role` (user/coach/admin), `keyword` (coincidencia parcial en nombre, apellido y email), `active` (estado de cuenta) y paginación `page`/`limit` (default 1/20, máx 100). La respuesta pasó a ser paginada: `{ data, total, page, limit, totalPages }` (cambio de contrato — antes era un array). Orden interno por `created_at` DESC (no expuesto como parámetro).
+- **Nuevo campo `User.active`** (boolean, default `true`): estado de la cuenta, independiente de si la membresía está vigente. Agregado a la entidad `User` y a los scripts de DB (`Db Creator/ddl.py`, `Db Creator/01_estructura.sql`, `db/Re-creacion DB.sql`). Los usuarios nuevos y el seed quedan `active = true` por el DEFAULT. Igual que `Membership.active`, **requiere regenerar la base**; hasta entonces los endpoints de usuarios fallan (TypeORM selecciona una columna inexistente). Deja el terreno listo para **CU-E-03** (cerrar cuenta de alumno).
 
 ---
 
@@ -86,13 +88,13 @@
 
 ---
 
-## Detalle — Rol Entrenador (29 CU · 14%)
+## Detalle — Rol Entrenador (29 CU · 21%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-E-01 | Obtener alumnos | 🟡 Parcial | `GET /users/all` · sin filtro por rol/entrenador |
-| CU-E-02 | Obtener alumnos — filtro por nombre | ⬜ No implementado | sin endpoint |
+| CU-E-01 | Obtener alumnos | ✅ Implementado | `GET /users/all?role=user` · filtros rol/keyword/active + paginación |
+| CU-E-02 | Obtener alumnos — filtro por nombre | ✅ Implementado | `GET /users/all?keyword=` · busca en nombre, apellido y email |
 | CU-E-03 | Cerrar cuenta de alumno | ⬜ No implementado | sin endpoint |
 | CU-E-04 | Obtener RMs del alumno | ✅ Implementado | `GET /user_rm/user/:id` |
 | CU-E-05 | Historial de pagos de alumno | ✅ Implementado | `GET /membership/payment/user/:id` |
