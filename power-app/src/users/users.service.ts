@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
+import { SetUserActiveDto } from '../dtos/user/set_user_active.dto';
 import { User, UserRole } from '../entities/user.entity';
 import { AuthService } from '../authentication/auth.service';
 
@@ -128,6 +129,9 @@ export class UsersService {
         const authenticatedUser = await this.authService.authenticateUser(loginUserDto);
 
         if (authenticatedUser) {
+            if (!authenticatedUser.active) {
+                return res.status(403).send({ error: 'La cuenta está cerrada' });
+            }
             const accessToken = await this.authService.generateJwtToken(authenticatedUser.id);
             res.setHeader('Authorization', `Bearer ${accessToken}`);
             res.status(200).send(instanceToPlain(authenticatedUser));
@@ -135,12 +139,37 @@ export class UsersService {
             const authenticatedTempUser = await this.authService.authenticateTemporaryPassword(loginUserDto);
 
             if (authenticatedTempUser) {
+                if (!authenticatedTempUser.active) {
+                    return res.status(403).send({ error: 'La cuenta está cerrada' });
+                }
                 const accessToken = await this.authService.generateJwtToken(authenticatedTempUser.id);
                 res.setHeader('Authorization', `Bearer ${accessToken}`);
                 res.status(200).send(instanceToPlain(authenticatedTempUser));
             } else {
                 res.status(401).send({ error: 'Credenciales inválidas' });
             }
+        }
+    }
+
+    async setUserActive(
+        idUser: string,
+        setUserActiveDto: SetUserActiveDto,
+        res: Response
+    ) {
+        try {
+            const user = await this.usersRepository.findOne({ where: { id: idUser } });
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            user.active = setUserActiveDto.active;
+            user.updated_at = new Date();
+
+            const savedUser = await this.usersRepository.save(user);
+            res.status(200).send(instanceToPlain(savedUser));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al actualizar el estado de la cuenta' });
         }
     }
 }

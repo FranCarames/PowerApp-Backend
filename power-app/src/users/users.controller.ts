@@ -16,6 +16,7 @@ import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
 import { PaginatedUsersResponseDto } from '../dtos/user/paginated_users_response.dto';
+import { SetUserActiveDto } from '../dtos/user/set_user_active.dto';
 import { User } from '../entities/user.entity';
 
 @ApiTags('Users')
@@ -55,5 +56,15 @@ export class UsersController {
         @Res() res: Response,
     ) {
         this.usersService.loginUser(loginUserDto, res);
+    }
+
+    @Post('/set-active/:id')
+    @ApiResponse({ status: 200, type: User })
+    async setUserActive(
+        @Param() idUser: ParameterIdDto,
+        @Body() setUserActiveDto: SetUserActiveDto,
+        @Res() res: Response,
+    ) {
+        this.usersService.setUserActive(idUser.id, setUserActiveDto, res);
     }
 }
