@@ -9,6 +9,7 @@ import { User } from '../entities/user.entity';
 import { CreateMembershipDto } from '../dtos/membership/create_membership.dto';
 import { EditMembershipDto } from '../dtos/membership/edit_membership.dto';
 import { RegisterMembershipPaymentDto } from '../dtos/membership/register_membership_payment.dto';
+import { SetMembershipActiveDto } from '../dtos/membership/set_membership_active.dto';
 
 @Injectable()
 export class MembershipService {
@@ -101,6 +102,28 @@ export class MembershipService {
         }
     }
     
+    async setMembershipActive(
+        idMembership: string,
+        setMembershipActiveDto: SetMembershipActiveDto,
+        res: Response
+    ) {
+        try {
+            const membership = await this.membershipRepository.findOne({ where: { id: idMembership } });
+            if (!membership) {
+                return res.status(404).send({ error: 'Membresía no encontrada' });
+            }
+
+            membership.active = setMembershipActiveDto.active;
+            membership.updated_at = new Date();
+
+            const savedMembership = await this.membershipRepository.save(membership);
+            res.status(200).send(savedMembership);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al actualizar el estado de la membresía' });
+        }
+    }
+
     async getUserMembershipPayments(
         idUser: string,
         res: Response

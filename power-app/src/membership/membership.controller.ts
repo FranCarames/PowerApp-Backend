@@ -14,6 +14,7 @@ import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { CreateMembershipDto } from '../dtos/membership/create_membership.dto';
 import { EditMembershipDto } from '../dtos/membership/edit_membership.dto';
 import { RegisterMembershipPaymentDto } from '../dtos/membership/register_membership_payment.dto';
+import { SetMembershipActiveDto } from '../dtos/membership/set_membership_active.dto';
 import { Membership } from '../entities/membership.entity';
 import { MembershipPayment } from '../entities/membership_payment.entity';
 
@@ -53,6 +54,16 @@ export class MembershipController {
         @Res() res: Response,
     ) {
         this.membershipService.editMembership(idMembership.id, editMembershipDto, res);
+    }
+
+    @Post('set-active/:id')
+    @ApiResponse({ status: 200, type: Membership })
+    async setMembershipActive(
+        @Param() idMembership: ParameterIdDto,
+        @Body() setMembershipActiveDto: SetMembershipActiveDto,
+        @Res() res: Response,
+    ) {
+        this.membershipService.setMembershipActive(idMembership.id, setMembershipActiveDto, res);
     }
 
     @Get('payment/user/:id')

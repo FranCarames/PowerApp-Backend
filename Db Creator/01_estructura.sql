@@ -49,6 +49,7 @@ CREATE TABLE public."Membership" (
     name        VARCHAR(50)    NOT NULL,
     duration    INTEGER        NOT NULL,
     price       DECIMAL(10,2)  NOT NULL,
+    active      BOOLEAN        NOT NULL DEFAULT true,
     created_at  TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ    NOT NULL DEFAULT NOW()
 );

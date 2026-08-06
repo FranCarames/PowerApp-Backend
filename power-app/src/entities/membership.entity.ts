@@ -20,6 +20,10 @@ export class Membership {
     @Column({ type: 'decimal', precision: 10, scale: 2, nullable: false, transformer: { to: (v) => v, from: (v) => parseFloat(v) } })
     price!: number;
 
+    @ApiProperty({ example: true, description: 'Baja lógica: true = disponible, false = dada de baja' })
+    @Column({ nullable: false, default: true })
+    active!: boolean;
+
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     created_at!: Date;
