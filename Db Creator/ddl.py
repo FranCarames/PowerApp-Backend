@@ -2,7 +2,7 @@
 """
 Modulo de ESTRUCTURA (DDL) - PowerApp
 Genera el script de creacion de tablas, ENUMs, FKs e indices.
-Copiado fielmente del Re-creacion_DB.sql v2 (modelo Miro 26/05/2026).
+Fuente única del DDL de la base (modelo Miro 26/05/2026).
 """
 
 DDL = r"""-- =============================================================
