@@ -92,7 +92,7 @@
   .sec-label::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);}
 
   /* ---------- Cards ---------- */
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
   .card{
     --c:var(--pri);
     position:relative;display:flex;flex-direction:column;
@@ -104,6 +104,7 @@
   }
   .card:nth-child(1){animation-delay:.28s;}
   .card:nth-child(2){animation-delay:.36s; --c:var(--teal);}
+  .card:nth-child(3){animation-delay:.44s; --c:var(--acc);}
   /* top accent line */
   .card::before{
     content:"";position:absolute;top:0;left:0;right:0;height:3px;
@@ -159,7 +160,10 @@
 
   @keyframes rise{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
 
-  @media (max-width:720px){
+  @media (max-width:940px){
+    .grid{grid-template-columns:repeat(2,1fr);}
+  }
+  @media (max-width:620px){
     .grid{grid-template-columns:1fr;}
     .card h2{font-size:24px;}
   }
@@ -198,7 +202,7 @@
 
     <a class="card" href="UI%20Front/powerapp-prototype.html">
       <div class="card-top">
-        <span class="card-idx">01 / 02</span>
+        <span class="card-idx">01 / 03</span>
         <span class="card-ico" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="6" y="2" width="12" height="20" rx="3"/><line x1="10" y1="18" x2="14" y2="18"/>
@@ -217,7 +221,7 @@
 
     <a class="card" href="Status/dashboard-estado-CU.html">
       <div class="card-top">
-        <span class="card-idx">02 / 02</span>
+        <span class="card-idx">02 / 03</span>
         <span class="card-ico" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <line x1="4" y1="20" x2="4" y2="12"/><line x1="10" y1="20" x2="10" y2="4"/>
@@ -233,6 +237,26 @@
         <span class="tag">avance por rol</span>
       </div>
       <div class="card-go">Abrir dashboard <span class="arw">→</span></div>
+    </a>
+
+    <a class="card" href="Use%20Cases/">
+      <div class="card-top">
+        <span class="card-idx">03 / 03</span>
+        <span class="card-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H16l4 4v12.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5z"/>
+            <path d="M15 3v4.5h4.5"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>
+          </svg>
+        </span>
+      </div>
+      <div class="eyebrow">Documentación</div>
+      <h2>Especificaciones de CU</h2>
+      <p>Las 72 especificaciones de casos de uso, navegables por rol y paquete: actores, alcance, precondiciones y flujos.</p>
+      <div class="tags">
+        <span class="tag">72 CU</span><span class="tag">3 roles</span>
+        <span class="tag">por paquete</span>
+      </div>
+      <div class="card-go">Abrir especificaciones <span class="arw">→</span></div>
     </a>
 
   </div>
