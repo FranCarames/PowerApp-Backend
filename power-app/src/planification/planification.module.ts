@@ -7,6 +7,7 @@ import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { UserPlanification } from '../entities/user_planification.entity';
 import { RoutineAsignationUser } from '../entities/routine_asignation_user.entity';
 import { UserRoutine } from '../entities/user_routine.entity';
+import { AuthModule } from '../authentication/auth.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([
@@ -15,7 +16,7 @@ import { UserRoutine } from '../entities/user_routine.entity';
     UserPlanification,
     RoutineAsignationUser,
     UserRoutine,
-  ])],
+  ]), AuthModule],
   controllers: [PlanificationController],
   providers: [PlanificationService]
 })

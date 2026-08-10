@@ -15,6 +15,8 @@ import { CreateExerciseDto } from '../dtos/exercise/create_exercise.dto';
 import { EditExerciseDto } from '../dtos/exercise/edit_exercise.dto';
 import { Exercise } from '../entities/exercise.entity';
 import { ExercisedMuscle } from '../entities/exercised_muscle.entity';
+import { UserRole } from '../entities/user.entity';
+import { Auth } from '../authentication/decorators/auth.decorator';
 
 @ApiTags('Exercise')
 @Controller('exercise')
@@ -30,6 +32,7 @@ export class ExerciseController {
     }
 
     @Post('create')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 201, type: Exercise })
     async createExercise(
         @Body() createExerciseDto: CreateExerciseDto,
@@ -39,6 +42,7 @@ export class ExerciseController {
     }
 
     @Post('edit/:id')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: Exercise })
     async editExercise(
         @Param() idExercise: ParameterIdDto,
@@ -49,6 +53,7 @@ export class ExerciseController {
     }
 
     @Delete(':id')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200 })
     async deleteExercise(
         @Param() idMuscle: ParameterIdDto,

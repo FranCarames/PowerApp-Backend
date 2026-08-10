@@ -5,9 +5,10 @@ import { TypeOrmModule } from '@nestjs/typeorm/dist/typeorm.module';
 import { Membership } from '../entities/membership.entity';
 import { MembershipPayment } from '../entities/membership_payment.entity';
 import { User } from '../entities/user.entity';
+import { AuthModule } from '../authentication/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Membership, MembershipPayment, User])],
+  imports: [TypeOrmModule.forFeature([Membership, MembershipPayment, User]), AuthModule],
   controllers: [MembershipController],
   providers: [MembershipService]
 })

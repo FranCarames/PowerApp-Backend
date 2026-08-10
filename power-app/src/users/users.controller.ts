@@ -17,7 +17,8 @@ import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
 import { PaginatedUsersResponseDto } from '../dtos/user/paginated_users_response.dto';
 import { SetUserActiveDto } from '../dtos/user/set_user_active.dto';
-import { User } from '../entities/user.entity';
+import { User, UserRole } from '../entities/user.entity';
+import { Auth } from '../authentication/decorators/auth.decorator';
 
 @ApiTags('Users')
 @Controller('users')
@@ -26,6 +27,7 @@ export class UsersController {
     constructor(private usersService: UsersService) { }
 
     @Get('/all')
+    @Auth()
     @ApiResponse({ status: 200, type: PaginatedUsersResponseDto })
     async getAllUsers(
         @Query() query: GetUsersQueryDto,
@@ -35,6 +37,7 @@ export class UsersController {
     }
 
     @Get('/get/:id')
+    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 200, type: User })
     async getUserId(@Param() idUser: ParameterIdDto, @Res() res: Response) {
         this.usersService.getUserId(idUser.id, res);
@@ -59,6 +62,7 @@ export class UsersController {
     }
 
     @Post('/set-active/:id')
+    @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 200, type: User })
     async setUserActive(
         @Param() idUser: ParameterIdDto,

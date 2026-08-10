@@ -162,10 +162,16 @@ export class UserRmService {
     }
 
     async createUserRm(
+        currentUserId: string,
         createUserRmDto: CreateUserRmDto,
         res: Response
     ) {
         try {
+            // Un usuario solo puede crear RMs para sí mismo
+            if (createUserRmDto.user_id !== currentUserId) {
+                return res.status(403).send({ error: 'No podés crear RMs para otro usuario.' });
+            }
+
             // Validar que todos los usuarios y el ejercicio existen en la base de datos
             const user = await this.userService._getUserById(createUserRmDto.user_id);
             const exercise = await this.exercisesService._getExerciseById(createUserRmDto.exercise_id);
@@ -205,6 +211,7 @@ export class UserRmService {
     }
 
     async editUserRm(
+        currentUserId: string,
         idUserRm: string,
         editUserRmDto: EditUserRmDto,
         res: Response
@@ -213,6 +220,11 @@ export class UserRmService {
             const userRm = await this.userRmRepository.findOne({ where: { id: idUserRm } });
             if (!userRm) {
                 return res.status(404).send({ error: 'RM de usuario no encontrado' });
+            }
+
+            // Solo el dueño puede editar su RM, y no puede reasignarlo a otro usuario
+            if (userRm.user_id !== currentUserId || editUserRmDto.user_id !== currentUserId) {
+                return res.status(403).send({ error: 'No podés editar RMs de otro usuario.' });
             }
 
             if (userRm.user_id !== editUserRmDto.user_id) {
@@ -258,6 +270,7 @@ export class UserRmService {
     }
 
     async deleteUserRm(
+        currentUserId: string,
         userRmId: string,
         res: Response
     ) {
@@ -265,6 +278,10 @@ export class UserRmService {
             const userRm = await this.userRmRepository.findOne({ where: { id: userRmId } });
             if (!userRm) {
                 return res.status(404).send({ error: 'RM de usuario no encontrado' });
+            }
+            // Solo el dueño puede eliminar su RM
+            if (userRm.user_id !== currentUserId) {
+                return res.status(403).send({ error: 'No podés eliminar RMs de otro usuario.' });
             }
             await this.userRmRepository.remove(userRm);
             res.status(200).send({ message: 'RM de usuario eliminado correctamente' });

@@ -17,6 +17,8 @@ import { CreateMuscleGroupDto } from '../dtos/muscle_groups/create_muscle_group.
 import { EditMuscleGroupDto } from '../dtos/muscle_groups/edit_muscle_group.dto';
 import { Muscle } from '../entities/muscle.entity';
 import { MuscleGroup } from '../entities/muscle_group.entity';
+import { UserRole } from '../entities/user.entity';
+import { Auth } from '../authentication/decorators/auth.decorator';
 
 @ApiTags('Muscles')
 @Controller('muscles')
@@ -38,6 +40,7 @@ export class MusclesController {
     }
 
     @Post('create')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 201, type: Muscle })
     async createMuscle(
         @Body() createMuscleDto: CreateMuscleDto,
@@ -47,6 +50,7 @@ export class MusclesController {
     }
 
     @Post('edit/:id')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: Muscle })
     async editMuscle(
         @Param() idMuscle: ParameterIdDto,
@@ -57,6 +61,7 @@ export class MusclesController {
     }
 
     @Delete(':id')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200 })
     async deleteMuscle(
         @Param() idMuscle: ParameterIdDto,
@@ -80,6 +85,7 @@ export class MusclesController {
     }
 
     @Post('mg/create')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 201, type: MuscleGroup })
     async createMuscleGroup(
         @Body() createMuscleGroupDto: CreateMuscleGroupDto,
@@ -89,6 +95,7 @@ export class MusclesController {
     }
 
     @Post('mg/edit/:id')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: MuscleGroup })
     async editMuscleGroup(
         @Param() idMuscleGroup: ParameterIdDto,
@@ -99,6 +106,7 @@ export class MusclesController {
     }
 
     @Delete('mg/:id')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200 })
     async deleteMuscleGroup(
         @Param() idMuscleGroup: ParameterIdDto,

@@ -6,6 +6,7 @@ import { Routine } from '../entities/routine.entity';
 import { Circuit } from '../entities/circuit.entity';
 import { RoutineExercise } from '../entities/routine_exercise.entity';
 import { ExerciseSet } from '../entities/exercise_set.entity';
+import { AuthModule } from '../authentication/auth.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([
@@ -13,7 +14,7 @@ import { ExerciseSet } from '../entities/exercise_set.entity';
     Circuit,
     RoutineExercise,
     ExerciseSet,
-  ])],
+  ]), AuthModule],
   controllers: [RoutineController],
   providers: [RoutineService]
 })

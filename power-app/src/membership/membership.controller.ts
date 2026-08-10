@@ -17,6 +17,8 @@ import { RegisterMembershipPaymentDto } from '../dtos/membership/register_member
 import { SetMembershipActiveDto } from '../dtos/membership/set_membership_active.dto';
 import { Membership } from '../entities/membership.entity';
 import { MembershipPayment } from '../entities/membership_payment.entity';
+import { UserRole } from '../entities/user.entity';
+import { Auth } from '../authentication/decorators/auth.decorator';
 
 @ApiTags('Membership')
 @Controller('membership')
@@ -38,6 +40,7 @@ export class MembershipController {
     }
 
     @Post('create')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 201, type: Membership })
     async createMembership(
         @Body() createMembershipDto: CreateMembershipDto,
@@ -47,6 +50,7 @@ export class MembershipController {
     }
 
     @Post('edit/:id')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: Membership })
     async editMembership(
         @Param() idMembership: ParameterIdDto,
@@ -57,6 +61,7 @@ export class MembershipController {
     }
 
     @Post('set-active/:id')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: Membership })
     async setMembershipActive(
         @Param() idMembership: ParameterIdDto,
@@ -67,6 +72,7 @@ export class MembershipController {
     }
 
     @Get('payment/user/:id')
+    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 200, type: [MembershipPayment] })
     async getUserMembershipPayments(
         @Param() userId: ParameterIdDto,
@@ -76,6 +82,7 @@ export class MembershipController {
     }
 
     @Post('payment/register')
+    @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 201, type: MembershipPayment })
     async registerMembershipPayment(
         @Body() registerMembershipPaymentDto: RegisterMembershipPaymentDto,
