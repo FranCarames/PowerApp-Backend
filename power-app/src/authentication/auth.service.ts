@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { User, UserRole } from '../entities/user.entity';
+import { AuthUser } from './auth-user.interface';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt/dist/jwt.service';
 
@@ -71,6 +72,29 @@ export class AuthService {
     }
   }
 
+  /**
+   * Verifica el token y resuelve la identidad para los guards: { id, role, active }.
+   * Un único lookup a DB, así el rol y el estado de cuenta siempre salen frescos.
+   */
+  async getAuthUserFromToken(token: string): Promise<AuthUser | null> {
+    const userId = await this.verifyJwtToken(token);
+
+    if (!userId) {
+      return null;
+    }
+
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: { id: true, role: true, active: true },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return { id: user.id, role: user.role, active: user.active };
+  }
+
   async authenticateUser(userCredentials: LoginUserDto): Promise<User | null> {
     const { email, password } = userCredentials;
 
@@ -99,8 +123,8 @@ export class AuthService {
     // Buscar al usuario por su correo electrónico
     const user = await this.usersRepository.findOne({ where: { email } });
 
-    if (!user) {
-      return null; // No se encontró un usuario con el correo electrónico proporcionado
+    if (!user || !user.temp_password) {
+      return null; // No hay usuario, o no tiene contraseña temporal → credenciales inválidas (evita bcrypt.compare con hash null)
     }
 
     // Verificar la contraseña utilizando bcrypt

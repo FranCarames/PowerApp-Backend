@@ -2,23 +2,20 @@ import {
   Controller,
   Get,
   Post,
-  Delete,
   Body,
   Param,
-  Headers,
   Res,
 } from '@nestjs/common';
-import { ApiTags, ApiResponse, ApiBearerAuth, ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
+import { ApiTags, ApiResponse, ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
 import { CoachService } from './coach.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { PromoteCoachDto } from '../dtos/coach/promote_coach.dto';
-import { AuthenticableDTO } from '../dtos/authenticable.dto';
 import { Coach } from '../entities/coach.entity';
-import { User } from '../entities/user.entity';
+import { User, UserRole } from '../entities/user.entity';
+import { Auth } from '../authentication/decorators/auth.decorator';
 
 @ApiTags('Coach')
-@ApiBearerAuth()
 @ApiExtraModels(User, Coach)
 @Controller('coach')
 export class CoachController {
@@ -40,22 +37,17 @@ export class CoachController {
     }
 
     @Post('/promote_user')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: User })
     async promoteUserToCoach(
-        @Headers() header: AuthenticableDTO,
         @Body() promoteCoachDto: PromoteCoachDto,
         @Res() res: Response,
     ) {
-        const accessToken = header.authorization;
-
-        if (accessToken) {
-            this.coachService.promoteUserToCoach(accessToken, promoteCoachDto, res);
-        } else {
-            res.status(401).send({ error: 'Access Token no encontrado.' });
-        }
+        this.coachService.promoteUserToCoach(promoteCoachDto, res);
     }
 
     @Post('/delete_coach/:id')
+    @Auth(UserRole.admin)
     @ApiResponse({
         status: 200,
         schema: {
@@ -75,16 +67,9 @@ export class CoachController {
         }
     })
     async deleteCoach(
-        @Headers() header: AuthenticableDTO,
         @Param() idCoach: ParameterIdDto,
         @Res() res: Response,
     ) {
-        const accessToken = header.authorization;
-
-        if (accessToken) {
-            this.coachService.deleteCoach(accessToken, idCoach.id, res);
-        } else {
-            res.status(401).send({ error: 'Access Token no encontrado.' });
-        }
+        this.coachService.deleteCoach(idCoach.id, res);
     }
 }

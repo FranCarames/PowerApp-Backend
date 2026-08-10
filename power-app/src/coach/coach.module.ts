@@ -6,11 +6,11 @@ import { TypeOrmModule } from '@nestjs/typeorm/dist/typeorm.module';
 import { Coach } from '../entities/coach.entity';
 import { User } from '../entities/user.entity';
 import { UsersService } from '../users/users.service';
-import { AuthService } from '../authentication/auth.service';
+import { AuthModule } from '../authentication/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Coach, User])],
+  imports: [TypeOrmModule.forFeature([Coach, User]), AuthModule],
   controllers: [CoachController],
-  providers: [CoachService, UsersService, AuthService]
+  providers: [CoachService, UsersService]
 })
 export class CoachModule {}
