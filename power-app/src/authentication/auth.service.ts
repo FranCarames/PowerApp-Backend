@@ -5,6 +5,7 @@ import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { User, UserRole } from '../entities/user.entity';
 import { AuthUser } from './auth-user.interface';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { JwtService } from '@nestjs/jwt/dist/jwt.service';
 
 @Injectable()
@@ -146,6 +147,20 @@ export class AuthService {
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         return hashedPassword;
+    }
+
+    /**
+     * Genera una contraseña temporal aleatoria (alfanumérica, sin caracteres
+     * ambiguos). Se usa en la recuperación de contraseña (CU-U-04).
+     */
+    generateRandomPassword(length = 10): string {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+        const bytes = randomBytes(length);
+        let out = '';
+        for (let i = 0; i < length; i++) {
+            out += chars[bytes[i] % chars.length];
+        }
+        return out;
     }
 }
 

@@ -8,6 +8,7 @@ import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
 import { SetUserActiveDto } from '../dtos/user/set_user_active.dto';
+import { RecoverPasswordDto } from '../dtos/user/recover_password.dto';
 import { User, UserRole } from '../entities/user.entity';
 import { AuthService } from '../authentication/auth.service';
 
@@ -170,6 +171,42 @@ export class UsersService {
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al actualizar el estado de la cuenta' });
+        }
+    }
+
+    // CU-U-03 — Cerrar sesión
+    async logout(res: Response) {
+        // El token es JWT stateless: el logout efectivo lo hace el cliente descartando el token.
+        // El servidor solo confirma; un token vencido tampoco es un error acá (camino alternativo del CU).
+        res.status(200).send({ message: 'Sesión cerrada correctamente' });
+    }
+
+    // CU-U-04 — Recuperar contraseña
+    async recoverPassword(
+        recoverPasswordDto: RecoverPasswordDto,
+        res: Response
+    ) {
+        try {
+            const { email } = recoverPasswordDto;
+            const user = await this.usersRepository.findOne({ where: { email } });
+
+            if (user) {
+                const tempPassword = this.authService.generateRandomPassword();
+                user.temp_password = await this.authService.hashPassword(tempPassword);
+                user.updated_at = new Date();
+                await this.usersRepository.save(user);
+
+                // TODO: integrar un servicio de email real (nodemailer/SMTP). Por ahora se loguea la temporal.
+                console.log(`[EMAIL STUB] Contraseña temporal para ${email}: ${tempPassword}`);
+            }
+
+            // Por seguridad, misma respuesta exista o no el email (no revelar si está registrado).
+            return res.status(200).send({
+                message: 'Si el email está registrado, te enviamos una contraseña temporal.',
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).send({ error: 'No se pudo procesar la recuperación de contraseña. Intentá de nuevo.' });
         }
     }
 }

@@ -17,6 +17,7 @@ import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
 import { PaginatedUsersResponseDto } from '../dtos/user/paginated_users_response.dto';
 import { SetUserActiveDto } from '../dtos/user/set_user_active.dto';
+import { RecoverPasswordDto } from '../dtos/user/recover_password.dto';
 import { User, UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
 
@@ -59,6 +60,21 @@ export class UsersController {
         @Res() res: Response,
     ) {
         this.usersService.loginUser(loginUserDto, res);
+    }
+
+    @Post('/logout')
+    @ApiResponse({ status: 200 })
+    async logout(@Res() res: Response) {
+        this.usersService.logout(res);
+    }
+
+    @Post('/recover-password')
+    @ApiResponse({ status: 200 })
+    async recoverPassword(
+        @Body() recoverPasswordDto: RecoverPasswordDto,
+        @Res() res: Response,
+    ) {
+        this.usersService.recoverPassword(recoverPasswordDto, res);
     }
 
     @Post('/set-active/:id')
