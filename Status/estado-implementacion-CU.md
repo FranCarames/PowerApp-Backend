@@ -61,6 +61,21 @@
 
 ---
 
+## Próximas semanas — cronograma del servidor (hasta 4/9)
+
+> Organizado por **viernes** (clases). El **7/8** (infra y transversales) ya está encaminado: DB regenerada, autorización centralizada con Guards y CU-U-03/U-04 implementados. Lo que sigue, hasta la **fecha límite de entrega del servidor (4/9)**:
+
+| Viernes | Foco | Casos de uso |
+|---|---|---|
+| **14/8** | CU sin dependencias | Estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**); cambiar contraseña (**U-05**), editar datos personales (**U-06**); detalle de ejercicio (**U-10**), filtrar RMs por usuario (**U-11**), RMs potenciales (**U-16**) |
+| **21/8** | Circuitos | Crear el módulo `Circuit` desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (**E-21→E-24**) |
+| **28/8** | Rutinas | Implementar el service de rutinas (**E-15→E-18**); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
+| **4/9** | Planificaciones y cierre | Service de planificaciones (**E-08→E-11**); asignar rutinas y planificaciones a alumnos (**E-12→E-14**); planificación activa y detalle de rutina del usuario (**U-08, U-09**); pruebas de integración sobre la API + Swagger. **🎯 Hito: servidor con los 72 CU cubiertos** |
+
+> Secuencia según dependencias: primero los CU independientes, luego **Circuitos**, sobre ellos las **Rutinas** y por último las **Planificaciones** que las agrupan.
+
+---
+
 ## Detalle — Rol Usuario (20 CU · 50%)
 
 ### Administrar mi cuenta

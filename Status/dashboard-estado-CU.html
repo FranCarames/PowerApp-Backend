@@ -298,8 +298,8 @@
       <div class="finding">
         <div class="fi">02</div>
         <div>
-          <h4>El módulo <code>/auth</code> está completamente comentado</h4>
-          <p>Logout, recuperar contraseña y registro social (Google/FB/Apple) están comentados en <code>authentication.controller.ts</code>. El registro y login reales viven en <code>/users</code>. Esto deja sin cubrir U-03 y U-04.</p>
+          <h4>✅ Resuelto — módulo <code>/auth</code></h4>
+          <p>El módulo viejo (todo comentado) se eliminó; <b>logout (U-03)</b> y <b>recuperar contraseña (U-04)</b> se implementaron en <code>/users</code>. Queda pendiente el registro social, fuera de los 72 CU.</p>
         </div>
       </div>
       <div class="finding">
@@ -326,10 +326,28 @@
       <div class="finding">
         <div class="fi">06</div>
         <div>
-          <h4>La autorización es manual, no centralizada</h4>
-          <p>Los controllers que exigen sesión leen el header y verifican el token a mano (p. ej. <code>verifyAdminJwtToken</code> en Coach). No hay <em>Guards</em> ni decoradores de rol de NestJS, lo que hará frágil el control de acceso a medida que crezcan los CU de Entrenador y Admin.</p>
+          <h4>✅ Resuelto — autorización centralizada</h4>
+          <p>Se reemplazó la verificación manual del token por <em>Guards</em> + el decorador <code>@Auth(...)</code> de NestJS en los 7 controllers (rol por endpoint, con check de dueño en User RM).</p>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ROADMAP: SERVER -->
+  <section>
+    <div class="sec-head"><h2>Próximas semanas — servidor</h2><span class="kicker">cronograma hasta 4/9 · entrega del server</span></div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th style="width:78px">Viernes</th><th style="width:170px">Foco</th><th>Casos de uso</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="cu">14/8</td><td class="name">CU sin dependencias</td><td>Estado y tipos de membresía + alumnos por estado/tipo (<b>E-26→E-28</b>); cambiar contraseña (<b>U-05</b>), editar datos (<b>U-06</b>); detalle de ejercicio (<b>U-10</b>), filtrar RMs por usuario (<b>U-11</b>), RMs potenciales (<b>U-16</b>)</td></tr>
+          <tr><td class="cu">21/8</td><td class="name">Circuitos</td><td>Crear el módulo <code>Circuit</code> desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (<b>E-21→E-24</b>)</td></tr>
+          <tr><td class="cu">28/8</td><td class="name">Rutinas</td><td>Service de rutinas (<b>E-15→E-18</b>); asignar/desasignar rutinas a alumnos (<b>E-19, E-20</b>); marcar series (<b>U-12</b>) y notas del ejercicio (<b>U-13</b>); historial de entrenamientos y su filtro (<b>E-06, E-07</b>)</td></tr>
+          <tr><td class="cu">4/9</td><td class="name">Planificaciones y cierre</td><td>Service de planificaciones (<b>E-08→E-11</b>); asignar rutinas y planificaciones a alumnos (<b>E-12→E-14</b>); planificación activa y detalle de rutina (<b>U-08, U-09</b>); pruebas de integración + Swagger. <b>🎯 Hito: servidor con los 72 CU</b></td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
