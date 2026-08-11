@@ -7,22 +7,30 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 38 | 53% | Endpoint existe y su service ejecuta lógica real |
+| ✅ Implementado | 40 | 56% | Endpoint existe y su service ejecuta lógica real |
 | 🟡 Parcial | 2 | 3% | Funciona a medias / resuelto dentro de otro endpoint |
 | 🔵 Andamiaje | 14 | 19% | Ruta declarada pero service vacío y llamada comentada |
-| ⬜ No implementado | 18 | 25% | Sin endpoint, service ni módulo |
+| ⬜ No implementado | 16 | 22% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
 
-**40 de 72 CU con código implementado o parcial (~56%).** Los otros 32 son trabajo pendiente (andamiaje + no implementado).
-> **Nota:** varios cambios recientes (columnas `active` en `Membership` y `User`) requieren **regenerar la DB** para funcionar; hasta entonces esos endpoints fallan (ver *Cambios recientes*).
+**42 de 72 CU con código implementado o parcial (~58%).** Los otros 30 son trabajo pendiente (andamiaje + no implementado).
+> **Nota:** la DB de Render fue **regenerada** con los scripts actualizados (incluye las columnas `active` de `Membership` y `User`), así que esos endpoints ya funcionan en runtime.
 
 ### Cobertura por rol
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
-| Usuario | 20 | 8 | 2 | 2 | 8 | 40% |
+| Usuario | 20 | 10 | 2 | 2 | 6 | 50% |
 | Entrenador | 29 | 7 | 0 | 12 | 10 | 24% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
+
+## Cambios recientes (2026-08-11)
+
+- **Autorización centralizada (Guards):** se reemplazó la verificación manual de token por Guards + decorador `@Auth(...)` de NestJS en los 7 controllers (rol por endpoint, `@Auth(user)` + check de dueño en User RM). Resuelve el hallazgo #6.
+- **CU-U-03 (cerrar sesión)** ✅: `POST /users/logout` responde 200 (ack). El JWT es stateless → el logout efectivo lo hace el cliente descartando el token; sin denylist server-side (no lo pide la spec).
+- **CU-U-04 (recuperar contraseña)** ✅: `POST /users/recover-password` genera una `temp_password` aleatoria, la hashea/persiste y responde el **mismo mensaje** exista o no el email (no revela). **Email stubbeado** (la temporal se loguea en consola; falta integrar un servicio de mail real). No requiere cambio de schema (`temp_password` ya existía).
+- El módulo `/auth` viejo (todo comentado) se **eliminó**; logout y recuperación viven en `/users`.
+- Se corrigió un crash de login: `authenticateTemporaryPassword` cortaba con `bcrypt.compare(null)` cuando `temp_password` es null → ahora devuelve 401 limpio.
 
 ## Cambios recientes (2026-08-06)
 
@@ -44,24 +52,24 @@
 ## Hallazgos estructurales
 
 1. **Routine y Planification son andamiaje puro.** Ambos `controller` declaran todas sus rutas, pero `routine.service.ts` y `planification.service.ts` están vacíos y cada llamada al service está comentada. Son **14 CU** (E-08→E-19, U-08, U-09): el mayor bloque de trabajo pendiente.
-2. **El módulo `/auth` está completamente comentado** (`authentication.controller.ts`): logout, recuperar contraseña y registro social no funcionan. El registro/login reales viven en `/users`. Deja sin cubrir U-03 y U-04.
+2. ~~**El módulo `/auth` está completamente comentado.**~~ **Resuelto (2026-08-11):** el módulo viejo se eliminó; logout (U-03) y recuperar contraseña (U-04) se implementaron en `/users`. Queda pendiente el registro social (fuera de los 72 CU).
 3. **No existe el módulo de Circuitos** (E-21→E-24): ni controller, ni service, ni ruta.
 4. **Falta la gestión de "Mi Cuenta" del usuario:** cambiar contraseña (U-05), editar datos (U-06), marcar serie (U-12), notas (U-13), RM potenciales (U-16).
 5. **No hay endpoints de "alumnos"** con filtro por rol/entrenador ni tracking de entrenamientos (historiales E-06/E-07) ni estados/tipos de membresía agregados (E-26→E-28).
-6. **La autorización es manual, no centralizada:** los controllers verifican el token a mano (ej. `verifyAdminJwtToken` en Coach). No hay Guards ni decoradores de rol de NestJS.
+6. ~~**La autorización es manual, no centralizada.**~~ **Resuelto (2026-08-11):** se centralizó con Guards + `@Auth(...)` en los 7 controllers (ver *Cambios recientes 2026-08-11*).
 7. **Sin infraestructura de migraciones y `synchronize: false`.** No existe carpeta `migrations`, `data-source` ni scripts typeorm en `package.json`. Todo cambio de columna en una entidad requiere definir cómo se aplica al schema.
 
 ---
 
-## Detalle — Rol Usuario (20 CU · 40%)
+## Detalle — Rol Usuario (20 CU · 50%)
 
 ### Administrar mi cuenta
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-U-01 | Registrar usuario | ✅ Implementado | `POST /users/register` |
 | CU-U-02 | Login | ✅ Implementado | `POST /users/login` |
-| CU-U-03 | Cerrar sesión | ⬜ No implementado | `/auth/logout` comentado |
-| CU-U-04 | Recuperar contraseña | ⬜ No implementado | `/auth/forgot_password` comentado |
+| CU-U-03 | Cerrar sesión | ✅ Implementado | `POST /users/logout` · ack 200, el cliente descarta el token |
+| CU-U-04 | Recuperar contraseña | ✅ Implementado | `POST /users/recover-password` · genera `temp_password`; email stubbeado |
 | CU-U-05 | Cambiar contraseña | ⬜ No implementado | sin endpoint |
 | CU-U-06 | Editar datos personales | ⬜ No implementado | sin endpoint |
 | CU-U-07 | Obtener historial de pagos | ✅ Implementado | `GET /membership/payment/user/:id` |
