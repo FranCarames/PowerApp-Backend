@@ -40,7 +40,7 @@ export class User {
     password!: string;
 
     @Exclude()
-    @Column({ length: 255, nullable: true })
+    @Column({ type: 'varchar', length: 255, nullable: true })
     temp_password?: string | null;
 
     @ApiProperty({ enum: UserRole, default: UserRole.user })
