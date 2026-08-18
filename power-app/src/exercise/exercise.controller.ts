@@ -69,4 +69,15 @@ export class ExerciseController {
     ) {
         this.exerciseService.getAllExercisedMuscles(res);
     }
+
+    @Get(':id')
+    @Auth()
+    @ApiResponse({ status: 200, type: Exercise })
+    @ApiResponse({ status: 404, description: 'Ejercicio no encontrado' })
+    async getExerciseById(
+        @Param() idExercise: ParameterIdDto,
+        @Res() res: Response,
+    ) {
+        this.exerciseService.getExerciseById(idExercise.id, res);
+    }
 }

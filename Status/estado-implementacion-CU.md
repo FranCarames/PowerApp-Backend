@@ -31,7 +31,10 @@
 - **Nuevo helper `AuthService.comparePassword(plain, hash)`**: compara contra un hash ya persistido y devuelve `false` si el hash es null, en vez de dejar que `bcrypt.compare` rompa.
 - **`User.temp_password` pasó a `string | null` en TypeScript** para reflejar el `nullable: true` que la columna ya tenía. **No es un cambio de schema** — la DB no cambia y `Db Creator` no se toca.
 - **CU-U-11 (ver mis RMs de un ejercicio)** ✅ *(era 🟡 parcial)*: nuevo `GET /user_rm/user/:idUser/exercise/:idExercise` con **check de dueño** — si el rol es `user`, el `:idUser` tiene que coincidir con el del token (403 si no); coach y admin consultan el de cualquier alumno. Devuelve los RMs ordenados por `date` DESC. Se eligió el path con los dos ids (en vez de un `/me/...`) para que el mismo endpoint le sirva al entrenador como drill-down por ejercicio sobre CU-E-04. Nuevo DTO `UserExerciseParamsDto` (dos UUIDs), porque `ParameterIdDto` sólo contempla uno.
-- **Pendientes del 14/8**: U-10, U-16 y E-26→E-28 quedan a la espera de definiciones.
+- **CU-U-10 (ver detalle de un ejercicio)** 🟡 *sigue parcial*: se expuso `GET /exercise/:id` con `@Auth()`, que devuelve la **ficha de catálogo** del ejercicio (descripción, tips, video, imágenes y músculos trabajados) reutilizando el `getExerciseById` que ya existía en el service.
+  - **Ojo con el alcance:** la spec de U-10 no pide sólo la ficha, sino el detalle del ejercicio **dentro de la rutina** — el `Exercise` con sus `Exercise_Set` ordenadas (reps, peso, RPE/RIR, AMRAP/RM) y las notas `coach_note`/`user_note` — con la precondición de que el ejercicio pertenezca a una rutina asignada vigente, e incluye («include») a U-11, U-12 y U-13. Ese camino pasa por `Routine_Exercise` → `Exercise_Set` desde la rutina del usuario, o sea por `RoutineService` (vacío) y el módulo `Circuit` (inexistente): **queda atado al bloque del 28/8**. La nota anterior del informe («falta exponer `GET /exercise/:id`») subestimaba el alcance real.
+  - **Inconsistencia de auth a resolver:** el endpoint nuevo pide sesión (`@Auth()`), siguiendo la precondición de la spec, pero `GET /exercise/all` sigue siendo **público**. Conviene alinear los dos criterios.
+- **Pendientes del 14/8**: U-16 y E-26→E-28 quedan a la espera de definiciones.
 
 ## Cambios recientes (2026-08-11)
 
@@ -76,7 +79,7 @@
 
 | Viernes | Foco | Casos de uso |
 |---|---|---|
-| **14/8** ⏳ | CU sin dependencias — **3 de 8** | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**) · ⏸️ **pendientes:** estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**), detalle de ejercicio (**U-10**), RMs potenciales (**U-16**) |
+| **14/8** ⏳ | CU sin dependencias — **3 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**) · 🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas · ⏸️ **pendientes:** estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**), RMs potenciales (**U-16**) |
 | **21/8** | Circuitos | Crear el módulo `Circuit` desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (**E-21→E-24**) |
 | **28/8** | Rutinas | Implementar el service de rutinas (**E-15→E-18**); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
 | **4/9** | Planificaciones y cierre | Service de planificaciones (**E-08→E-11**); asignar rutinas y planificaciones a alumnos (**E-12→E-14**); planificación activa y detalle de rutina del usuario (**U-08, U-09**); pruebas de integración sobre la API + Swagger. **🎯 Hito: servidor con los 72 CU cubiertos** |
@@ -105,7 +108,7 @@
 |---|---|---|---|
 | CU-U-08 | Obtener mi planificación | 🔵 Andamiaje | `GET /planification/user/:id/active` · service vacío |
 | CU-U-09 | Ver detalle de rutina | 🔵 Andamiaje | `GET /routine/:id` · service vacío |
-| CU-U-10 | Ver detalle de un ejercicio | 🟡 Parcial | `getExerciseById` existe; falta exponer `GET /exercise/:id` |
+| CU-U-10 | Ver detalle de un ejercicio | 🟡 Parcial | `GET /exercise/:id` ✅ expuesto (ficha de catálogo) · **falta** el detalle en contexto de rutina (`Exercise_Set` ordenadas, notas) — depende de Rutinas |
 | CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user`, orden por fecha DESC |
 | CU-U-12 | Marcar serie como realizado | ⬜ No implementado | sin endpoint (Exercise_Set) |
 | CU-U-13 | Dejar una nota en el ejercicio | ⬜ No implementado | sin endpoint |
