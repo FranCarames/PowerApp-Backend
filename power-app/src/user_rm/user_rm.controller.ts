@@ -13,6 +13,7 @@ import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { CreateUserRmDto } from '../dtos/user_rm/create_user_rm.dto';
 import { EditUserRmDto } from '../dtos/user_rm/edit_user_rm.dto';
+import { UserExerciseParamsDto } from '../dtos/user_rm/user_exercise_params.dto';
 import { UserRM } from '../entities/user_rm.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
@@ -51,6 +52,18 @@ export class UserRmController {
         @Res() res: Response
     ) {
         this.userRmService.getAllUserRmsByUserId(idUser.id, res);
+    }
+
+    @Get('/user/:idUser/exercise/:idExercise')
+    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: [UserRM] })
+    @ApiResponse({ status: 403, description: 'Un alumno sólo puede consultar sus propios RMs' })
+    async getUserRmsByUserAndExercise(
+        @CurrentUser() user: AuthUser,
+        @Param() params: UserExerciseParamsDto,
+        @Res() res: Response
+    ) {
+        this.userRmService.getUserRmsByUserAndExercise(user, params.idUser, params.idExercise, res);
     }
 
     @Get('/exercise/:id')

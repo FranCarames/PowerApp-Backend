@@ -7,8 +7,8 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 42 | 58% | Endpoint existe y su service ejecuta lógica real |
-| 🟡 Parcial | 2 | 3% | Funciona a medias / resuelto dentro de otro endpoint |
+| ✅ Implementado | 43 | 60% | Endpoint existe y su service ejecuta lógica real |
+| 🟡 Parcial | 1 | 1% | Funciona a medias / resuelto dentro de otro endpoint |
 | 🔵 Andamiaje | 14 | 19% | Ruta declarada pero service vacío y llamada comentada |
 | ⬜ No implementado | 14 | 19% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
@@ -20,7 +20,7 @@
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
-| Usuario | 20 | 12 | 2 | 2 | 4 | 60% |
+| Usuario | 20 | 13 | 1 | 2 | 4 | 65% |
 | Entrenador | 29 | 7 | 0 | 12 | 10 | 24% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
 
@@ -30,7 +30,8 @@
 - **CU-U-06 (editar datos personales)** ✅: `POST /users/edit` sobre el **propio** registro — el id sale de `@CurrentUser()`, no del path, así que no hay forma de editar a otro usuario. Todos los campos son opcionales (`first_name`, `last_name`, `email`, `phone_prefix`, `phone_number`, `profile_picture`); sólo se persisten los que vienen. Si cambia el email se valida unicidad (409) y se resetea `email_verified`; si cambia el teléfono se resetea `phone_verified`.
 - **Nuevo helper `AuthService.comparePassword(plain, hash)`**: compara contra un hash ya persistido y devuelve `false` si el hash es null, en vez de dejar que `bcrypt.compare` rompa.
 - **`User.temp_password` pasó a `string | null` en TypeScript** para reflejar el `nullable: true` que la columna ya tenía. **No es un cambio de schema** — la DB no cambia y `Db Creator` no se toca.
-- **Pausados a pedido**: el resto del bloque del 14/8 (U-10, U-11, U-16, E-26→E-28) queda en espera de definiciones.
+- **CU-U-11 (ver mis RMs de un ejercicio)** ✅ *(era 🟡 parcial)*: nuevo `GET /user_rm/user/:idUser/exercise/:idExercise` con **check de dueño** — si el rol es `user`, el `:idUser` tiene que coincidir con el del token (403 si no); coach y admin consultan el de cualquier alumno. Devuelve los RMs ordenados por `date` DESC. Se eligió el path con los dos ids (en vez de un `/me/...`) para que el mismo endpoint le sirva al entrenador como drill-down por ejercicio sobre CU-E-04. Nuevo DTO `UserExerciseParamsDto` (dos UUIDs), porque `ParameterIdDto` sólo contempla uno.
+- **Pendientes del 14/8**: U-10, U-16 y E-26→E-28 quedan a la espera de definiciones.
 
 ## Cambios recientes (2026-08-11)
 
@@ -75,7 +76,7 @@
 
 | Viernes | Foco | Casos de uso |
 |---|---|---|
-| **14/8** ⏳ | CU sin dependencias — **2 de 8** | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**) · ⏸️ **en pausa, a la espera de definiciones:** estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**), detalle de ejercicio (**U-10**), filtrar RMs por usuario (**U-11**), RMs potenciales (**U-16**) |
+| **14/8** ⏳ | CU sin dependencias — **3 de 8** | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**) · ⏸️ **pendientes:** estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**), detalle de ejercicio (**U-10**), RMs potenciales (**U-16**) |
 | **21/8** | Circuitos | Crear el módulo `Circuit` desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (**E-21→E-24**) |
 | **28/8** | Rutinas | Implementar el service de rutinas (**E-15→E-18**); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
 | **4/9** | Planificaciones y cierre | Service de planificaciones (**E-08→E-11**); asignar rutinas y planificaciones a alumnos (**E-12→E-14**); planificación activa y detalle de rutina del usuario (**U-08, U-09**); pruebas de integración sobre la API + Swagger. **🎯 Hito: servidor con los 72 CU cubiertos** |
@@ -86,7 +87,7 @@
 
 ---
 
-## Detalle — Rol Usuario (20 CU · 60%)
+## Detalle — Rol Usuario (20 CU · 65%)
 
 ### Administrar mi cuenta
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -105,7 +106,7 @@
 | CU-U-08 | Obtener mi planificación | 🔵 Andamiaje | `GET /planification/user/:id/active` · service vacío |
 | CU-U-09 | Ver detalle de rutina | 🔵 Andamiaje | `GET /routine/:id` · service vacío |
 | CU-U-10 | Ver detalle de un ejercicio | 🟡 Parcial | `getExerciseById` existe; falta exponer `GET /exercise/:id` |
-| CU-U-11 | Ver mis RMs de un ejercicio | 🟡 Parcial | `GET /user_rm/exercise/:id` · no filtra por usuario |
+| CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user`, orden por fecha DESC |
 | CU-U-12 | Marcar serie como realizado | ⬜ No implementado | sin endpoint (Exercise_Set) |
 | CU-U-13 | Dejar una nota en el ejercicio | ⬜ No implementado | sin endpoint |
 | CU-U-14 | Temporizador | ⬜ No implementado | sin endpoint (probable front-end) |

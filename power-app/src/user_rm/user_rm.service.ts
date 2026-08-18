@@ -4,10 +4,11 @@ import { Response } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRM } from '../entities/user_rm.entity';
-import { User } from '../entities/user.entity';
+import { User, UserRole } from '../entities/user.entity';
 import { Exercise } from '../entities/exercise.entity';
 import { CreateUserRmDto } from '../dtos/user_rm/create_user_rm.dto';
 import { EditUserRmDto } from '../dtos/user_rm/edit_user_rm.dto';
+import { AuthUser } from '../authentication/auth-user.interface';
 // import { Exercise } from '../entities/exercise.entity';
 // import { EditExerciseDto } from '../dtos/exercise/edit_exercise.dto';
 // import { ExercisedMuscle } from '../entities/exercised_muscle.entity';
@@ -158,6 +159,50 @@ export class UserRmService {
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener los RMs de los usuarios.' });
+        }
+    }
+
+    // CU-U-11 — Ver mis RMs de un ejercicio
+    async getUserRmsByUserAndExercise(
+        currentUser: AuthUser,
+        idUser: string,
+        idExercise: string,
+        res: Response
+    ) {
+        try {
+            // Un alumno sólo puede consultar sus propios RMs; coach y admin ven los de cualquiera.
+            if (currentUser.role === UserRole.user && currentUser.id !== idUser) {
+                return res.status(403).send({ error: 'No podés consultar los RMs de otro usuario.' });
+            }
+
+            const userRms = await this.userRmRepository.find({
+                where: { user_id: idUser, exercise_id: idExercise },
+                relations: ['exercise', 'user'],
+                select: {
+                    id: true,
+                    weight: true,
+                    reps: true,
+                    date: true,
+                    created_at: true,
+                    updated_at: true,
+                    exercise: {
+                        id: true,
+                        name: true
+                    },
+                    user: {
+                        id: true,
+                        first_name: true,
+                        last_name: true
+                    }
+                },
+                // Del más reciente al más viejo: sirve como referencia de progreso durante la ejecución.
+                order: { date: 'DESC' },
+            });
+
+            res.status(200).send(userRms);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener los RMs del usuario para el ejercicio.' });
         }
     }
 
