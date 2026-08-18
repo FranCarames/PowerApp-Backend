@@ -150,6 +150,18 @@ export class AuthService {
     }
 
     /**
+     * Compara una contraseña en texto plano contra un hash ya persistido.
+     * Devuelve false si el hash es null/vacío (usuario sin contraseña temporal),
+     * en vez de dejar que bcrypt.compare rompa.
+     */
+    async comparePassword(plain: string, hash?: string | null): Promise<boolean> {
+        if (!hash) {
+            return false;
+        }
+        return bcrypt.compare(plain, hash);
+    }
+
+    /**
      * Genera una contraseña temporal aleatoria (alfanumérica, sin caracteres
      * ambiguos). Se usa en la recuperación de contraseña (CU-U-04).
      */

@@ -9,6 +9,8 @@ import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
 import { SetUserActiveDto } from '../dtos/user/set_user_active.dto';
 import { RecoverPasswordDto } from '../dtos/user/recover_password.dto';
+import { ChangePasswordDto } from '../dtos/user/change_password.dto';
+import { EditUserDto } from '../dtos/user/edit_user.dto';
 import { User, UserRole } from '../entities/user.entity';
 import { AuthService } from '../authentication/auth.service';
 
@@ -207,6 +209,96 @@ export class UsersService {
         } catch (error) {
             console.error(error);
             return res.status(500).send({ error: 'No se pudo procesar la recuperación de contraseña. Intentá de nuevo.' });
+        }
+    }
+
+    // CU-U-05 — Cambiar contraseña
+    async changePassword(
+        currentUserId: string,
+        changePasswordDto: ChangePasswordDto,
+        res: Response
+    ) {
+        try {
+            const { current_password, new_password } = changePasswordDto;
+
+            const user = await this.usersRepository.findOne({ where: { id: currentUserId } });
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            // La sesión puede haberse iniciado con la contraseña normal o con la temporal:
+            // cualquiera de las dos habilita el cambio.
+            const matchesPassword = await this.authService.comparePassword(current_password, user.password);
+            const matchesTempPassword = matchesPassword
+                ? false
+                : await this.authService.comparePassword(current_password, user.temp_password);
+
+            if (!matchesPassword && !matchesTempPassword) {
+                return res.status(401).send({ error: 'La contraseña actual es incorrecta' });
+            }
+
+            user.password = await this.authService.hashPassword(new_password);
+            // La temporal queda anulada siempre: una vez cambiada la contraseña deja de ser válida.
+            user.temp_password = null;
+            user.updated_at = new Date();
+
+            await this.usersRepository.save(user);
+
+            res.status(200).send({ message: 'Contraseña actualizada correctamente' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al cambiar la contraseña' });
+        }
+    }
+
+    // CU-U-06 — Editar datos personales
+    async editUser(
+        currentUserId: string,
+        editUserDto: EditUserDto,
+        res: Response
+    ) {
+        try {
+            const user = await this.usersRepository.findOne({ where: { id: currentUserId } });
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            if (editUserDto.email !== undefined && editUserDto.email !== user.email) {
+                const emailTaken = await this.usersRepository.findOne({ where: { email: editUserDto.email } });
+                if (emailTaken) {
+                    return res.status(409).send({ error: 'Ya existe un usuario con ese email' });
+                }
+                user.email = editUserDto.email;
+                // El email nuevo arranca sin verificar.
+                user.email_verified = false;
+            }
+
+            const phonePrefix = editUserDto.phone_prefix ?? user.phone_prefix;
+            const phoneNumber = editUserDto.phone_number ?? user.phone_number;
+            if (phonePrefix !== user.phone_prefix || phoneNumber !== user.phone_number) {
+                user.phone_prefix = phonePrefix;
+                user.phone_number = phoneNumber;
+                // Igual que el email: si cambia el teléfono, se pierde la verificación.
+                user.phone_verified = false;
+            }
+
+            if (editUserDto.first_name !== undefined) {
+                user.first_name = editUserDto.first_name;
+            }
+            if (editUserDto.last_name !== undefined) {
+                user.last_name = editUserDto.last_name;
+            }
+            if (editUserDto.profile_picture !== undefined) {
+                user.profile_picture = editUserDto.profile_picture;
+            }
+
+            user.updated_at = new Date();
+
+            const savedUser = await this.usersRepository.save(user);
+            res.status(200).send(instanceToPlain(savedUser));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al editar los datos personales' });
         }
     }
 }

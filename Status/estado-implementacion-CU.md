@@ -1,28 +1,36 @@
 # PowerApp Backend — Estado de implementación vs. Casos de Uso
 
-> **Corte:** 2026-08-06 · **Fuente:** `Documentation/Especificaciones de CU/especificaciones/` comparado contra `power-app/src`
+> **Corte:** 2026-08-18 · **Fuente:** `Documentation/Especificaciones de CU/especificaciones/` comparado contra `power-app/src`
 > **Método:** mapeo 1:1 de los 72 CU contra los `controller` y `service` presentes en el código.
 
 ## Resumen
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 40 | 56% | Endpoint existe y su service ejecuta lógica real |
+| ✅ Implementado | 42 | 58% | Endpoint existe y su service ejecuta lógica real |
 | 🟡 Parcial | 2 | 3% | Funciona a medias / resuelto dentro de otro endpoint |
 | 🔵 Andamiaje | 14 | 19% | Ruta declarada pero service vacío y llamada comentada |
-| ⬜ No implementado | 16 | 22% | Sin endpoint, service ni módulo |
+| ⬜ No implementado | 14 | 19% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
 
-**42 de 72 CU con código implementado o parcial (~58%).** Los otros 30 son trabajo pendiente (andamiaje + no implementado).
+**44 de 72 CU con código implementado o parcial (~61%).** Los otros 28 son trabajo pendiente (andamiaje + no implementado).
 > **Nota:** la DB de Render fue **regenerada** con los scripts actualizados (incluye las columnas `active` de `Membership` y `User`), así que esos endpoints ya funcionan en runtime.
 
 ### Cobertura por rol
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
-| Usuario | 20 | 10 | 2 | 2 | 6 | 50% |
+| Usuario | 20 | 12 | 2 | 2 | 4 | 60% |
 | Entrenador | 29 | 7 | 0 | 12 | 10 | 24% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
+
+## Cambios recientes (2026-08-18)
+
+- **CU-U-05 (cambiar contraseña)** ✅: `POST /users/change-password` con body `{ current_password, new_password }`. Acepta como contraseña actual tanto la normal como la **temporal** (cubre el cambio obligatorio tras una recuperación) y en ambos casos deja `temp_password` en `null`. Valida que la actual sea correcta (401) y que la nueva cumpla los requisitos de formato (mínimo 6, máximo 50). **Decisión (18/8):** la repetición de la contraseña nueva **no viaja al server** — esa confirmación se valida en el front, así que el camino alternativo «confirmación no coincide» de la spec queda del lado del cliente.
+- **CU-U-06 (editar datos personales)** ✅: `POST /users/edit` sobre el **propio** registro — el id sale de `@CurrentUser()`, no del path, así que no hay forma de editar a otro usuario. Todos los campos son opcionales (`first_name`, `last_name`, `email`, `phone_prefix`, `phone_number`, `profile_picture`); sólo se persisten los que vienen. Si cambia el email se valida unicidad (409) y se resetea `email_verified`; si cambia el teléfono se resetea `phone_verified`.
+- **Nuevo helper `AuthService.comparePassword(plain, hash)`**: compara contra un hash ya persistido y devuelve `false` si el hash es null, en vez de dejar que `bcrypt.compare` rompa.
+- **`User.temp_password` pasó a `string | null` en TypeScript** para reflejar el `nullable: true` que la columna ya tenía. **No es un cambio de schema** — la DB no cambia y `Db Creator` no se toca.
+- **Pausados a pedido**: el resto del bloque del 14/8 (U-10, U-11, U-16, E-26→E-28) queda en espera de definiciones.
 
 ## Cambios recientes (2026-08-11)
 
@@ -54,7 +62,7 @@
 1. **Routine y Planification son andamiaje puro.** Ambos `controller` declaran todas sus rutas, pero `routine.service.ts` y `planification.service.ts` están vacíos y cada llamada al service está comentada. Son **14 CU** (E-08→E-19, U-08, U-09): el mayor bloque de trabajo pendiente.
 2. ~~**El módulo `/auth` está completamente comentado.**~~ **Resuelto (2026-08-11):** el módulo viejo se eliminó; logout (U-03) y recuperar contraseña (U-04) se implementaron en `/users`. Queda pendiente el registro social (fuera de los 72 CU).
 3. **No existe el módulo de Circuitos** (E-21→E-24): ni controller, ni service, ni ruta.
-4. **Falta la gestión de "Mi Cuenta" del usuario:** cambiar contraseña (U-05), editar datos (U-06), marcar serie (U-12), notas (U-13), RM potenciales (U-16).
+4. **Falta la gestión de "Mi Cuenta" del usuario:** ~~cambiar contraseña (U-05), editar datos (U-06)~~ **resueltos (2026-08-18)**; siguen pendientes marcar serie (U-12), notas (U-13) y RM potenciales (U-16).
 5. **No hay endpoints de "alumnos"** con filtro por rol/entrenador ni tracking de entrenamientos (historiales E-06/E-07) ni estados/tipos de membresía agregados (E-26→E-28).
 6. ~~**La autorización es manual, no centralizada.**~~ **Resuelto (2026-08-11):** se centralizó con Guards + `@Auth(...)` en los 7 controllers (ver *Cambios recientes 2026-08-11*).
 7. **Sin infraestructura de migraciones y `synchronize: false`.** No existe carpeta `migrations`, `data-source` ni scripts typeorm en `package.json`. Todo cambio de columna en una entidad requiere definir cómo se aplica al schema.
@@ -63,20 +71,22 @@
 
 ## Próximas semanas — cronograma del servidor (hasta 4/9)
 
-> Organizado por **viernes** (clases). El **7/8** (infra y transversales) ya está encaminado: DB regenerada, autorización centralizada con Guards y CU-U-03/U-04 implementados. Lo que sigue, hasta la **fecha límite de entrega del servidor (4/9)**:
+> Organizado por **viernes** (clases). El **7/8** (infra y transversales) está **cerrado**: DB regenerada, autorización centralizada con Guards y CU-U-03/U-04 implementados. El **14/8** quedó **parcial** (ver abajo). Lo que sigue, hasta la **fecha límite de entrega del servidor (4/9)**:
 
 | Viernes | Foco | Casos de uso |
 |---|---|---|
-| **14/8** | CU sin dependencias | Estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**); cambiar contraseña (**U-05**), editar datos personales (**U-06**); detalle de ejercicio (**U-10**), filtrar RMs por usuario (**U-11**), RMs potenciales (**U-16**) |
+| **14/8** ⏳ | CU sin dependencias — **2 de 8** | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**) · ⏸️ **en pausa, a la espera de definiciones:** estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**), detalle de ejercicio (**U-10**), filtrar RMs por usuario (**U-11**), RMs potenciales (**U-16**) |
 | **21/8** | Circuitos | Crear el módulo `Circuit` desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (**E-21→E-24**) |
 | **28/8** | Rutinas | Implementar el service de rutinas (**E-15→E-18**); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
 | **4/9** | Planificaciones y cierre | Service de planificaciones (**E-08→E-11**); asignar rutinas y planificaciones a alumnos (**E-12→E-14**); planificación activa y detalle de rutina del usuario (**U-08, U-09**); pruebas de integración sobre la API + Swagger. **🎯 Hito: servidor con los 72 CU cubiertos** |
 
 > Secuencia según dependencias: primero los CU independientes, luego **Circuitos**, sobre ellos las **Rutinas** y por último las **Planificaciones** que las agrupan.
 
+> **Riesgo abierto (18/8):** los 6 CU pausados del 14/8 no bloquean a nadie, pero **Circuitos sí** — es la base de las Rutinas (28/8) y éstas de las Planificaciones (4/9). Si el 21/8 se corre, se corre toda la cadena hasta el hito del servidor. Además, arrancar Circuitos exige resolver antes el desvío de modelo pendiente (`Circuit.routine_id` 1:N en el código vs. `Routine_Circuit` M:N en el modelo vigente de `Doc/`).
+
 ---
 
-## Detalle — Rol Usuario (20 CU · 50%)
+## Detalle — Rol Usuario (20 CU · 60%)
 
 ### Administrar mi cuenta
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -85,8 +95,8 @@
 | CU-U-02 | Login | ✅ Implementado | `POST /users/login` |
 | CU-U-03 | Cerrar sesión | ✅ Implementado | `POST /users/logout` · ack 200, el cliente descarta el token |
 | CU-U-04 | Recuperar contraseña | ✅ Implementado | `POST /users/recover-password` · genera `temp_password`; email stubbeado |
-| CU-U-05 | Cambiar contraseña | ⬜ No implementado | sin endpoint |
-| CU-U-06 | Editar datos personales | ⬜ No implementado | sin endpoint |
+| CU-U-05 | Cambiar contraseña | ✅ Implementado | `POST /users/change-password` · acepta contraseña actual o temporal; anula `temp_password` |
+| CU-U-06 | Editar datos personales | ✅ Implementado | `POST /users/edit` · sobre el propio registro (`@CurrentUser`), campos opcionales |
 | CU-U-07 | Obtener historial de pagos | ✅ Implementado | `GET /membership/payment/user/:id` |
 
 ### Mi entrenamiento
@@ -217,7 +227,7 @@
 1. **Admin cerrado (23/23):** A-18 cubierto por `promote_user`; A-02/A-03 se resuelven al crear/editar ejercicios; A-23 implementado y con la columna `active` ya agregada a los scripts de DB (falta regenerar la base para aplicarlo).
 2. **Routine + Planification**: implementar los services stubbed → desbloquea 14 CU y hace usable el rol Entrenador y "Mi Entrenamiento" del Usuario.
 3. **Módulo Circuitos** (E-21→E-24), dependencia de las rutinas.
-4. **Gestión de cuenta del Usuario** (U-05, U-06) y auth (U-03, U-04).
+4. ~~**Gestión de cuenta del Usuario** (U-05, U-06) y auth (U-03, U-04).~~ **Cerrado** (U-03/U-04 el 11/8, U-05/U-06 el 18/8).
 5. **Transversal:** Guards de autenticación/roles antes de que crezca el volumen de endpoints; definir estrategia de migraciones para cambios de schema.
 
 ---

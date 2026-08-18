@@ -41,7 +41,7 @@ export class User {
 
     @Exclude()
     @Column({ length: 255, nullable: true })
-    temp_password!: string;
+    temp_password?: string | null;
 
     @ApiProperty({ enum: UserRole, default: UserRole.user })
     @Column({ type: 'enum', enum: UserRole, default: UserRole.user, nullable: false })

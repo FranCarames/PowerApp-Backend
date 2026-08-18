@@ -194,7 +194,7 @@
       <span><b>72</b> casos de uso</span>
       <span><b>9</b> módulos</span>
       <span>Fuente: <b>especificaciones/</b> vs <b>power-app/src</b></span>
-      <span>Corte: <b>2026-08-06</b></span>
+      <span>Corte: <b>2026-08-18</b></span>
     </div>
   </header>
 
@@ -203,7 +203,7 @@
     <div class="sec-head"><h2>Panorama general</h2><span class="kicker">72 CU clasificados</span></div>
     <div class="tiles">
       <div class="tile done">
-        <div class="n">40</div><div class="lbl">Implementado</div><div class="pct">56% · endpoint + lógica</div>
+        <div class="n">42</div><div class="lbl">Implementado</div><div class="pct">58% · endpoint + lógica</div>
       </div>
       <div class="tile partial">
         <div class="n">2</div><div class="lbl">Parcial</div><div class="pct">3% · incompleto</div>
@@ -212,20 +212,20 @@
         <div class="n">14</div><div class="lbl">Andamiaje</div><div class="pct">19% · ruta sin lógica</div>
       </div>
       <div class="tile missing">
-        <div class="n">16</div><div class="lbl">No implementado</div><div class="pct">22% · sin endpoint</div>
+        <div class="n">14</div><div class="lbl">No implementado</div><div class="pct">19% · sin endpoint</div>
       </div>
     </div>
 
     <div class="bar-block">
-      <div class="bar" role="img" aria-label="40 implementados, 2 parciales, 14 andamiaje, 16 no implementados de 72">
-        <span class="s-done" style="width:55.56%"></span>
+      <div class="bar" role="img" aria-label="42 implementados, 2 parciales, 14 andamiaje, 14 no implementados de 72">
+        <span class="s-done" style="width:58.33%"></span>
         <span class="s-partial" style="width:2.78%"></span>
         <span class="s-stub" style="width:19.44%"></span>
-        <span class="s-missing" style="width:22.22%"></span>
+        <span class="s-missing" style="width:19.45%"></span>
       </div>
       <div class="bar-cap">
-        <span><b>42 de 72</b> CU con código implementado o parcial (58%)</span>
-        <span><b>30</b> pendientes de trabajo real (andamiaje + no implementado)</span>
+        <span><b>44 de 72</b> CU con código implementado o parcial (61%)</span>
+        <span><b>28</b> pendientes de trabajo real (andamiaje + no implementado)</span>
       </div>
     </div>
   </section>
@@ -237,19 +237,19 @@
 
       <div class="role-card">
         <h3>Usuario <em>20 CU</em></h3>
-        <div class="role-pct" style="color:var(--done)">50%</div>
-        <div class="role-sub">10 implementados · cuenta y entrenamiento a medias</div>
+        <div class="role-pct" style="color:var(--done)">60%</div>
+        <div class="role-sub">12 implementados · "Mi Cuenta" cerrada, entrenamiento pendiente</div>
         <div class="mini-bar">
-          <span style="width:50%;background:var(--done)"></span>
+          <span style="width:60%;background:var(--done)"></span>
           <span style="width:10%;background:var(--partial)"></span>
           <span style="width:10%;background:var(--stub)"></span>
-          <span style="width:30%;background:var(--missing-line)"></span>
+          <span style="width:20%;background:var(--missing-line)"></span>
         </div>
         <div class="role-legend">
-          <i><span class="swatch" style="background:var(--done)"></span><b>10</b> impl.</i>
+          <i><span class="swatch" style="background:var(--done)"></span><b>12</b> impl.</i>
           <i><span class="swatch" style="background:var(--partial)"></span><b>2</b> parc.</i>
           <i><span class="swatch" style="background:var(--stub)"></span><b>2</b> andam.</i>
-          <i><span class="swatch" style="background:var(--missing-line)"></span><b>6</b> falta</i>
+          <i><span class="swatch" style="background:var(--missing-line)"></span><b>4</b> falta</i>
         </div>
       </div>
 
@@ -313,7 +313,7 @@
         <div class="fi">04</div>
         <div>
           <h4>Falta la gestión de "Mi Cuenta" del usuario</h4>
-          <p>Cambiar contraseña (U-05), editar datos personales (U-06), marcar serie realizada (U-12), notas de ejercicio (U-13) y cálculo de RM potenciales (U-16) no tienen endpoint.</p>
+          <p>Cambiar contraseña (U-05) y editar datos personales (U-06) quedaron <b>resueltos el 18/8</b>. Siguen sin endpoint marcar serie realizada (U-12), notas de ejercicio (U-13) y cálculo de RM potenciales (U-16).</p>
         </div>
       </div>
       <div class="finding">
@@ -342,7 +342,7 @@
           <tr><th style="width:78px">Viernes</th><th style="width:170px">Foco</th><th>Casos de uso</th></tr>
         </thead>
         <tbody>
-          <tr><td class="cu">14/8</td><td class="name">CU sin dependencias</td><td>Estado y tipos de membresía + alumnos por estado/tipo (<b>E-26→E-28</b>); cambiar contraseña (<b>U-05</b>), editar datos (<b>U-06</b>); detalle de ejercicio (<b>U-10</b>), filtrar RMs por usuario (<b>U-11</b>), RMs potenciales (<b>U-16</b>)</td></tr>
+          <tr><td class="cu">14/8</td><td class="name">CU sin dependencias <span class="muted">· 2 de 8</span></td><td>✅ cambiar contraseña (<b>U-05</b>), ✅ editar datos (<b>U-06</b>). ⏸️ <b>En pausa, a la espera de definiciones:</b> estado y tipos de membresía + alumnos por estado/tipo (<b>E-26→E-28</b>), detalle de ejercicio (<b>U-10</b>), filtrar RMs por usuario (<b>U-11</b>), RMs potenciales (<b>U-16</b>)</td></tr>
           <tr><td class="cu">21/8</td><td class="name">Circuitos</td><td>Crear el módulo <code>Circuit</code> desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (<b>E-21→E-24</b>)</td></tr>
           <tr><td class="cu">28/8</td><td class="name">Rutinas</td><td>Service de rutinas (<b>E-15→E-18</b>); asignar/desasignar rutinas a alumnos (<b>E-19, E-20</b>); marcar series (<b>U-12</b>) y notas del ejercicio (<b>U-13</b>); historial de entrenamientos y su filtro (<b>E-06, E-07</b>)</td></tr>
           <tr><td class="cu">4/9</td><td class="name">Planificaciones y cierre</td><td>Service de planificaciones (<b>E-08→E-11</b>); asignar rutinas y planificaciones a alumnos (<b>E-12→E-14</b>); planificación activa y detalle de rutina (<b>U-08, U-09</b>); pruebas de integración + Swagger. <b>🎯 Hito: servidor con los 72 CU</b></td></tr>
@@ -353,7 +353,7 @@
 
   <!-- DETAIL: USUARIO -->
   <section>
-    <div class="sec-head"><h2>Rol Usuario</h2><span class="kicker">20 CU · 50% implementado</span></div>
+    <div class="sec-head"><h2>Rol Usuario</h2><span class="kicker">20 CU · 60% implementado</span></div>
     <div class="table-scroll">
       <table>
         <thead>
@@ -365,8 +365,8 @@
           <tr><td class="cu">CU-U-02</td><td class="name">Login</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /users/login</td></tr>
           <tr><td class="cu">CU-U-03</td><td class="name">Cerrar sesión</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /users/logout</td></tr>
           <tr><td class="cu">CU-U-04</td><td class="name">Recuperar contraseña</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /users/recover-password</td></tr>
-          <tr><td class="cu">CU-U-05</td><td class="name">Cambiar contraseña</td><td><span class="chip missing"><span class="cd"></span>No implementado</span></td><td class="endpoint"><span class="muted">sin endpoint</span></td></tr>
-          <tr><td class="cu">CU-U-06</td><td class="name">Editar datos personales</td><td><span class="chip missing"><span class="cd"></span>No implementado</span></td><td class="endpoint"><span class="muted">sin endpoint</span></td></tr>
+          <tr><td class="cu">CU-U-05</td><td class="name">Cambiar contraseña</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /users/change-password <span class="muted">· acepta la actual o la temporal; la confirmación se valida en el front</span></td></tr>
+          <tr><td class="cu">CU-U-06</td><td class="name">Editar datos personales</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /users/edit <span class="muted">· sobre el propio registro</span></td></tr>
           <tr><td class="cu">CU-U-07</td><td class="name">Obtener historial de pagos</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">GET</span> /membership/payment/user/:id</td></tr>
 
           <tr class="pkg"><td colspan="4"><span class="pkg-lbl">Mi entrenamiento</span></td></tr>

@@ -18,8 +18,12 @@ import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
 import { PaginatedUsersResponseDto } from '../dtos/user/paginated_users_response.dto';
 import { SetUserActiveDto } from '../dtos/user/set_user_active.dto';
 import { RecoverPasswordDto } from '../dtos/user/recover_password.dto';
+import { ChangePasswordDto } from '../dtos/user/change_password.dto';
+import { EditUserDto } from '../dtos/user/edit_user.dto';
 import { User, UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
+import { CurrentUser } from '../authentication/decorators/current-user.decorator';
+import { AuthUser } from '../authentication/auth-user.interface';
 
 @ApiTags('Users')
 @Controller('users')
@@ -86,5 +90,29 @@ export class UsersController {
         @Res() res: Response,
     ) {
         this.usersService.setUserActive(idUser.id, setUserActiveDto, res);
+    }
+
+    @Post('/change-password')
+    @Auth()
+    @ApiResponse({ status: 200, description: 'Contraseña actualizada' })
+    @ApiResponse({ status: 401, description: 'La contraseña actual es incorrecta' })
+    async changePassword(
+        @CurrentUser() user: AuthUser,
+        @Body() changePasswordDto: ChangePasswordDto,
+        @Res() res: Response,
+    ) {
+        this.usersService.changePassword(user.id, changePasswordDto, res);
+    }
+
+    @Post('/edit')
+    @Auth()
+    @ApiResponse({ status: 200, type: User })
+    @ApiResponse({ status: 409, description: 'El email ya está en uso por otro usuario' })
+    async editUser(
+        @CurrentUser() user: AuthUser,
+        @Body() editUserDto: EditUserDto,
+        @Res() res: Response,
+    ) {
+        this.usersService.editUser(user.id, editUserDto, res);
     }
 }
