@@ -194,7 +194,7 @@
       <span><b>72</b> casos de uso</span>
       <span><b>9</b> módulos</span>
       <span>Fuente: <b>especificaciones/</b> vs <b>power-app/src</b></span>
-      <span>Corte: <b>2026-08-18</b></span>
+      <span>Corte: <b>2026-08-19</b></span>
     </div>
   </header>
 
@@ -306,21 +306,21 @@
         <div class="fi">03</div>
         <div>
           <h4>No existe el módulo de Circuitos</h4>
-          <p>Los CU E-21 a E-24 (obtener/crear/editar/eliminar circuito) no tienen controller, service ni ruta. Ausencia total, no andamiaje.</p>
+          <p>Los CU E-21 a E-24 (obtener/crear/editar/eliminar circuito) no tienen controller, service ni ruta. Las <b>entidades sí están</b> desde el 19/8 (<code>Circuit</code> reutilizable + <code>Routine_Circuit</code>), y los circuitos van a vivir <b>dentro del módulo <code>routine/</code></b>, no en uno propio: ambas funcionalidades dependen entre sí.</p>
         </div>
       </div>
       <div class="finding">
         <div class="fi">04</div>
         <div>
           <h4>Falta la gestión de "Mi Cuenta" del usuario</h4>
-          <p>Cambiar contraseña (U-05) y editar datos personales (U-06) quedaron <b>resueltos el 18/8</b>. Siguen sin endpoint marcar serie realizada (U-12), notas de ejercicio (U-13) y cálculo de RM potenciales (U-16).</p>
+          <p>Cambiar contraseña (U-05) y editar datos personales (U-06) quedaron <b>resueltos el 18/8</b>. Siguen sin endpoint marcar serie realizada (U-12) y notas de ejercicio (U-13), ambos atados al bloque de Rutinas. El cálculo de RM potenciales (U-16) quedó <b>resuelto el 18/8</b>.</p>
         </div>
       </div>
       <div class="finding">
         <div class="fi">05</div>
         <div>
-          <h4>No hay endpoints de "alumnos" ni historial de entrenamientos</h4>
-          <p>Obtener alumnos usa <code>GET /users/all</code> sin filtro por rol ni por entrenador (E-01 parcial; E-02/E-03 faltan). Tampoco existe tracking para los historiales de entrenamiento (E-06, E-07) ni estados/tipos de membresía agregados (E-26 a E-28).</p>
+          <h4>Falta el tracking de entrenamientos (E-06, E-07)</h4>
+          <p>Obtener alumnos (E-01, E-02) y cerrar cuenta (E-03) quedaron <b>resueltos el 6/8</b> con <code>GET /users/all</code> — filtros por rol, keyword y estado, con paginación — y <code>POST /users/set-active/:id</code>. Los estados y tipos de membresía (E-26 a E-28) se <b>resolvieron el 18/8</b>. Lo que sigue sin existir es el tracking de los historiales de entrenamiento (E-06, E-07), que depende del bloque de Rutinas.</p>
         </div>
       </div>
       <div class="finding">
@@ -328,6 +328,13 @@
         <div>
           <h4>✅ Resuelto — autorización centralizada</h4>
           <p>Se reemplazó la verificación manual del token por <em>Guards</em> + el decorador <code>@Auth(...)</code> de NestJS en los 7 controllers (rol por endpoint, con check de dueño en User RM).</p>
+        </div>
+      </div>
+      <div class="finding">
+        <div class="fi">07</div>
+        <div>
+          <h4>✅ Resuelto (19/8) — modelo de circuitos alineado con <code>Doc/</code></h4>
+          <p><code>Circuit</code> dejó de colgar de una rutina y pasó a ser una <b>pieza global reutilizable</b> (<code>description</code>, <code>type</code>, <code>active</code>), vinculada por la nueva <code>Routine_Circuit</code> (M:N con orden, sin unique: un circuito puede repetirse en la rutina). <code>Routine_Exercise</code> perdió <code>finished</code> y <code>user_note</code>, que se fueron a la nueva <code>Routine_Exercise_Set_Finished</code> — estado por usuario e instancia de rutina, que habilita U-12. <b>Deuda: hay que regenerar la base</b> para que el schema exista en Postgres.</p>
         </div>
       </div>
     </div>
@@ -343,7 +350,7 @@
         </thead>
         <tbody>
           <tr><td class="cu">14/8 ✅</td><td class="name">CU sin dependencias <span class="muted">· 7 de 8 (+ U-10 parcial)</span></td><td>✅ cambiar contraseña (<b>U-05</b>), ✅ editar datos (<b>U-06</b>), ✅ filtrar RMs por usuario (<b>U-11</b>), ✅ RMs potenciales (<b>U-16</b>), ✅ estado y tipos de membresía + alumnos por estado/tipo (<b>E-26→E-28</b>). 🟡 detalle de ejercicio (<b>U-10</b>): ficha de catálogo expuesta, el resto depende de Rutinas</td></tr>
-          <tr><td class="cu">21/8</td><td class="name">Circuitos</td><td>Crear el módulo <code>Circuit</code> desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (<b>E-21→E-24</b>)</td></tr>
+          <tr><td class="cu">21/8</td><td class="name">Circuitos</td><td>Entidades ✅ (19/8); falta el módulo, controller y service dentro de <code>routine/</code>; obtener/crear/editar/eliminar circuitos (<b>E-21→E-24</b>)</td></tr>
           <tr><td class="cu">28/8</td><td class="name">Rutinas</td><td>Service de rutinas (<b>E-15→E-18</b>); asignar/desasignar rutinas a alumnos (<b>E-19, E-20</b>); marcar series (<b>U-12</b>) y notas del ejercicio (<b>U-13</b>); historial de entrenamientos y su filtro (<b>E-06, E-07</b>)</td></tr>
           <tr><td class="cu">4/9</td><td class="name">Planificaciones y cierre</td><td>Service de planificaciones (<b>E-08→E-11</b>); asignar rutinas y planificaciones a alumnos (<b>E-12→E-14</b>); planificación activa y detalle de rutina (<b>U-08, U-09</b>); pruebas de integración + Swagger. <b>🎯 Hito: servidor con los 72 CU</b></td></tr>
         </tbody>

@@ -1,7 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
-import { Routine } from './routine.entity';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoutineExercise } from './routine_exercise.entity';
+import { RoutineCircuit } from './routine_circuit.entity';
 
 @Entity('Circuit')
 export class Circuit {
@@ -9,13 +9,21 @@ export class Circuit {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
 
-    @ApiProperty({ example: 'uuid-1234' })
-    @Column({ type: 'uuid', nullable: false })
-    routine_id!: string;
-
-    @ApiProperty({ example: 'Bloque A - Empuje', maxLength: 100 })
+    @ApiProperty({ example: 'Entrada en calor - Tren superior', maxLength: 100 })
     @Column({ length: 100, nullable: false })
     name!: string;
+
+    @ApiPropertyOptional({ example: 'Movilidad de hombro y activación de manguito', maxLength: 100 })
+    @Column({ length: 100, nullable: true })
+    description?: string;
+
+    @ApiProperty({ example: 'entrada en calor', maxLength: 30 })
+    @Column({ length: 30, nullable: false })
+    type!: string;
+
+    @ApiProperty({ example: true })
+    @Column({ nullable: false, default: true })
+    active!: boolean;
 
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
@@ -26,10 +34,9 @@ export class Circuit {
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS
-    @ManyToOne(() => Routine, routine => routine.circuits, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'routine_id' })
-    routine!: Routine;
-
     @OneToMany(() => RoutineExercise, routineExercise => routineExercise.circuit)
     routineExercises!: RoutineExercise[];
+
+    @OneToMany(() => RoutineCircuit, routineCircuit => routineCircuit.circuit)
+    routineCircuits!: RoutineCircuit[];
 }

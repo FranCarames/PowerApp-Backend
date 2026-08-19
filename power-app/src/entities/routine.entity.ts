@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Planification } from './planification.entity';
-import { Circuit } from './circuit.entity';
+import { RoutineCircuit } from './routine_circuit.entity';
 import { RoutineAsignation } from './routine_asignation.entity';
 import { RoutineAsignationUser } from './routine_asignation_user.entity';
 
@@ -36,8 +36,8 @@ export class Routine {
     @JoinColumn({ name: 'routine_plan_id' })
     planification?: Planification;
 
-    @OneToMany(() => Circuit, circuit => circuit.routine)
-    circuits!: Circuit[];
+    @OneToMany(() => RoutineCircuit, routineCircuit => routineCircuit.routine)
+    routineCircuits!: RoutineCircuit[];
 
     @OneToMany(() => RoutineAsignation, routineAsignation => routineAsignation.routine)
     routineAsignations!: RoutineAsignation[];

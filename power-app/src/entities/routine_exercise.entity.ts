@@ -26,14 +26,6 @@ export class RoutineExercise {
     @Column({ length: 100, nullable: true })
     coach_note?: string;
 
-    @ApiPropertyOptional({ example: 'Me costó la última serie', maxLength: 100 })
-    @Column({ length: 100, nullable: true })
-    user_note?: string;
-
-    @ApiProperty({ example: false })
-    @Column({ nullable: false, default: false })
-    finished!: boolean;
-
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     created_at!: Date;

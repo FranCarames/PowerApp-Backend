@@ -1,6 +1,6 @@
 # PowerApp Backend — Estado de implementación vs. Casos de Uso
 
-> **Corte:** 2026-08-18 · **Fuente:** `Documentation/Especificaciones de CU/especificaciones/` comparado contra `power-app/src`
+> **Corte:** 2026-08-19 · **Fuente:** `Documentation/Especificaciones de CU/especificaciones/` comparado contra `power-app/src`
 > **Método:** mapeo 1:1 de los 72 CU contra los `controller` y `service` presentes en el código.
 
 ## Resumen
@@ -23,6 +23,17 @@
 | Usuario | 20 | 14 | 1 | 2 | 3 | 70% |
 | Entrenador | 29 | 10 | 0 | 12 | 7 | 34% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
+
+## Cambios recientes (2026-08-19)
+
+Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2026-08-19-ajuste-modelo-circuitos-design.md`, plan: `Doc/plans/2026-08-19-ajuste-modelo-circuitos-plan.md`). **Sin endpoints nuevos: ningún CU cambia de estado ni se mueven los conteos.**
+
+- **`Circuit` pasa a pieza global reutilizable**: se va `routine_id` (la forma 1:N que tenía el código), entran `description` varchar(100) nullable, `type` varchar(30) y `active` boolean. `type` queda como **string libre** por ahora — la idea es cerrarlo más adelante a un conjunto de valores por función dentro de la rutina (entrada en calor / principal / accesorio / cardio / estiramiento), y al ser varchar eso no va a requerir tocar la base.
+- **Nueva `Routine_Circuit`**: join M:N rutina ↔ circuito con `order`. **Sin unique sobre (`routine_id`, `circuit_id`)** — un mismo circuito puede repetirse dentro de la rutina y el `order` distingue las apariciones. FKs: `routine_id` CASCADE, `circuit_id` RESTRICT (la baja de circuitos es lógica, así que el RESTRICT sólo protege de un borrado manual en la base).
+- **`Routine_Exercise` pierde `finished` y `user_note`**: era estado per-usuario viviendo en la plantilla genérica y compartida del circuito. `coach_note` se queda.
+- **Nueva `Routine_Exercise_Set_Finished`**: `user_routine_id` + `routine_exercise_set_id` (→ `Exercise_Set.id`) + `user_note`, con unique del par. La existencia de la fila *es* el "hecho". Habilita **CU-U-12**, que sigue ⬜ hasta que existan los endpoints.
+- **`Db Creator`**: `ddl.py` + `01_estructura.sql` actualizados y regenerados con `build_sql.py`; `02` y `03` sin cambios de contenido. **Deuda abierta: hay que regenerar la base** para que este schema exista en Postgres — hasta entonces los endpoints que toquen estas tablas van a fallar.
+- Verificado por compilación (`npm --prefix power-app run build`) y por chequeo cruzado columna a columna entre entidades y `01_estructura.sql`.
 
 ## Cambios recientes (2026-08-18)
 
@@ -80,9 +91,9 @@
 
 1. **Routine y Planification son andamiaje puro.** Ambos `controller` declaran todas sus rutas, pero `routine.service.ts` y `planification.service.ts` están vacíos y cada llamada al service está comentada. Son **14 CU** (E-08→E-19, U-08, U-09): el mayor bloque de trabajo pendiente.
 2. ~~**El módulo `/auth` está completamente comentado.**~~ **Resuelto (2026-08-11):** el módulo viejo se eliminó; logout (U-03) y recuperar contraseña (U-04) se implementaron en `/users`. Queda pendiente el registro social (fuera de los 72 CU).
-3. **No existe el módulo de Circuitos** (E-21→E-24): ni controller, ni service, ni ruta.
-4. **Falta la gestión de "Mi Cuenta" del usuario:** ~~cambiar contraseña (U-05), editar datos (U-06)~~ **resueltos (2026-08-18)**; siguen pendientes marcar serie (U-12), notas (U-13) y RM potenciales (U-16).
-5. **No hay endpoints de "alumnos"** con filtro por rol/entrenador ni tracking de entrenamientos (historiales E-06/E-07). ~~Ni estados/tipos de membresía agregados (E-26→E-28).~~ **Resuelto (2026-08-18).**
+3. **No existe el módulo de Circuitos** (E-21→E-24): ni controller, ni service, ni ruta. Las **entidades sí están** desde el 2026-08-19 (`Circuit` reutilizable + `Routine_Circuit`), y los circuitos van a vivir **dentro del módulo `routine/`**, no en uno propio: ambas funcionalidades dependen entre sí.
+4. **Falta la gestión de "Mi Cuenta" del usuario:** ~~cambiar contraseña (U-05), editar datos (U-06)~~ **resueltos (2026-08-18)**; siguen pendientes marcar serie (U-12) y notas del ejercicio (U-13), ambos atados al bloque de Rutinas. ~~RM potenciales (U-16)~~ **resuelto (2026-08-18)**.
+5. **Falta el tracking de entrenamientos (E-06/E-07).** ~~No hay endpoints de "alumnos" con filtro por rol/entrenador~~ **resuelto (2026-08-06)**: E-01→E-03 ✅ vía `GET /users/all` con filtros/paginación y `POST /users/set-active/:id`. ~~Ni estados/tipos de membresía agregados (E-26→E-28).~~ **Resuelto (2026-08-18).** Lo que queda es el historial de entrenamientos y su filtro por ejercicio, que dependen del bloque de Rutinas (28/8).
 6. ~~**La autorización es manual, no centralizada.**~~ **Resuelto (2026-08-11):** se centralizó con Guards + `@Auth(...)` en los 7 controllers (ver *Cambios recientes 2026-08-11*).
 7. **Sin infraestructura de migraciones y `synchronize: false`.** No existe carpeta `migrations`, `data-source` ni scripts typeorm en `package.json`. Todo cambio de columna en una entidad requiere definir cómo se aplica al schema.
 
@@ -95,13 +106,15 @@
 | Viernes | Foco | Casos de uso |
 |---|---|---|
 | **14/8** ✅ | CU sin dependencias — **7 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**), ✅ RMs potenciales (**U-16**), ✅ estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**) · 🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas |
-| **21/8** | Circuitos | Crear el módulo `Circuit` desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (**E-21→E-24**) |
+| **21/8** | Circuitos | Entidades ✅ (19/8); falta el módulo, controller y service dentro de `routine/`; obtener/crear/editar/eliminar circuitos (**E-21→E-24**) |
 | **28/8** | Rutinas | Implementar el service de rutinas (**E-15→E-18**); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
 | **4/9** | Planificaciones y cierre | Service de planificaciones (**E-08→E-11**); asignar rutinas y planificaciones a alumnos (**E-12→E-14**); planificación activa y detalle de rutina del usuario (**U-08, U-09**); pruebas de integración sobre la API + Swagger. **🎯 Hito: servidor con los 72 CU cubiertos** |
 
 > Secuencia según dependencias: primero los CU independientes, luego **Circuitos**, sobre ellos las **Rutinas** y por último las **Planificaciones** que las agrupan.
 
-> **Riesgo abierto (18/8):** los 6 CU pausados del 14/8 no bloquean a nadie, pero **Circuitos sí** — es la base de las Rutinas (28/8) y éstas de las Planificaciones (4/9). Si el 21/8 se corre, se corre toda la cadena hasta el hito del servidor. Además, arrancar Circuitos exige resolver antes el desvío de modelo pendiente (`Circuit.routine_id` 1:N en el código vs. `Routine_Circuit` M:N en el modelo vigente de `Doc/`).
+> **Riesgo abierto (18/8):** los 6 CU pausados del 14/8 no bloquean a nadie, pero **Circuitos sí** — es la base de las Rutinas (28/8) y éstas de las Planificaciones (4/9). Si el 21/8 se corre, se corre toda la cadena hasta el hito del servidor.
+
+> **Actualización (19/8):** el desvío de modelo que bloqueaba Circuitos quedó resuelto — las entidades ya siguen el modelo de `Doc/` (`Circuit` reutilizable + `Routine_Circuit` M:N). Queda **regenerar la base** para que el schema exista en Postgres, y escribir los CRUD de **E-21→E-24**.
 
 ---
 

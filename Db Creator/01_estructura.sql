@@ -90,6 +90,20 @@ CREATE TABLE public."Planification" (
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Circuit es una pieza global reutilizable: no depende de Routine
+CREATE TABLE public."Circuit" (
+    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        VARCHAR(100) NOT NULL,
+    description VARCHAR(100),
+    type        VARCHAR(30)  NOT NULL,
+    active      BOOLEAN      NOT NULL DEFAULT true,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_circuit_active ON public."Circuit"(active);
+CREATE INDEX idx_circuit_type   ON public."Circuit"(type);
+
 CREATE TABLE public."Routine" (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     routine_plan_id UUID,
@@ -212,18 +226,22 @@ CREATE TABLE public."User_Planification" (
         FOREIGN KEY (planification_id) REFERENCES public."Planification"(id) ON DELETE SET NULL
 );
 
--- Circuit ahora tiene FK a Routine
-CREATE TABLE public."Circuit" (
-    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    routine_id  UUID         NOT NULL,
-    name        VARCHAR(100) NOT NULL,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_circuit_routine
-        FOREIGN KEY (routine_id) REFERENCES public."Routine"(id) ON DELETE CASCADE
+-- Vinculo M:N Routine <-> Circuit. Sin unique: un circuito puede repetirse en la rutina
+CREATE TABLE public."Routine_Circuit" (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    routine_id  UUID        NOT NULL,
+    circuit_id  UUID        NOT NULL,
+    "order"     INTEGER     NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_routine_circuit_routine
+        FOREIGN KEY (routine_id) REFERENCES public."Routine"(id) ON DELETE CASCADE,
+    CONSTRAINT fk_routine_circuit_circuit
+        FOREIGN KEY (circuit_id) REFERENCES public."Circuit"(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_circuit_routine_id ON public."Circuit"(routine_id);
+CREATE INDEX idx_routine_circuit_routine_id ON public."Routine_Circuit"(routine_id, "order");
+CREATE INDEX idx_routine_circuit_circuit_id ON public."Routine_Circuit"(circuit_id);
 
 
 -- =============================================================
@@ -236,8 +254,6 @@ CREATE TABLE public."Routine_Exercise" (
     circuit_id      UUID         NOT NULL,
     exercise_order  INTEGER      NOT NULL,
     coach_note      VARCHAR(100),
-    user_note       VARCHAR(100),
-    finished        BOOLEAN      NOT NULL DEFAULT false,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_routine_exercise_exercise
@@ -305,6 +321,28 @@ CREATE TABLE public."Exercise_Set" (
 
 CREATE INDEX idx_exercise_set_routine_exercise_id ON public."Exercise_Set"(routine_exercise_id);
 CREATE INDEX idx_exercise_set_order               ON public."Exercise_Set"(routine_exercise_id, set_order);
+
+
+-- =============================================================
+--  TABLAS CON DEPENDENCIAS DE CUARTO NIVEL
+-- =============================================================
+
+-- La existencia de la fila = ese set esta hecho en esa instancia de rutina
+CREATE TABLE public."Routine_Exercise_Set_Finished" (
+    id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_routine_id         UUID        NOT NULL,
+    routine_exercise_set_id UUID        NOT NULL,
+    user_note               VARCHAR(100),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_resf_user_routine
+        FOREIGN KEY (user_routine_id)         REFERENCES public."User_Routine"(id) ON DELETE CASCADE,
+    CONSTRAINT fk_resf_exercise_set
+        FOREIGN KEY (routine_exercise_set_id) REFERENCES public."Exercise_Set"(id)  ON DELETE CASCADE,
+    CONSTRAINT uk_resf_user_routine_set UNIQUE (user_routine_id, routine_exercise_set_id)
+);
+
+CREATE INDEX idx_resf_user_routine_id ON public."Routine_Exercise_Set_Finished"(user_routine_id);
 
 
 -- =============================================================
