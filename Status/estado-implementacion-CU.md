@@ -7,13 +7,13 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 44 | 61% | Endpoint existe y su service ejecuta lógica real |
+| ✅ Implementado | 47 | 65% | Endpoint existe y su service ejecuta lógica real |
 | 🟡 Parcial | 1 | 1% | Funciona a medias / resuelto dentro de otro endpoint |
 | 🔵 Andamiaje | 14 | 19% | Ruta declarada pero service vacío y llamada comentada |
-| ⬜ No implementado | 13 | 18% | Sin endpoint, service ni módulo |
+| ⬜ No implementado | 10 | 14% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
 
-**45 de 72 CU con código implementado o parcial (~63%).** Los otros 27 son trabajo pendiente (andamiaje + no implementado).
+**48 de 72 CU con código implementado o parcial (~67%).** Los otros 24 son trabajo pendiente (andamiaje + no implementado).
 > **Nota:** la DB de Render fue **regenerada** con los scripts actualizados (incluye las columnas `active` de `Membership` y `User`), así que esos endpoints ya funcionan en runtime.
 
 ### Cobertura por rol
@@ -21,7 +21,7 @@
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 14 | 1 | 2 | 3 | 70% |
-| Entrenador | 29 | 7 | 0 | 12 | 10 | 24% |
+| Entrenador | 29 | 10 | 0 | 12 | 7 | 34% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
 
 ## Cambios recientes (2026-08-18)
@@ -40,7 +40,16 @@
   - **Rango fijo 1→12**, sin importar el `max_reps` recibido: es el rango estándar y más allá de 12 repeticiones Epley pierde precisión.
   - Valores con 2 decimales; el redondeo a disco queda del lado del cliente.
   - **Caso borde `max_reps = 1` contemplado:** Epley asume más de una repetición, así que aplicarlo a 1 rep inflaba el resultado un 3.3% (informar «120 kg a 1 repetición» devolvía `1RM = 124`). Ahora, si `max_reps === 1`, el peso informado **es** el 1RM y la tabla se deriva de ahí. Verificado sobre 6 combinaciones de peso/reps: en todas, la fila `n = max_reps` devuelve exactamente el peso informado.
-- **Pendiente del 14/8**: E-26→E-28 queda a la espera de definiciones.
+- **CU-E-26 / E-27 / E-28 (estado y tipo de membresía)** ✅: tres endpoints nuevos en `MembershipController`, todos `@Auth(coach, admin)`.
+  - `GET /membership/status/summary` — contadores de alumnos por estado.
+  - `GET /membership/status/users?status=` — alumnos filtrados por estado.
+  - `GET /membership/type/users?membership_id=` — alumnos por tipo; **sin** el parámetro devuelve todos los tipos agrupados (404 si el `membership_id` no existe).
+  - **Estado derivado, no persistido:** la spec de E-26 pide explícitamente derivarlo de `Membership_Payment.expired_at` contra la fecha actual. Se ignora a propósito el flag `active` del pago, que lo pisa un cron a las 03:00 y durante el día puede estar desfasado. De cada alumno manda el pago de `expired_at` más lejano.
+  - **Ventana "por vencer" configurable:** variable de entorno **`MEMBERSHIP_EXPIRING_SOON_DAYS`**, default **7** días. Se lee una vez al construir el service vía `ConfigService`; si falta o no es un entero ≥ 0, cae al default y avisa por consola. El valor se devuelve en las respuestas como `expiring_soon_days`. **No está expuesta al cliente** (no es query param). Como `.env` está gitignoreado, hay que agregarla a mano en cada entorno donde se quiera cambiar el default.
+  - **Alumnos sin pagos:** no entran en activa/por vencer/vencida; van a un contador propio `no_payments` y quedan fuera de la agrupación por tipo (se informan aparte como `without_payments`).
+  - **Corte de la ventana a fin de día:** los vencimientos se persisten a las 23:59:59.999 (ver `calculateExpirationDate`), así que el umbral también se corta a fin del día N. Si no, una membresía que vence justo dentro de N días quedaba como "activa" por unas horas de diferencia. Verificado sobre 8 casos de borde (vencida ayer, vence hoy, en 3, en 7, en 8 y en 30 días).
+  - **Resolución en memoria:** se traen los alumnos con sus pagos y se clasifica en JS, en vez de un `DISTINCT ON`. Es específico de PostgreSQL, más frágil de mantener, y el volumen es de escala gimnasio.
+- **Bloque del 14/8 cerrado** (7 de 8 + U-10 parcial). Lo que sigue es **Circuitos (21/8)**.
 
 ## Cambios recientes (2026-08-11)
 
@@ -73,7 +82,7 @@
 2. ~~**El módulo `/auth` está completamente comentado.**~~ **Resuelto (2026-08-11):** el módulo viejo se eliminó; logout (U-03) y recuperar contraseña (U-04) se implementaron en `/users`. Queda pendiente el registro social (fuera de los 72 CU).
 3. **No existe el módulo de Circuitos** (E-21→E-24): ni controller, ni service, ni ruta.
 4. **Falta la gestión de "Mi Cuenta" del usuario:** ~~cambiar contraseña (U-05), editar datos (U-06)~~ **resueltos (2026-08-18)**; siguen pendientes marcar serie (U-12), notas (U-13) y RM potenciales (U-16).
-5. **No hay endpoints de "alumnos"** con filtro por rol/entrenador ni tracking de entrenamientos (historiales E-06/E-07) ni estados/tipos de membresía agregados (E-26→E-28).
+5. **No hay endpoints de "alumnos"** con filtro por rol/entrenador ni tracking de entrenamientos (historiales E-06/E-07). ~~Ni estados/tipos de membresía agregados (E-26→E-28).~~ **Resuelto (2026-08-18).**
 6. ~~**La autorización es manual, no centralizada.**~~ **Resuelto (2026-08-11):** se centralizó con Guards + `@Auth(...)` en los 7 controllers (ver *Cambios recientes 2026-08-11*).
 7. **Sin infraestructura de migraciones y `synchronize: false`.** No existe carpeta `migrations`, `data-source` ni scripts typeorm en `package.json`. Todo cambio de columna en una entidad requiere definir cómo se aplica al schema.
 
@@ -85,7 +94,7 @@
 
 | Viernes | Foco | Casos de uso |
 |---|---|---|
-| **14/8** ⏳ | CU sin dependencias — **4 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**), ✅ RMs potenciales (**U-16**) · 🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas · ⏸️ **pendiente:** estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**) |
+| **14/8** ✅ | CU sin dependencias — **7 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**), ✅ RMs potenciales (**U-16**), ✅ estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**) · 🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas |
 | **21/8** | Circuitos | Crear el módulo `Circuit` desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (**E-21→E-24**) |
 | **28/8** | Rutinas | Implementar el service de rutinas (**E-15→E-18**); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
 | **4/9** | Planificaciones y cierre | Service de planificaciones (**E-08→E-11**); asignar rutinas y planificaciones a alumnos (**E-12→E-14**); planificación activa y detalle de rutina del usuario (**U-08, U-09**); pruebas de integración sobre la API + Swagger. **🎯 Hito: servidor con los 72 CU cubiertos** |
@@ -132,7 +141,7 @@
 
 ---
 
-## Detalle — Rol Entrenador (29 CU · 24%)
+## Detalle — Rol Entrenador (29 CU · 34%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -178,9 +187,9 @@
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-E-25 | Obtener membresías | ✅ Implementado | `GET /membership/all` |
-| CU-E-26 | Obtener estado de membresías | ⬜ No implementado | solo método interno `updateFinished` |
-| CU-E-27 | Obtener alumnos por estado de membresía | ⬜ No implementado | sin endpoint |
-| CU-E-28 | Obtener alumnos por tipo de membresía | ⬜ No implementado | sin endpoint |
+| CU-E-26 | Obtener estado de membresías | ✅ Implementado | `GET /membership/status/summary` · contadores derivados de `expired_at` |
+| CU-E-27 | Obtener alumnos por estado de membresía | ✅ Implementado | `GET /membership/status/users?status=` · active / expiring_soon / expired / no_payments |
+| CU-E-28 | Obtener alumnos por tipo de membresía | ✅ Implementado | `GET /membership/type/users?membership_id=` · sin el param, agrupa por tipo |
 | CU-E-29 | Registrar pago de alumno | ✅ Implementado | `POST /membership/payment/register` |
 
 ---

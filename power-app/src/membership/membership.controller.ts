@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Res,
 } from '@nestjs/common';
 import { ApiTags, ApiResponse } from '@nestjs/swagger';
@@ -15,6 +16,9 @@ import { CreateMembershipDto } from '../dtos/membership/create_membership.dto';
 import { EditMembershipDto } from '../dtos/membership/edit_membership.dto';
 import { RegisterMembershipPaymentDto } from '../dtos/membership/register_membership_payment.dto';
 import { SetMembershipActiveDto } from '../dtos/membership/set_membership_active.dto';
+import { MembershipStatusQueryDto } from '../dtos/membership/membership_status_query.dto';
+import { MembershipTypeQueryDto } from '../dtos/membership/membership_type_query.dto';
+import { MembershipStatusSummaryDto } from '../dtos/membership/membership_status_responses.dto';
 import { Membership } from '../entities/membership.entity';
 import { MembershipPayment } from '../entities/membership_payment.entity';
 import { UserRole } from '../entities/user.entity';
@@ -69,6 +73,36 @@ export class MembershipController {
         @Res() res: Response,
     ) {
         this.membershipService.setMembershipActive(idMembership.id, setMembershipActiveDto, res);
+    }
+
+    @Get('status/summary')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: MembershipStatusSummaryDto })
+    async getMembershipStatusSummary(
+        @Res() res: Response,
+    ) {
+        this.membershipService.getMembershipStatusSummary(res);
+    }
+
+    @Get('status/users')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, description: 'Alumnos cuyo estado de membresía coincide con el filtro' })
+    async getStudentsByMembershipStatus(
+        @Query() query: MembershipStatusQueryDto,
+        @Res() res: Response,
+    ) {
+        this.membershipService.getStudentsByMembershipStatus(query, res);
+    }
+
+    @Get('type/users')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, description: 'Alumnos por tipo de membresía; sin membership_id devuelve todos los tipos agrupados' })
+    @ApiResponse({ status: 404, description: 'Membresía no encontrada' })
+    async getStudentsByMembershipType(
+        @Query() query: MembershipTypeQueryDto,
+        @Res() res: Response,
+    ) {
+        this.membershipService.getStudentsByMembershipType(query, res);
     }
 
     @Get('payment/user/:id')

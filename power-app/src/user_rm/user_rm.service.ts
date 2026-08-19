@@ -244,7 +244,6 @@ export class UserRmService {
                 potentialRms.push({ reps, weight: this.roundToTwo(estimatedWeight) });
             }
 
-            // Resultado efímero: la spec pide explícitamente no persistirlo.
             res.status(200).send({
                 exercise: { id: exercise.id, name: exercise.name },
                 input: { weight, max_reps },
