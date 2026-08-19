@@ -7,20 +7,20 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 43 | 60% | Endpoint existe y su service ejecuta lógica real |
+| ✅ Implementado | 44 | 61% | Endpoint existe y su service ejecuta lógica real |
 | 🟡 Parcial | 1 | 1% | Funciona a medias / resuelto dentro de otro endpoint |
 | 🔵 Andamiaje | 14 | 19% | Ruta declarada pero service vacío y llamada comentada |
-| ⬜ No implementado | 14 | 19% | Sin endpoint, service ni módulo |
+| ⬜ No implementado | 13 | 18% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
 
-**44 de 72 CU con código implementado o parcial (~61%).** Los otros 28 son trabajo pendiente (andamiaje + no implementado).
+**45 de 72 CU con código implementado o parcial (~63%).** Los otros 27 son trabajo pendiente (andamiaje + no implementado).
 > **Nota:** la DB de Render fue **regenerada** con los scripts actualizados (incluye las columnas `active` de `Membership` y `User`), así que esos endpoints ya funcionan en runtime.
 
 ### Cobertura por rol
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
-| Usuario | 20 | 13 | 1 | 2 | 4 | 65% |
+| Usuario | 20 | 14 | 1 | 2 | 3 | 70% |
 | Entrenador | 29 | 7 | 0 | 12 | 10 | 24% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
 
@@ -34,7 +34,13 @@
 - **CU-U-10 (ver detalle de un ejercicio)** 🟡 *sigue parcial*: se expuso `GET /exercise/:id` con `@Auth()`, que devuelve la **ficha de catálogo** del ejercicio (descripción, tips, video, imágenes y músculos trabajados) reutilizando el `getExerciseById` que ya existía en el service.
   - **Ojo con el alcance:** la spec de U-10 no pide sólo la ficha, sino el detalle del ejercicio **dentro de la rutina** — el `Exercise` con sus `Exercise_Set` ordenadas (reps, peso, RPE/RIR, AMRAP/RM) y las notas `coach_note`/`user_note` — con la precondición de que el ejercicio pertenezca a una rutina asignada vigente, e incluye («include») a U-11, U-12 y U-13. Ese camino pasa por `Routine_Exercise` → `Exercise_Set` desde la rutina del usuario, o sea por `RoutineService` (vacío) y el módulo `Circuit` (inexistente): **queda atado al bloque del 28/8**. La nota anterior del informe («falta exponer `GET /exercise/:id`») subestimaba el alcance real.
   - **Inconsistencia de auth a resolver:** el endpoint nuevo pide sesión (`@Auth()`), siguiendo la precondición de la spec, pero `GET /exercise/all` sigue siendo **público**. Conviene alinear los dos criterios.
-- **Pendientes del 14/8**: U-16 y E-26→E-28 quedan a la espera de definiciones.
+- **CU-U-16 (calcular mis RM potenciales)** ✅: `POST /user_rm/potential` con body `{ exercise_id, weight, max_reps }`. Valida que el ejercicio exista (404), que el peso sea > 0 y que las reps sean un entero ≥ 1. **No persiste nada**, como pide la spec.
+  - **Forma elegida (decisión del usuario):** en vez de devolver un único número, devuelve la **tabla completa de 1RM a 12RM**. Se calcula el 1RM con Epley directo (`peso × (1 + reps/30)`) y de ahí se derivan las demás filas con la inversa (`1RM / (1 + n/30)`). La fila `n = max_reps` devuelve exactamente el peso informado, lo que valida la tabla.
+  - **Fila 1RM:** usa el Epley **directo**, no la inversa. La inversa en n=1 da ~3% menos y no coincidiría con el 1RM que muestra cualquier otra calculadora; se privilegió que el número sea cruzable con el resto del mundo.
+  - **Rango fijo 1→12**, sin importar el `max_reps` recibido: es el rango estándar y más allá de 12 repeticiones Epley pierde precisión.
+  - Valores con 2 decimales; el redondeo a disco queda del lado del cliente.
+  - **Caso borde `max_reps = 1` contemplado:** Epley asume más de una repetición, así que aplicarlo a 1 rep inflaba el resultado un 3.3% (informar «120 kg a 1 repetición» devolvía `1RM = 124`). Ahora, si `max_reps === 1`, el peso informado **es** el 1RM y la tabla se deriva de ahí. Verificado sobre 6 combinaciones de peso/reps: en todas, la fila `n = max_reps` devuelve exactamente el peso informado.
+- **Pendiente del 14/8**: E-26→E-28 queda a la espera de definiciones.
 
 ## Cambios recientes (2026-08-11)
 
@@ -79,7 +85,7 @@
 
 | Viernes | Foco | Casos de uso |
 |---|---|---|
-| **14/8** ⏳ | CU sin dependencias — **3 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**) · 🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas · ⏸️ **pendientes:** estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**), RMs potenciales (**U-16**) |
+| **14/8** ⏳ | CU sin dependencias — **4 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**), ✅ RMs potenciales (**U-16**) · 🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas · ⏸️ **pendiente:** estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**) |
 | **21/8** | Circuitos | Crear el módulo `Circuit` desde cero (entidad, módulo, controller, service); obtener/crear/editar/eliminar circuitos (**E-21→E-24**) |
 | **28/8** | Rutinas | Implementar el service de rutinas (**E-15→E-18**); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
 | **4/9** | Planificaciones y cierre | Service de planificaciones (**E-08→E-11**); asignar rutinas y planificaciones a alumnos (**E-12→E-14**); planificación activa y detalle de rutina del usuario (**U-08, U-09**); pruebas de integración sobre la API + Swagger. **🎯 Hito: servidor con los 72 CU cubiertos** |
@@ -90,7 +96,7 @@
 
 ---
 
-## Detalle — Rol Usuario (20 CU · 65%)
+## Detalle — Rol Usuario (20 CU · 70%)
 
 ### Administrar mi cuenta
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -118,7 +124,7 @@
 ### Administrar mis RMs
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-U-16 | Calcular mis RM potenciales | ⬜ No implementado | sin fórmula ni endpoint |
+| CU-U-16 | Calcular mis RM potenciales | ✅ Implementado | `POST /user_rm/potential` · Epley, tabla 1RM→12RM, no persiste |
 | CU-U-17 | Registrar un RM | ✅ Implementado | `POST /user_rm/create` |
 | CU-U-18 | Editar un RM | ✅ Implementado | `POST /user_rm/edit/:id` |
 | CU-U-19 | Obtener mis RMs | ✅ Implementado | `GET /user_rm/user/:id` |

@@ -9,6 +9,8 @@ import { Exercise } from '../entities/exercise.entity';
 import { CreateUserRmDto } from '../dtos/user_rm/create_user_rm.dto';
 import { EditUserRmDto } from '../dtos/user_rm/edit_user_rm.dto';
 import { AuthUser } from '../authentication/auth-user.interface';
+import { CalculatePotentialRmDto } from '../dtos/user_rm/calculate_potential_rm.dto';
+import { PotentialRmItemDto } from '../dtos/user_rm/potential_rm_response.dto';
 // import { Exercise } from '../entities/exercise.entity';
 // import { EditExerciseDto } from '../dtos/exercise/edit_exercise.dto';
 // import { ExercisedMuscle } from '../entities/exercised_muscle.entity';
@@ -16,6 +18,9 @@ import { UsersService } from '../users/users.service';
 import { AuthService } from '../authentication/auth.service';
 import { ExerciseService } from '../exercise/exercise.service';
 
+
+/** Hasta qué nRM se arma la tabla de RMs potenciales. Más allá de 12 repeticiones Epley pierde precisión. */
+const MAX_RM_REPS = 12;
 
 @Injectable()
 export class UserRmService {
@@ -204,6 +209,58 @@ export class UserRmService {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener los RMs del usuario para el ejercicio.' });
         }
+    }
+
+    // CU-U-16 — Calcular mis RM potenciales
+    async calculatePotentialRms(
+        calculatePotentialRmDto: CalculatePotentialRmDto,
+        res: Response
+    ) {
+        try {
+            const { exercise_id, weight, max_reps } = calculatePotentialRmDto;
+
+            const exercise = await this.exercisesService._getExerciseById(exercise_id);
+            if (!exercise) {
+                return res.status(404).send({ error: 'Ejercicio no encontrado' });
+            }
+
+            // Epley directo: a partir del peso y las reps logradas, estima el 1RM.
+            // Con max_reps = 1 no se aplica: si el usuario levantó ese peso una vez, ese peso
+            // YA es su 1RM. La fórmula lo inflaría un 3.3% (120kg x 1 daría 124).
+            const estimated1Rm = max_reps === 1
+                ? weight
+                : weight * (1 + max_reps / 30);
+
+            // Epley inverso: para cada n, qué peso correspondería a n repeticiones.
+            // La fila n = max_reps devuelve exactamente el peso informado, lo que valida la tabla.
+            // n = 1 es la excepción: se usa el 1RM directo, porque la inversa en 1 repetición
+            // da ~3% menos y no coincidiría con el 1RM que muestra cualquier otra calculadora.
+            const potentialRms: PotentialRmItemDto[] = [];
+            for (let reps = 1; reps <= MAX_RM_REPS; reps++) {
+                const estimatedWeight = reps === 1
+                    ? estimated1Rm
+                    : estimated1Rm / (1 + reps / 30);
+
+                potentialRms.push({ reps, weight: this.roundToTwo(estimatedWeight) });
+            }
+
+            // Resultado efímero: la spec pide explícitamente no persistirlo.
+            res.status(200).send({
+                exercise: { id: exercise.id, name: exercise.name },
+                input: { weight, max_reps },
+                formula: 'Epley',
+                estimated_1rm: this.roundToTwo(estimated1Rm),
+                potential_rms: potentialRms
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al calcular los RMs potenciales.' });
+        }
+    }
+
+    /** Redondea a 2 decimales; el redondeo a disco queda del lado del cliente. */
+    private roundToTwo(value: number): number {
+        return Math.round(value * 100) / 100;
     }
 
     async createUserRm(

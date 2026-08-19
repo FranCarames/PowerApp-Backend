@@ -14,6 +14,8 @@ import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { CreateUserRmDto } from '../dtos/user_rm/create_user_rm.dto';
 import { EditUserRmDto } from '../dtos/user_rm/edit_user_rm.dto';
 import { UserExerciseParamsDto } from '../dtos/user_rm/user_exercise_params.dto';
+import { CalculatePotentialRmDto } from '../dtos/user_rm/calculate_potential_rm.dto';
+import { PotentialRmResponseDto } from '../dtos/user_rm/potential_rm_response.dto';
 import { UserRM } from '../entities/user_rm.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
@@ -74,6 +76,17 @@ export class UserRmController {
         @Res() res: Response
     ) {
         this.userRmService.getAllUserRmsByExerciseId(idExercise.id, res);
+    }
+
+    @Post('potential')
+    @Auth()
+    @ApiResponse({ status: 200, type: PotentialRmResponseDto })
+    @ApiResponse({ status: 404, description: 'Ejercicio no encontrado' })
+    async calculatePotentialRms(
+        @Body() calculatePotentialRmDto: CalculatePotentialRmDto,
+        @Res() res: Response,
+    ) {
+        this.userRmService.calculatePotentialRms(calculatePotentialRmDto, res);
     }
 
     @Post('create')
