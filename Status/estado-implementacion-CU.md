@@ -32,6 +32,8 @@
 - Los tres son `@Auth(coach, admin)` y viven en `routine.controller.ts` / `routine.service.ts`: **los circuitos no tienen módulo ni controller propio** (decisión del usuario — rutinas y circuitos dependen entre sí). El `RoutineService` deja de estar vacío.
 - **CU-E-22 y CU-E-23 quedan pendientes por decisión de diseño**, no por falta de tiempo: el contrato de alta/edición (lista completa de ejercicios con sus series + reconciliación) se refina antes de codificarse.
 - Sin cambios de entidades → `Db Creator` intacto. Sigue pendiente **regenerar la base** con el schema del ajuste de modelo de más abajo.
+- **`Db Creator/migraciones/`** (carpeta nueva): deltas escritos a mano para migrar una base **ya existente**, fuera del pipeline de `build_sql.py`. Incluye `2026-08-19-circuitos.sql` (aplicada) y su script de verificación de 12 chequeos. La base de Render quedó **migrada al schema nuevo**.
+- **`ias_users` fuera del DDL:** era una tabla de otro proyecto arrastrada en `ddl.py`. Se sacó de los scripts para que no vuelva a crearse al regenerar; **la tabla existente en la base no se toca** (decisión del usuario). Ahora la correspondencia entidades ↔ tablas es 20 a 20, sin excepciones.
 - Spec: `Doc/specs/2026-08-19-circuitos-listado-y-baja-design.md` · plan: `Doc/plans/2026-08-19-circuitos-listado-y-baja-plan.md`.
 
 ## Cambios recientes (2026-08-19 · modelo)
@@ -99,13 +101,13 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ## Hallazgos estructurales
 
-1. **Routine y Planification son andamiaje puro.** Ambos `controller` declaran todas sus rutas, pero `routine.service.ts` y `planification.service.ts` están vacíos y cada llamada al service está comentada. Son **14 CU** (E-08→E-19, U-08, U-09): el mayor bloque de trabajo pendiente.
+1. **Routine y Planification siguen siendo andamiaje** *(actualizado 19/8)*. Las rutas de rutinas y planificaciones están declaradas pero con la llamada al service comentada, y `planification.service.ts` sigue vacío. `routine.service.ts` **ya no está vacío**: tiene los métodos reales de circuitos (E-21/E-24), pero ninguno de rutinas. Siguen siendo **14 CU** (E-08→E-19, U-08, U-09): el mayor bloque de trabajo pendiente.
 2. ~~**El módulo `/auth` está completamente comentado.**~~ **Resuelto (2026-08-11):** el módulo viejo se eliminó; logout (U-03) y recuperar contraseña (U-04) se implementaron en `/users`. Queda pendiente el registro social (fuera de los 72 CU).
-3. **No existe el módulo de Circuitos** (E-21→E-24): ni controller, ni service, ni ruta. Las **entidades sí están** desde el 2026-08-19 (`Circuit` reutilizable + `Routine_Circuit`), y los circuitos van a vivir **dentro del módulo `routine/`**, no en uno propio: ambas funcionalidades dependen entre sí.
+3. **Circuitos: a mitad de camino** *(actualizado 19/8)*. Entidades ✅ (`Circuit` reutilizable + `Routine_Circuit`) y **E-21/E-24 implementados** — listado con filtros, detalle anidado y baja lógica, todo en `routine.controller.ts`/`routine.service.ts`: **no hay módulo ni controller propio de circuitos**, conviven con rutinas porque dependen entre sí. Faltan **E-22 y E-23** (crear/editar), pausados a propósito hasta refinar el contrato de alta/edición: reciben la lista completa de ejercicios con sus series y tienen que reconciliar (mantener / crear / eliminar), y esa reconciliación decide qué pasa con los `Exercise_Set` que los usuarios ya marcaron como hechos.
 4. **Falta la gestión de "Mi Cuenta" del usuario:** ~~cambiar contraseña (U-05), editar datos (U-06)~~ **resueltos (2026-08-18)**; siguen pendientes marcar serie (U-12) y notas del ejercicio (U-13), ambos atados al bloque de Rutinas. ~~RM potenciales (U-16)~~ **resuelto (2026-08-18)**.
 5. **Falta el tracking de entrenamientos (E-06/E-07).** ~~No hay endpoints de "alumnos" con filtro por rol/entrenador~~ **resuelto (2026-08-06)**: E-01→E-03 ✅ vía `GET /users/all` con filtros/paginación y `POST /users/set-active/:id`. ~~Ni estados/tipos de membresía agregados (E-26→E-28).~~ **Resuelto (2026-08-18).** Lo que queda es el historial de entrenamientos y su filtro por ejercicio, que dependen del bloque de Rutinas (28/8).
 6. ~~**La autorización es manual, no centralizada.**~~ **Resuelto (2026-08-11):** se centralizó con Guards + `@Auth(...)` en los 7 controllers (ver *Cambios recientes 2026-08-11*).
-7. **Sin infraestructura de migraciones y `synchronize: false`.** No existe carpeta `migrations`, `data-source` ni scripts typeorm en `package.json`. Todo cambio de columna en una entidad requiere definir cómo se aplica al schema.
+7. **Sin infraestructura de migraciones y `synchronize: false`.** No existe carpeta `migrations`, `data-source` ni scripts typeorm en `package.json`: todo cambio de columna se aplica **regenerando la base** con `Db Creator` (01 → 02 → 03). **Consecuencia hoy (19/8):** el schema de circuitos existe en los scripts pero **no en Postgres** — hasta regenerar, los endpoints de circuitos no se pueden probar en runtime y fallarían por columnas inexistentes.
 
 ---
 

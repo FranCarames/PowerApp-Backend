@@ -29,6 +29,23 @@ psql "<tu_connection_string>" -f 03_datos_dinamicos.sql
 El orden importa: la estructura primero, después los estáticos (que las FK
 necesitan), y al final los dinámicos (usuarios, pagos, etc.).
 
+## Migrar una base que YA existe
+
+Los tres `.sql` de arriba sirven para levantar la base **desde cero**. Si la
+instancia ya está viva y sólo cambió el schema, en `migraciones/` hay deltas
+escritos a mano (uno por cambio, con fecha). **No los genera `build_sql.py`**:
+son de una sola vez y no forman parte del pipeline.
+
+```bash
+psql "<tu_connection_string>" -f migraciones/2026-08-19-circuitos.sql
+```
+
+| Migración | Qué aplica |
+|---|---|
+| `2026-08-19-circuitos.sql` | `Circuit` reutilizable (sin `routine_id`, con `description`/`type`/`active`), nueva `Routine_Circuit`, `Routine_Exercise` sin `finished`/`user_note`, nueva `Routine_Exercise_Set_Finished`. |
+
+Son idempotentes y transaccionales: se pueden correr dos veces sin romper nada.
+
 ## Estructura del proyecto
 
 | Archivo            | Qué contiene                                                       |
@@ -62,5 +79,7 @@ Después volvé a correr `python3 build_sql.py`.
   columna `name` (que es `NOT NULL`), por lo que habría fallado. Acá se incluye
   `name` con el nombre de la membresía referenciada.
 - Validado ejecutando los 3 scripts en un PostgreSQL real desde cero, sin errores.
-  Conteos resultantes: 8 grupos, 35 músculos, 207 ejercicios, 734 vínculos,
-  3 usuarios, 1 coach, 3 membresías, 1 pago, 3 RMs.
+  Conteos actuales que imprime `build_sql.py`: 8 grupos, 35 músculos,
+  207 ejercicios, 10 usuarios, 3 coaches, 3 membresías, 43 pagos, 83 RMs.
+  *(Los conteos dinámicos que figuraban antes acá — 3 usuarios, 1 coach, 1 pago,
+  3 RMs — quedaron viejos: `dynamic_data.py` creció desde entonces.)*

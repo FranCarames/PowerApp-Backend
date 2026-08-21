@@ -343,18 +343,3 @@ CREATE TABLE public."Routine_Exercise_Set_Finished" (
 );
 
 CREATE INDEX idx_resf_user_routine_id ON public."Routine_Exercise_Set_Finished"(user_routine_id);
-
-
--- =============================================================
---  TABLA DE OTRO PROYECTO (sacar en el futuro)
--- =============================================================
-
-CREATE TABLE public.ias_users (
-    id         SERIAL       PRIMARY KEY,
-    first_name VARCHAR(100) NOT NULL,
-    last_name  VARCHAR(100) NOT NULL,
-    email      VARCHAR(120) NOT NULL,
-    password   VARCHAR(100) NOT NULL,
-    birthdate  DATE,
-    CONSTRAINT ias_users_email_key UNIQUE (email)
-);

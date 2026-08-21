@@ -291,8 +291,8 @@
       <div class="finding">
         <div class="fi">01</div>
         <div>
-          <h4>Routine y Planification son andamiaje puro</h4>
-          <p>Ambos <code>controller</code> declaran todas sus rutas, pero <code>routine.service.ts</code> y <code>planification.service.ts</code> están vacíos y cada llamada al servicio está comentada. Son <b>14 CU</b> (E-08 a E-19, U-08, U-09) que responden pero no ejecutan lógica: el mayor bloque de trabajo pendiente.</p>
+          <h4>Routine y Planification siguen siendo andamiaje</h4>
+          <p>Las rutas de rutinas y planificaciones están declaradas pero con la llamada al servicio comentada, y <code>planification.service.ts</code> sigue vacío. <code>routine.service.ts</code> <b>ya no está vacío</b> (19/8): tiene los métodos reales de circuitos, pero ninguno de rutinas. Siguen siendo <b>14 CU</b> (E-08 a E-19, U-08, U-09) que responden sin ejecutar lógica: el mayor bloque de trabajo pendiente.</p>
         </div>
       </div>
       <div class="finding">
@@ -305,8 +305,8 @@
       <div class="finding">
         <div class="fi">03</div>
         <div>
-          <h4>No existe el módulo de Circuitos</h4>
-          <p>Los CU E-21 a E-24 (obtener/crear/editar/eliminar circuito) no tienen controller, service ni ruta. Las <b>entidades sí están</b> desde el 19/8 (<code>Circuit</code> reutilizable + <code>Routine_Circuit</code>), y los circuitos van a vivir <b>dentro del módulo <code>routine/</code></b>, no en uno propio: ambas funcionalidades dependen entre sí.</p>
+          <h4>Circuitos: a mitad de camino</h4>
+          <p>Entidades ✅ (<code>Circuit</code> reutilizable + <code>Routine_Circuit</code>) y <b>E-21/E-24 implementados</b> el 19/8 — listado con filtros, detalle anidado y baja lógica, todo en <code>routine.controller.ts</code> / <code>routine.service.ts</code>: <b>no hay módulo ni controller propio de circuitos</b>, conviven con rutinas porque dependen entre sí. Faltan <b>E-22 y E-23</b> (crear/editar), pausados a propósito hasta refinar el contrato de alta/edición: reciben la lista completa de ejercicios con sus series y tienen que reconciliar, y esa reconciliación decide qué pasa con los <code>Exercise_Set</code> que los usuarios ya marcaron como hechos.</p>
         </div>
       </div>
       <div class="finding">
@@ -334,7 +334,7 @@
         <div class="fi">07</div>
         <div>
           <h4>✅ Resuelto (19/8) — modelo de circuitos alineado con <code>Doc/</code></h4>
-          <p><code>Circuit</code> dejó de colgar de una rutina y pasó a ser una <b>pieza global reutilizable</b> (<code>description</code>, <code>type</code>, <code>active</code>), vinculada por la nueva <code>Routine_Circuit</code> (M:N con orden, sin unique: un circuito puede repetirse en la rutina). <code>Routine_Exercise</code> perdió <code>finished</code> y <code>user_note</code>, que se fueron a la nueva <code>Routine_Exercise_Set_Finished</code> — estado por usuario e instancia de rutina, que habilita U-12. <b>Deuda: hay que regenerar la base</b> para que el schema exista en Postgres.</p>
+          <p><code>Circuit</code> dejó de colgar de una rutina y pasó a ser una <b>pieza global reutilizable</b> (<code>description</code>, <code>type</code>, <code>active</code>), vinculada por la nueva <code>Routine_Circuit</code> (M:N con orden, sin unique: un circuito puede repetirse en la rutina). <code>Routine_Exercise</code> perdió <code>finished</code> y <code>user_note</code>, que se fueron a la nueva <code>Routine_Exercise_Set_Finished</code> — estado por usuario e instancia de rutina, que habilita U-12. <b>Deuda: hay que regenerar la base</b> (<code>Db Creator</code>, 01 → 02 → 03) para que el schema exista en Postgres. Hasta entonces los endpoints de circuitos no se pueden probar en runtime: fallarían por columnas inexistentes.</p>
         </div>
       </div>
     </div>
