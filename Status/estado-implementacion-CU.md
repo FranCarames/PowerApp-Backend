@@ -7,24 +7,34 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 47 | 65% | Endpoint existe y su service ejecuta lógica real |
+| ✅ Implementado | 49 | 68% | Endpoint existe y su service ejecuta lógica real |
 | 🟡 Parcial | 1 | 1% | Funciona a medias / resuelto dentro de otro endpoint |
 | 🔵 Andamiaje | 14 | 19% | Ruta declarada pero service vacío y llamada comentada |
-| ⬜ No implementado | 10 | 14% | Sin endpoint, service ni módulo |
+| ⬜ No implementado | 8 | 11% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
 
-**48 de 72 CU con código implementado o parcial (~67%).** Los otros 24 son trabajo pendiente (andamiaje + no implementado).
-> **Nota:** la DB de Render fue **regenerada** con los scripts actualizados (incluye las columnas `active` de `Membership` y `User`), así que esos endpoints ya funcionan en runtime.
+**50 de 72 CU con código implementado o parcial (~69%).** Los otros 22 son trabajo pendiente (andamiaje + no implementado).
+> **Nota (19/8):** la DB **está pendiente de regenerar**. La regeneración anterior cubrió las columnas `active` de `Membership` y `User`, pero el ajuste de modelo de circuitos (ver más abajo) cambió el schema otra vez: hasta correr `01` → `02` → `03` con los scripts actualizados, los endpoints de circuitos no se pueden probar en runtime.
 
 ### Cobertura por rol
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 14 | 1 | 2 | 3 | 70% |
-| Entrenador | 29 | 10 | 0 | 12 | 7 | 34% |
+| Entrenador | 29 | 12 | 0 | 12 | 5 | 41% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
 
-## Cambios recientes (2026-08-19)
+## Cambios recientes (2026-08-19 · circuitos)
+
+- **CU-E-21 (obtener circuitos)** ✅: `GET /routine/circuit/all` con tres filtros opcionales — `keyword` (parcial, sin distinguir mayúsculas, sobre nombre y descripción), `type` (exacto, sin distinguir mayúsculas) e `include_inactive` (por defecto `false`, solo activos como pide la spec). Devuelve un array plano ordenado por nombre, con `exercise_count` por circuito resuelto con `loadRelationCountAndMap` (sin query extra).
+- **`GET /routine/circuit/:id`** — no es un CU: es el «include» que CU-E-23 necesita para "abrir un circuito con sus ejercicios actuales". Devuelve el circuito con sus `Routine_Exercise` ordenados por `exercise_order` y sus `Exercise_Set` por `set_order`, aplanando las relaciones como hace `exercise.service.ts`. Responde también para circuitos inactivos, para que se puedan inspeccionar los dados de baja.
+- **CU-E-24 (eliminar circuito, lógico)** ✅: `POST /routine/circuit/set-active/:id` con body `{ active }`, mismo patrón que `/membership/set-active/:id` y `/users/set-active/:id`. Un solo endpoint da de baja y reactiva. **No toca `Routine_Circuit`**: las rutinas que referencian el circuito quedan intactas, que es la postcondición explícita del CU.
+- Los tres son `@Auth(coach, admin)` y viven en `routine.controller.ts` / `routine.service.ts`: **los circuitos no tienen módulo ni controller propio** (decisión del usuario — rutinas y circuitos dependen entre sí). El `RoutineService` deja de estar vacío.
+- **CU-E-22 y CU-E-23 quedan pendientes por decisión de diseño**, no por falta de tiempo: el contrato de alta/edición (lista completa de ejercicios con sus series + reconciliación) se refina antes de codificarse.
+- Sin cambios de entidades → `Db Creator` intacto. Sigue pendiente **regenerar la base** con el schema del ajuste de modelo de más abajo.
+- Spec: `Doc/specs/2026-08-19-circuitos-listado-y-baja-design.md` · plan: `Doc/plans/2026-08-19-circuitos-listado-y-baja-plan.md`.
+
+## Cambios recientes (2026-08-19 · modelo)
 
 Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2026-08-19-ajuste-modelo-circuitos-design.md`, plan: `Doc/plans/2026-08-19-ajuste-modelo-circuitos-plan.md`). **Sin endpoints nuevos: ningún CU cambia de estado ni se mueven los conteos.**
 
@@ -154,7 +164,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Entrenador (29 CU · 34%)
+## Detalle — Rol Entrenador (29 CU · 41%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -191,10 +201,10 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Administrar circuitos
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-E-21 | Obtener circuitos | ⬜ No implementado | sin módulo Circuit |
-| CU-E-22 | Crear circuito | ⬜ No implementado | sin módulo Circuit |
-| CU-E-23 | Editar circuito | ⬜ No implementado | sin módulo Circuit |
-| CU-E-24 | Eliminar circuito (lógico) | ⬜ No implementado | sin módulo Circuit |
+| CU-E-21 | Obtener circuitos | ✅ Implementado | `GET /routine/circuit/all` · filtros keyword/type/include_inactive + `exercise_count` |
+| CU-E-22 | Crear circuito | ⬜ No implementado | pendiente de refinar el contrato de alta |
+| CU-E-23 | Editar circuito | ⬜ No implementado | pendiente de refinar la reconciliación |
+| CU-E-24 | Eliminar circuito (lógico) | ✅ Implementado | `POST /routine/circuit/set-active/:id` · flag `{ active }` |
 
 ### Gestionar membresías
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -258,7 +268,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 1. **Admin cerrado (23/23):** A-18 cubierto por `promote_user`; A-02/A-03 se resuelven al crear/editar ejercicios; A-23 implementado y con la columna `active` ya agregada a los scripts de DB (falta regenerar la base para aplicarlo).
 2. **Routine + Planification**: implementar los services stubbed → desbloquea 14 CU y hace usable el rol Entrenador y "Mi Entrenamiento" del Usuario.
-3. **Módulo Circuitos** (E-21→E-24), dependencia de las rutinas.
+3. **Circuitos** (E-21→E-24), dependencia de las rutinas: **E-21 y E-24 cerrados el 19/8**; quedan E-22 y E-23, pendientes de refinar el contrato de alta/edición.
 4. ~~**Gestión de cuenta del Usuario** (U-05, U-06) y auth (U-03, U-04).~~ **Cerrado** (U-03/U-04 el 11/8, U-05/U-06 el 18/8).
 5. **Transversal:** Guards de autenticación/roles antes de que crezca el volumen de endpoints; definir estrategia de migraciones para cambios de schema.
 
