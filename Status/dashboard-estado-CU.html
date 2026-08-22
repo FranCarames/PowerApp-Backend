@@ -203,13 +203,13 @@
     <div class="sec-head"><h2>Panorama general</h2><span class="kicker">72 CU clasificados</span></div>
     <div class="tiles">
       <div class="tile done">
-        <div class="n">50</div><div class="lbl">Implementado</div><div class="pct">69% · endpoint + lógica</div>
+        <div class="n">51</div><div class="lbl">Implementado</div><div class="pct">71% · endpoint + lógica</div>
       </div>
       <div class="tile partial">
         <div class="n">1</div><div class="lbl">Parcial</div><div class="pct">1% · incompleto</div>
       </div>
       <div class="tile stub">
-        <div class="n">14</div><div class="lbl">Andamiaje</div><div class="pct">19% · ruta sin lógica</div>
+        <div class="n">13</div><div class="lbl">Andamiaje</div><div class="pct">18% · ruta sin lógica</div>
       </div>
       <div class="tile missing">
         <div class="n">7</div><div class="lbl">No implementado</div><div class="pct">10% · sin endpoint</div>
@@ -217,15 +217,15 @@
     </div>
 
     <div class="bar-block">
-      <div class="bar" role="img" aria-label="50 implementados, 1 parcial, 14 andamiaje, 7 no implementados de 72">
-        <span class="s-done" style="width:69.44%"></span>
+      <div class="bar" role="img" aria-label="51 implementados, 1 parcial, 13 andamiaje, 7 no implementados de 72">
+        <span class="s-done" style="width:70.83%"></span>
         <span class="s-partial" style="width:1.39%"></span>
-        <span class="s-stub" style="width:19.44%"></span>
+        <span class="s-stub" style="width:18.06%"></span>
         <span class="s-missing" style="width:9.72%"></span>
       </div>
       <div class="bar-cap">
-        <span><b>51 de 72</b> CU con código implementado o parcial (71%)</span>
-        <span><b>21</b> pendientes de trabajo real (andamiaje + no implementado)</span>
+        <span><b>52 de 72</b> CU con código implementado o parcial (72%)</span>
+        <span><b>20</b> pendientes de trabajo real (andamiaje + no implementado)</span>
       </div>
     </div>
   </section>
@@ -255,16 +255,16 @@
 
       <div class="role-card">
         <h3>Entrenador <em>29 CU</em></h3>
-        <div class="role-pct" style="color:var(--stub)">45%</div>
-        <div class="role-sub">13 implementados · circuitos casi cerrados, rutinas y planificaciones sin lógica</div>
+        <div class="role-pct" style="color:var(--stub)">48%</div>
+        <div class="role-sub">14 implementados · circuitos cerrados, arrancó la lectura de rutinas</div>
         <div class="mini-bar">
-          <span style="width:44.83%;background:var(--done)"></span>
-          <span style="width:41.38%;background:var(--stub)"></span>
+          <span style="width:48.28%;background:var(--done)"></span>
+          <span style="width:37.93%;background:var(--stub)"></span>
           <span style="width:13.79%;background:var(--missing-line)"></span>
         </div>
         <div class="role-legend">
-          <i><span class="swatch" style="background:var(--done)"></span><b>13</b> impl.</i>
-          <i><span class="swatch" style="background:var(--stub)"></span><b>12</b> andam.</i>
+          <i><span class="swatch" style="background:var(--done)"></span><b>14</b> impl.</i>
+          <i><span class="swatch" style="background:var(--stub)"></span><b>11</b> andam.</i>
           <i><span class="swatch" style="background:var(--missing-line)"></span><b>4</b> falta</i>
         </div>
       </div>
@@ -399,7 +399,7 @@
 
   <!-- DETAIL: ENTRENADOR -->
   <section>
-    <div class="sec-head"><h2>Rol Entrenador</h2><span class="kicker">29 CU · 45% implementado</span></div>
+    <div class="sec-head"><h2>Rol Entrenador</h2><span class="kicker">29 CU · 48% implementado</span></div>
     <div class="table-scroll">
       <table>
         <thead>
@@ -425,7 +425,7 @@
           <tr><td class="cu">CU-E-14</td><td class="name">Eliminar planificación a alumno</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">DELETE</span> /planification/user/:id <span class="muted">· comentado</span></td></tr>
 
           <tr class="pkg"><td colspan="4"><span class="pkg-lbl">Administrar rutinas</span></td></tr>
-          <tr><td class="cu">CU-E-15</td><td class="name">Obtener rutinas sistémicas</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">GET</span> /routine/all <span class="muted">· comentado</span></td></tr>
+          <tr><td class="cu">CU-E-15</td><td class="name">Obtener rutinas sistémicas</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">GET</span> /routine/all <span class="muted">· keyword/include_inactive + circuit_count</span></td></tr>
           <tr><td class="cu">CU-E-16</td><td class="name">Crear rutina sistémica</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">POST</span> /routine/create <span class="muted">· comentado</span></td></tr>
           <tr><td class="cu">CU-E-17</td><td class="name">Editar rutina sistémica</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">POST</span> /routine/edit/:id <span class="muted">· comentado</span></td></tr>
           <tr><td class="cu">CU-E-18</td><td class="name">Eliminar rutina sistémica (lógico)</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="muted">pasa a baja lógica (22/8): será </span><span class="verb">POST</span> /routine/set-active/:id</td></tr>

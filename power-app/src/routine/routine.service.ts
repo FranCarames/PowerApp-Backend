@@ -5,20 +5,134 @@ import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource, In, SelectQueryBuilder } from 'typeorm';
 import { Circuit } from '../entities/circuit.entity';
 import { Exercise } from '../entities/exercise.entity';
+import { Routine } from '../entities/routine.entity';
 import { RoutineExercise } from '../entities/routine_exercise.entity';
 import { ExerciseSet } from '../entities/exercise_set.entity';
 import { GetCircuitsQueryDto } from '../dtos/circuit/get_circuits_query.dto';
 import { SetCircuitActiveDto } from '../dtos/circuit/set_circuit_active.dto';
 import { CreateCircuitDto } from '../dtos/circuit/create_circuit.dto';
+import { GetRoutinesQueryDto } from '../dtos/routine/get_routines_query.dto';
 
 @Injectable()
 export class RoutineService {
     constructor(
         @InjectRepository(Circuit)
         private circuitRepository: Repository<Circuit>,
+        @InjectRepository(Routine)
+        private routineRepository: Repository<Routine>,
         @InjectDataSource()
         private dataSource: DataSource,
     ) {
+    }
+
+    // ===================== RUTINAS =====================
+
+    async getAllRoutines(
+        query: GetRoutinesQueryDto,
+        res: Response
+    ) {
+        try {
+            const routines = await this.buildRoutinesQuery(query)
+                .loadRelationCountAndMap('routine.circuit_count', 'routine.routineCircuits')
+                .getMany();
+
+            res.status(200).send(routines);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener las rutinas.' });
+        }
+    }
+
+    async getAllRoutinesPlus(
+        query: GetRoutinesQueryDto,
+        res: Response
+    ) {
+        try {
+            // Con los circuitos ya cargados, el conteo sale del array
+            const routines = await this.buildRoutinesQuery(query)
+                .leftJoinAndSelect('routine.routineCircuits', 'routineCircuit')
+                .leftJoinAndSelect('routineCircuit.circuit', 'circuit')
+                .addOrderBy('routineCircuit.order', 'ASC')
+                .getMany();
+
+            const response = routines.map(routine => ({
+                id: routine.id,
+                name: routine.name,
+                coach_note: routine.coach_note,
+                active: routine.active,
+                circuit_count: routine.routineCircuits.length,
+                created_at: routine.created_at,
+                updated_at: routine.updated_at,
+                circuits: routine.routineCircuits.map(routineCircuit => ({
+                    id: routineCircuit.id,
+                    order: routineCircuit.order,
+                    circuit: {
+                        id: routineCircuit.circuit.id,
+                        name: routineCircuit.circuit.name,
+                        type: routineCircuit.circuit.type,
+                        active: routineCircuit.circuit.active,
+                    },
+                })),
+            }));
+
+            res.status(200).send(response);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener las rutinas.' });
+        }
+    }
+
+    async getRoutineById(
+        idRoutine: string,
+        res: Response
+    ) {
+        try {
+            const routine = await this.routineRepository.findOne({
+                where: { id: idRoutine },
+                relations: [
+                    'routineCircuits',
+                    'routineCircuits.circuit',
+                    'routineCircuits.circuit.routineExercises',
+                    'routineCircuits.circuit.routineExercises.exercise',
+                    'routineCircuits.circuit.routineExercises.exerciseSets',
+                ],
+                order: {
+                    routineCircuits: {
+                        order: 'ASC',
+                        circuit: {
+                            routineExercises: {
+                                exercise_order: 'ASC',
+                                exerciseSets: {
+                                    set_order: 'ASC',
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+
+            if (!routine) {
+                return res.status(404).send({ error: 'Rutina no encontrada' });
+            }
+
+            res.status(200).send({
+                id: routine.id,
+                name: routine.name,
+                coach_note: routine.coach_note,
+                active: routine.active,
+                created_at: routine.created_at,
+                updated_at: routine.updated_at,
+                circuits: routine.routineCircuits.map(routineCircuit => ({
+                    id: routineCircuit.id,
+                    order: routineCircuit.order,
+                    // Mismo formato que GET /routine/circuit/:id
+                    circuit: this.buildCircuitDetailResponse(routineCircuit.circuit),
+                })),
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener la rutina.' });
+        }
     }
 
     // ===================== CIRCUITOS =====================
@@ -203,6 +317,28 @@ export class RoutineService {
             console.error(error);
             res.status(500).send({ error: 'Error al actualizar el estado del circuito.' });
         }
+    }
+
+    // ===================== HELPERS DE RUTINA =====================
+
+    // Filtros compartidos por el listado y el listado con circuitos
+    private buildRoutinesQuery(query: GetRoutinesQueryDto): SelectQueryBuilder<Routine> {
+        const queryBuilder = this.routineRepository
+            .createQueryBuilder('routine')
+            .orderBy('routine.name', 'ASC');
+
+        if (!query.include_inactive) {
+            queryBuilder.andWhere('routine.active = :active', { active: true });
+        }
+
+        if (query.keyword) {
+            queryBuilder.andWhere(
+                '(routine.name ILIKE :keyword OR routine.coach_note ILIKE :keyword)',
+                { keyword: `%${query.keyword}%` }
+            );
+        }
+
+        return queryBuilder;
     }
 
     // ===================== HELPERS DE CIRCUITO =====================

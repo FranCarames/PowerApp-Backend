@@ -21,6 +21,10 @@ import { GetCircuitsQueryDto } from '../dtos/circuit/get_circuits_query.dto';
 import { SetCircuitActiveDto } from '../dtos/circuit/set_circuit_active.dto';
 import { CircuitListItemResponseDto } from '../dtos/circuit/circuit_list_item_response.dto';
 import { CircuitListItemPlusResponseDto } from '../dtos/circuit/circuit_list_item_plus_response.dto';
+import { GetRoutinesQueryDto } from '../dtos/routine/get_routines_query.dto';
+import { RoutineListItemResponseDto } from '../dtos/routine/routine_list_item_response.dto';
+import { RoutineListItemPlusResponseDto } from '../dtos/routine/routine_list_item_plus_response.dto';
+import { RoutineDetailResponseDto } from '../dtos/routine/routine_detail_response.dto';
 import { CircuitDetailResponseDto } from '../dtos/circuit/circuit_detail_response.dto';
 // TODO: crear los siguientes DTOs en src/dtos/routine/
 // import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
@@ -34,21 +38,36 @@ export class RoutineController {
 
     @Get('/all')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [Routine] })
+    @ApiResponse({ status: 200, type: [RoutineListItemResponseDto] })
     async getAllRoutines(
+        @Query() query: GetRoutinesQueryDto,
         @Res() res: Response,
     ) {
-        // this.routineService.getAllRoutines(res);
+        this.routineService.getAllRoutines(query, res);
     }
 
+    // Va antes de '/:id': al ser un solo segmento tambien matchea ese patron,
+    // y si quedara declarado despues caeria ahi y devolveria 400 por UUID invalido
+    @Get('/all-plus')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: [RoutineListItemPlusResponseDto] })
+    async getAllRoutinesPlus(
+        @Query() query: GetRoutinesQueryDto,
+        @Res() res: Response,
+    ) {
+        this.routineService.getAllRoutinesPlus(query, res);
+    }
+
+    // Sin el rol user: CU-U-09 exige que la rutina pertenezca a una asignacion vigente
+    // del alumno, y esa cadena todavia no existe. Habilitarlo sin el check seria un agujero
     @Get('/:id')
-    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: Routine })
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: RoutineDetailResponseDto })
     async getRoutineById(
         @Param() idRoutine: ParameterIdDto,
         @Res() res: Response,
     ) {
-        // this.routineService.getRoutineById(idRoutine.id, res);
+        this.routineService.getRoutineById(idRoutine.id, res);
     }
 
     @Post('/create')

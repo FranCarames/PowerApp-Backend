@@ -7,13 +7,13 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 50 | 69% | Endpoint existe y su service ejecuta lógica real |
+| ✅ Implementado | 51 | 71% | Endpoint existe y su service ejecuta lógica real |
 | 🟡 Parcial | 1 | 1% | Funciona a medias / resuelto dentro de otro endpoint |
-| 🔵 Andamiaje | 14 | 19% | Ruta declarada pero service vacío y llamada comentada |
+| 🔵 Andamiaje | 13 | 18% | Ruta declarada pero service vacío y llamada comentada |
 | ⬜ No implementado | 7 | 10% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
 
-**51 de 72 CU con código implementado o parcial (~71%).** Los otros 21 son trabajo pendiente (andamiaje + no implementado).
+**52 de 72 CU con código implementado o parcial (~72%).** Los otros 20 son trabajo pendiente (andamiaje + no implementado).
 > **Nota (19/8):** la DB está **al día** con el modelo. El ajuste de circuitos se aplicó sobre la instancia existente con un delta puntual, sin recrearla, así que todos los endpoints se pueden probar en runtime.
 
 ### Cobertura por rol
@@ -21,8 +21,18 @@
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 14 | 1 | 2 | 3 | 70% |
-| Entrenador | 29 | 13 | 0 | 12 | 4 | 45% |
+| Entrenador | 29 | 14 | 0 | 11 | 4 | 48% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
+
+## Cambios recientes (2026-08-22 · lectura de rutinas)
+
+- **CU-E-15 (obtener rutinas sistémicas)** ✅: `GET /routine/all` con dos filtros opcionales — `keyword` (parcial, sin distinguir mayúsculas, sobre `name` y `coach_note`) e `include_inactive` (por defecto `false`, sólo activas). Array ordenado por nombre con `circuit_count`. No hay filtro por `type`: a diferencia de `Circuit`, `Routine` no tiene ese campo.
+- **`GET /routine/all-plus`** — no es un CU: el mismo listado con los circuitos de cada rutina (`id` del `Routine_Circuit`, `order`, y del circuito sólo `id`, `name`, `type` y `active`). Se incluye el `active` del circuito **a propósito**: una rutina puede referenciar un circuito dado de baja y el entrenador necesita verlo.
+- **`GET /routine/:id`** — tampoco es un CU: el árbol completo, rutina → circuitos → ejercicios → series. Cada circuito anidado se arma con **`buildCircuitDetailResponse`, el helper que ya existía**: es el pago del refactor de CU-E-22, y evita que el formato del circuito se duplique en dos lugares.
+- **`/routine/:id` quedó en coach + admin**, aunque el andamiaje declaraba también `user`. CU-U-09 pide esta misma estructura pero exige que la rutina pertenezca a una **asignación vigente del alumno**, y esa cadena todavía no existe: habilitar el rol `user` sin ese check dejaría que cualquier alumno leyera cualquier rutina. **U-09 sigue 🔵** y se cierra sumando el check cuando existan las asignaciones.
+- **Helper `buildRoutinesQuery`**, espejo del de circuitos, con los filtros compartidos por los dos listados.
+- Sin cambios de entidades → `Db Creator` intacto. Spec: `Doc/specs/2026-08-22-rutinas-lectura-design.md`.
+- **Pendiente de verificar en runtime:** no hay ninguna rutina cargada (E-16 no existe todavía), así que los listados devuelven `[]`. Para probar el detalle hay que insertar a mano una `Routine` y sus `Routine_Circuit`. En particular queda sin validar el **orden anidado de tres niveles** (`order` → `exercise_order` → `set_order`) de las find options de TypeORM.
 
 ## Cambios recientes (2026-08-22 · baja lógica en Rutinas y Planificaciones)
 
@@ -185,7 +195,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Entrenador (29 CU · 45%)
+## Detalle — Rol Entrenador (29 CU · 48%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -212,7 +222,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Administrar rutinas
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-E-15 | Obtener rutinas sistémicas | 🔵 Andamiaje | `GET /routine/all` · comentado |
+| CU-E-15 | Obtener rutinas sistémicas | ✅ Implementado | `GET /routine/all` · filtros keyword/include_inactive + `circuit_count` |
 | CU-E-16 | Crear rutina sistémica | 🔵 Andamiaje | `POST /routine/create` · comentado |
 | CU-E-17 | Editar rutina sistémica | 🔵 Andamiaje | `POST /routine/edit/:id` · comentado |
 | CU-E-18 | Eliminar rutina sistémica (lógico) | 🔵 Andamiaje | pasa a baja lógica (22/8): será `POST /routine/set-active/:id` |
