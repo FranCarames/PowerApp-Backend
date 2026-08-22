@@ -14,6 +14,7 @@ Con el modelo alineado (`Circuit` como pieza global reutilizable + `Routine_Circ
 **Incluye:**
 
 - `GET /routine/circuit/all` — listado con filtros opcionales (CU-E-21).
+- `GET /routine/circuit/all-plus` — el mismo listado, con los ejercicios de cada circuito (sólo `id` y `name`). Agregado el 2026-08-22; ver 4.4.
 - `GET /routine/circuit/:id` — detalle con ejercicios y series anidados. No es un CU propio: es el «include» que CU-E-23 necesita para "abrir un circuito con sus ejercicios actuales", y le sirve al front para previsualizar antes de ensamblar.
 - `POST /routine/circuit/set-active/:id` — baja lógica y reactivación (CU-E-24).
 
@@ -39,6 +40,7 @@ Todos con `@Auth(UserRole.coach, UserRole.admin)`, mismo criterio que E-26→E-2
 | Método | Ruta | CU |
 |---|---|---|
 | `GET` | `/routine/circuit/all` | E-21 |
+| `GET` | `/routine/circuit/all-plus` | E-21 (variante con ejercicios) |
 | `GET` | `/routine/circuit/:id` | «include» de E-23 |
 | `POST` | `/routine/circuit/set-active/:id` | E-24 |
 
@@ -78,7 +80,28 @@ Sin resultados → `200` con `[]`. El estado vacío del CU lo resuelve el front.
 
 Se arma aplanando las relaciones antes de responder, igual que hace `exercise.service.ts` con `exercisedMuscles`. `exercises` sale de `Routine_Exercise` (el `id` de cada item es el del `Routine_Exercise`, no el del `Exercise`, porque es lo que E-23 va a necesitar para reconciliar).
 
-### 4.3 Baja lógica — `POST /routine/circuit/set-active/:id`
+### 4.3 Listado con ejercicios — `GET /routine/circuit/all-plus` *(agregado 2026-08-22)*
+
+Mismo listado que 4.1 — **reutiliza `GetCircuitsQueryDto` tal cual**, con los mismos tres filtros — pero cada circuito trae además la lista de sus ejercicios.
+
+Se resolvió como **endpoint aparte y no como un cuarto parámetro** del listado (decisión del usuario): un `include_exercises` habría hecho que un mismo endpoint devolviera dos formas distintas según el query string.
+
+**Respuesta `200`:** array con los campos del listado normal más `exercises`:
+
+```
+{ id, name, description, type, active, exercise_count, created_at, updated_at,
+  exercises: [ { id, exercise_order, exercise: { id, name } } ] }   // ordenados por exercise_order ASC
+```
+
+De cada ejercicio van **sólo `id` y `name`**: sin series, sin `coach_note` y sin el resto de la ficha del catálogo — para eso está el detalle (4.2). El `id` de cada item es el del `Routine_Exercise`. Circuito sin ejercicios → `exercises: []`.
+
+`exercise_count` se mantiene y acá sale del `.length` del array ya cargado, **sin la query extra** que hace el listado normal con `loadRelationCountAndMap`.
+
+**Orden de declaración en el controller:** va **antes** de `circuit/:id`. Al ser un solo segmento, `all-plus` también matchea ese patrón; declarado después, la request caería ahí y devolvería `400` por UUID inválido.
+
+**Nota de escala:** es un join de tres tablas sin paginación. Con una biblioteca de circuitos grande, es el primer endpoint donde va a hacer falta paginar.
+
+### 4.4 Baja lógica — `POST /routine/circuit/set-active/:id`
 
 Body `SetCircuitActiveDto`: `{ active: boolean }` (requerido). Calcado de `/membership/set-active/:id` y `/users/set-active/:id`: un solo endpoint sirve para dar de baja y para reactivar, y encaja con `include_inactive`.
 
@@ -95,11 +118,12 @@ Body `SetCircuitActiveDto`: `{ active: boolean }` (requerido). Calcado de `/memb
 - `power-app/src/dtos/circuit/set_circuit_active.dto.ts`
 - `power-app/src/dtos/circuit/circuit_list_item_response.dto.ts` — forma de cada fila del listado (Swagger).
 - `power-app/src/dtos/circuit/circuit_detail_response.dto.ts` — forma anidada del detalle (Swagger).
+- `power-app/src/dtos/circuit/circuit_list_item_plus_response.dto.ts` — forma del listado con ejercicios (Swagger). Agregado el 2026-08-22.
 
 **Modificar:**
 
-- `power-app/src/routine/routine.controller.ts` — tres endpoints nuevos.
-- `power-app/src/routine/routine.service.ts` — tres métodos nuevos (hoy el archivo está vacío).
+- `power-app/src/routine/routine.controller.ts` — tres endpoints nuevos (más `all-plus`, agregado el 2026-08-22).
+- `power-app/src/routine/routine.service.ts` — tres métodos nuevos (hoy el archivo está vacío). Con `all-plus` se sumó `getAllCircuitsPlus` y los filtros compartidos se extrajeron al helper privado `buildCircuitsQuery`.
 
 `RoutineModule` **no cambia**: `Circuit`, `RoutineExercise` y `ExerciseSet` ya están en su `forFeature` desde el ajuste de modelo.
 

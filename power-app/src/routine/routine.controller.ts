@@ -20,6 +20,7 @@ import { CreateCircuitDto } from '../dtos/circuit/create_circuit.dto';
 import { GetCircuitsQueryDto } from '../dtos/circuit/get_circuits_query.dto';
 import { SetCircuitActiveDto } from '../dtos/circuit/set_circuit_active.dto';
 import { CircuitListItemResponseDto } from '../dtos/circuit/circuit_list_item_response.dto';
+import { CircuitListItemPlusResponseDto } from '../dtos/circuit/circuit_list_item_plus_response.dto';
 import { CircuitDetailResponseDto } from '../dtos/circuit/circuit_detail_response.dto';
 // TODO: crear los siguientes DTOs en src/dtos/routine/
 // import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
@@ -101,6 +102,18 @@ export class RoutineController {
         @Res() res: Response,
     ) {
         this.routineService.getAllCircuits(query, res);
+    }
+
+    // Va antes de 'circuit/:id': al ser un solo segmento tambien matchea ese patron,
+    // y si quedara declarado despues caeria ahi y devolveria 400 por UUID invalido
+    @Get('circuit/all-plus')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: [CircuitListItemPlusResponseDto] })
+    async getAllCircuitsPlus(
+        @Query() query: GetCircuitsQueryDto,
+        @Res() res: Response,
+    ) {
+        this.routineService.getAllCircuitsPlus(query, res);
     }
 
     @Get('circuit/:id')

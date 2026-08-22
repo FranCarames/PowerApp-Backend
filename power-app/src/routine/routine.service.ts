@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource, In, SelectQueryBuilder } from 'typeorm';
 import { Circuit } from '../entities/circuit.entity';
 import { Exercise } from '../entities/exercise.entity';
 import { RoutineExercise } from '../entities/routine_exercise.entity';
@@ -115,29 +115,50 @@ export class RoutineService {
         res: Response
     ) {
         try {
-            const queryBuilder = this.circuitRepository
-                .createQueryBuilder('circuit')
+            const circuits = await this.buildCircuitsQuery(query)
                 .loadRelationCountAndMap('circuit.exercise_count', 'circuit.routineExercises')
-                .orderBy('circuit.name', 'ASC');
-
-            if (!query.include_inactive) {
-                queryBuilder.andWhere('circuit.active = :active', { active: true });
-            }
-
-            if (query.type) {
-                queryBuilder.andWhere('LOWER(circuit.type) = LOWER(:type)', { type: query.type });
-            }
-
-            if (query.keyword) {
-                queryBuilder.andWhere(
-                    '(circuit.name ILIKE :keyword OR circuit.description ILIKE :keyword)',
-                    { keyword: `%${query.keyword}%` }
-                );
-            }
-
-            const circuits = await queryBuilder.getMany();
+                .getMany();
 
             res.status(200).send(circuits);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener los circuitos.' });
+        }
+    }
+
+    async getAllCircuitsPlus(
+        query: GetCircuitsQueryDto,
+        res: Response
+    ) {
+        try {
+            // Con los ejercicios ya cargados, el conteo sale del array: no hace falta
+            // la query extra del loadRelationCountAndMap
+            const circuits = await this.buildCircuitsQuery(query)
+                .leftJoinAndSelect('circuit.routineExercises', 'routineExercise')
+                .leftJoinAndSelect('routineExercise.exercise', 'exercise')
+                .addOrderBy('routineExercise.exercise_order', 'ASC')
+                .getMany();
+
+            const response = circuits.map(circuit => ({
+                id: circuit.id,
+                name: circuit.name,
+                description: circuit.description,
+                type: circuit.type,
+                active: circuit.active,
+                exercise_count: circuit.routineExercises.length,
+                created_at: circuit.created_at,
+                updated_at: circuit.updated_at,
+                exercises: circuit.routineExercises.map(routineExercise => ({
+                    id: routineExercise.id,
+                    exercise_order: routineExercise.exercise_order,
+                    exercise: {
+                        id: routineExercise.exercise.id,
+                        name: routineExercise.exercise.name,
+                    },
+                })),
+            }));
+
+            res.status(200).send(response);
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener los circuitos.' });
@@ -185,6 +206,31 @@ export class RoutineService {
     }
 
     // ===================== HELPERS DE CIRCUITO =====================
+
+    // Filtros compartidos por el listado y el listado con ejercicios: si mañana cambia
+    // alguno (por ejemplo, cuando type deje de ser string libre), se toca en un solo lugar
+    private buildCircuitsQuery(query: GetCircuitsQueryDto): SelectQueryBuilder<Circuit> {
+        const queryBuilder = this.circuitRepository
+            .createQueryBuilder('circuit')
+            .orderBy('circuit.name', 'ASC');
+
+        if (!query.include_inactive) {
+            queryBuilder.andWhere('circuit.active = :active', { active: true });
+        }
+
+        if (query.type) {
+            queryBuilder.andWhere('LOWER(circuit.type) = LOWER(:type)', { type: query.type });
+        }
+
+        if (query.keyword) {
+            queryBuilder.andWhere(
+                '(circuit.name ILIKE :keyword OR circuit.description ILIKE :keyword)',
+                { keyword: `%${query.keyword}%` }
+            );
+        }
+
+        return queryBuilder;
+    }
 
     private validateCircuitSetRules(createCircuitDto: CreateCircuitDto): string | null {
         for (const [exerciseIndex, exercise] of createCircuitDto.exercises.entries()) {

@@ -1,6 +1,6 @@
 # PowerApp Backend — Estado de implementación vs. Casos de Uso
 
-> **Corte:** 2026-08-19 · **Fuente:** `Documentation/Especificaciones de CU/especificaciones/` comparado contra `power-app/src`
+> **Corte:** 2026-08-22 · **Fuente:** `Documentation/Especificaciones de CU/especificaciones/` comparado contra `power-app/src`
 > **Método:** mapeo 1:1 de los 72 CU contra los `controller` y `service` presentes en el código.
 
 ## Resumen
@@ -27,6 +27,7 @@
 ## Cambios recientes (2026-08-19 · circuitos)
 
 - **CU-E-21 (obtener circuitos)** ✅: `GET /routine/circuit/all` con tres filtros opcionales — `keyword` (parcial, sin distinguir mayúsculas, sobre nombre y descripción), `type` (exacto, sin distinguir mayúsculas) e `include_inactive` (por defecto `false`, solo activos como pide la spec). Devuelve un array plano ordenado por nombre, con `exercise_count` por circuito resuelto con `loadRelationCountAndMap` (sin query extra).
+- **`GET /routine/circuit/all-plus`** (22/8) — tampoco es un CU: es el mismo listado de E-21 con los ejercicios de cada circuito (sólo `id` y `name`, sin series ni notas), pensado para que el front arme una rutina viendo el contenido de cada pieza sin una llamada por circuito. Se resolvió como **endpoint aparte y no como un parámetro `include_exercises`** del listado (decisión del usuario): así ningún endpoint devuelve dos formas distintas según el query string. Reutiliza el mismo `GetCircuitsQueryDto`, y los filtros compartidos se extrajeron a un helper privado `buildCircuitsQuery` para que un cambio futuro (por ejemplo, cuando `type` deje de ser string libre) se toque en un solo lugar. Acá el `exercise_count` sale del `.length` del array ya cargado, sin la query extra del listado normal.
 - **`GET /routine/circuit/:id`** — no es un CU: es el «include» que CU-E-23 necesita para "abrir un circuito con sus ejercicios actuales". Devuelve el circuito con sus `Routine_Exercise` ordenados por `exercise_order` y sus `Exercise_Set` por `set_order`, aplanando las relaciones como hace `exercise.service.ts`. Responde también para circuitos inactivos, para que se puedan inspeccionar los dados de baja.
 - **CU-E-24 (eliminar circuito, lógico)** ✅: `POST /routine/circuit/set-active/:id` con body `{ active }`, mismo patrón que `/membership/set-active/:id` y `/users/set-active/:id`. Un solo endpoint da de baja y reactiva. **No toca `Routine_Circuit`**: las rutinas que referencian el circuito quedan intactas, que es la postcondición explícita del CU.
 - Los tres son `@Auth(coach, admin)` y viven en `routine.controller.ts` / `routine.service.ts`: **los circuitos no tienen módulo ni controller propio** (decisión del usuario — rutinas y circuitos dependen entre sí). El `RoutineService` deja de estar vacío.
@@ -125,7 +126,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | Viernes | Foco | Casos de uso |
 |---|---|---|
 | **14/8** ✅ | CU sin dependencias — **7 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**), ✅ RMs potenciales (**U-16**), ✅ estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**) · 🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas |
-| **21/8** | Circuitos | Entidades ✅ (19/8); falta el módulo, controller y service dentro de `routine/`; obtener/crear/editar/eliminar circuitos (**E-21→E-24**) |
+| **21/8** ✅ | Circuitos — **3 de 4** | ✅ obtener (**E-21**), ✅ crear (**E-22**), ✅ baja lógica (**E-24**), más el detalle y el listado con ejercicios (`/all-plus`). ⏸️ editar (**E-23**) pausado por decisión de diseño: hay que definir qué pasa con los sets ya marcados por los alumnos |
 | **28/8** | Rutinas | Implementar el service de rutinas (**E-15→E-18**); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
 | **4/9** | Planificaciones y cierre | Service de planificaciones (**E-08→E-11**); asignar rutinas y planificaciones a alumnos (**E-12→E-14**); planificación activa y detalle de rutina del usuario (**U-08, U-09**); pruebas de integración sobre la API + Swagger. **🎯 Hito: servidor con los 72 CU cubiertos** |
 
@@ -133,7 +134,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 > **Riesgo abierto (18/8):** los 6 CU pausados del 14/8 no bloquean a nadie, pero **Circuitos sí** — es la base de las Rutinas (28/8) y éstas de las Planificaciones (4/9). Si el 21/8 se corre, se corre toda la cadena hasta el hito del servidor.
 
-> **Actualización (19/8):** el desvío de modelo que bloqueaba Circuitos quedó resuelto — las entidades ya siguen el modelo de `Doc/` (`Circuit` reutilizable + `Routine_Circuit` M:N). Queda **regenerar la base** para que el schema exista en Postgres, y escribir los CRUD de **E-21→E-24**.
+> **Actualización (22/8):** **Circuitos deja de ser el cuello de botella.** E-21, E-22 y E-24 están implementados y la base está migrada, así que **Rutinas (28/8) ya se puede arrancar**: `Routine_Circuit` existe y hay circuitos reales para ensamblar. E-23 quedó pausado a propósito y **no bloquea a Rutinas** — se puede retomar en cualquier momento, incluso después del 28/8.
 
 ---
 
@@ -277,7 +278,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 1. **Admin cerrado (23/23):** A-18 cubierto por `promote_user`; A-02/A-03 se resuelven al crear/editar ejercicios; A-23 implementado y con la columna `active` ya agregada a los scripts de DB (falta regenerar la base para aplicarlo).
 2. **Routine + Planification**: implementar los services stubbed → desbloquea 14 CU y hace usable el rol Entrenador y "Mi Entrenamiento" del Usuario.
-3. **Circuitos** (E-21→E-24), dependencia de las rutinas: **E-21 y E-24 cerrados el 19/8**; quedan E-22 y E-23, pendientes de refinar el contrato de alta/edición.
+3. ~~**Circuitos** (E-21→E-24)~~ **cerrado el 22/8** salvo **E-23** (editar), pausado por diseño y sin bloquear a nadie. Lo que sigue es **Rutinas** (E-15→E-18): ensamblar `Routine_Circuit` sobre los circuitos ya existentes.
 4. ~~**Gestión de cuenta del Usuario** (U-05, U-06) y auth (U-03, U-04).~~ **Cerrado** (U-03/U-04 el 11/8, U-05/U-06 el 18/8).
 5. **Transversal:** Guards de autenticación/roles antes de que crezca el volumen de endpoints; definir estrategia de migraciones para cambios de schema.
 
