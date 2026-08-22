@@ -38,7 +38,10 @@
 - Sin cambios de entidades → `Db Creator` intacto.
 - **La base ya está migrada al schema nuevo** (19/8): se aplicó el delta de circuitos sobre la instancia existente en vez de recrearla, así que los endpoints de circuitos se pueden probar en runtime.
 - **`ias_users` fuera del DDL:** era una tabla de otro proyecto arrastrada en `ddl.py`. Se sacó de los scripts para que no vuelva a crearse al regenerar; **la tabla existente en la base no se toca** (decisión del usuario). Ahora la correspondencia entidades ↔ tablas es 20 a 20, sin excepciones.
-- Spec: `Doc/specs/2026-08-19-circuitos-listado-y-baja-design.md` · plan: `Doc/plans/2026-08-19-circuitos-listado-y-baja-plan.md`.
+- **Bugfix transversal — `@IsUUID('4')` → `@IsUUID('all')` en los 17 usos (12 DTOs).** El seed genera ids **deterministas v5** (`uuid5(namespace, nombre)`, en `gen_seed.py` y `dynamic_data.py`), mientras que la app genera **v4 aleatorios** (`gen_random_uuid()` / TypeORM). Los validadores exigían v4, así que **cualquier endpoint que recibiera un id del seed devolvía 400**: 939 de 984 ids del catálogo y 131 de 142 de los datos dinámicos son v5. Afectaba a `ParameterIdDto` (todos los `:id`), a los ids de ejercicio y músculo de ejercicios y RMs, y a usuarios y membresías sembrados. Se detectó probando el alta de circuitos con ejercicios reales del catálogo.
+  - **Decisión:** no se toca la generación de ids. El v5 del seed es deliberado — es lo que hace que los INSERT sean idempotentes (`ON CONFLICT (id) DO NOTHING`), que los `.sql` regenerados queden byte-idénticos y que los ids se puedan citar en payloads y documentación. La app no puede usar v5 porque en runtime no hay clave natural que hashear. El error estaba en el validador, que afirmaba una propiedad que el sistema nunca garantizó: `'all'` sigue exigiendo un UUID bien formado, sólo deja de exigir que sea aleatorio.
+- Spec: `Doc/specs/2026-08-19-crear-circuito-design.md` · plan: `Doc/plans/2026-08-19-crear-circuito-plan.md`.
+- Spec del bloque: `Doc/specs/2026-08-19-circuitos-listado-y-baja-design.md` · plan: `Doc/plans/2026-08-19-circuitos-listado-y-baja-plan.md`.
 
 ## Cambios recientes (2026-08-19 · modelo)
 

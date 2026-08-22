@@ -11,12 +11,12 @@ export class UserExerciseParamsDto {
     @ApiProperty({ example: 'uuid-1234', description: 'Id del usuario dueño de los RMs' })
     @Type(() => String)
     @IsNotEmpty()
-    @IsUUID('4', { message: 'El ID de usuario debe ser un UUID válido en formato PostgreSQL' })
+    @IsUUID('all', { message: 'El ID de usuario debe ser un UUID válido en formato PostgreSQL' })
     idUser!: string;
 
     @ApiProperty({ example: 'uuid-1234', description: 'Id del ejercicio por el que se filtra' })
     @Type(() => String)
     @IsNotEmpty()
-    @IsUUID('4', { message: 'El ID de ejercicio debe ser un UUID válido en formato PostgreSQL' })
+    @IsUUID('all', { message: 'El ID de ejercicio debe ser un UUID válido en formato PostgreSQL' })
     idExercise!: string;
 }

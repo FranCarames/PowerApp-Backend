@@ -8,6 +8,6 @@ export class MembershipTypeQueryDto {
         description: 'Tipo de membresía por el que se filtra. Si se omite, devuelve todos los tipos agrupados.',
     })
     @IsOptional()
-    @IsUUID('4', { message: 'El ID de membresía debe ser un UUID válido en formato PostgreSQL' })
+    @IsUUID('all', { message: 'El ID de membresía debe ser un UUID válido en formato PostgreSQL' })
     membership_id?: string;
 }

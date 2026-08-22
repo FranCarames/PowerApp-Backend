@@ -11,7 +11,7 @@ export class CreateExerciseDto {
     @IsArray()
     @ArrayNotEmpty()
     @ArrayUnique()
-    @IsUUID('4', { each: true, message: 'Todos los elementos del array deben ser UUID válidos' })
+    @IsUUID('all', { each: true, message: 'Todos los elementos del array deben ser UUID válidos' })
     exercised_muscles_ids!: string[];
 
     @ApiProperty({ example: 'Press de banca', maxLength: 50 })

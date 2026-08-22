@@ -70,7 +70,7 @@ export class CreateCircuitExerciseDto {
 
     @ApiProperty({ example: 'uuid-1234', description: 'ID del ejercicio del catálogo. No puede repetirse dentro del circuito' })
     @IsNotEmpty()
-    @IsUUID('4', { message: 'El ID de ejercicio debe ser un UUID válido' })
+    @IsUUID('all', { message: 'El ID de ejercicio debe ser un UUID válido' })
     exercise_id!: string;
 
     @ApiPropertyOptional({ example: 'Bajar lento en 3 segundos', maxLength: 100 })

@@ -10,7 +10,7 @@ export class CalculatePotentialRmDto {
 
     @ApiProperty({ example: 'uuid-1234', description: 'Ejercicio sobre el que se calcula' })
     @IsNotEmpty()
-    @IsUUID('4', { message: 'El ID de ejercicio debe ser un UUID válido en formato PostgreSQL' })
+    @IsUUID('all', { message: 'El ID de ejercicio debe ser un UUID válido en formato PostgreSQL' })
     exercise_id!: string;
 
     @ApiProperty({ example: 100, description: 'Peso levantado, en kg' })

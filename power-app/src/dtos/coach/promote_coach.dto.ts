@@ -7,7 +7,7 @@ export class PromoteCoachDto {
     @ApiProperty({ example: 'uuid-1234', description: 'ID del usuario a promover' })
     @Type(() => String)
     @IsNotEmpty()
-    @IsUUID('4', { message: 'El ID debe ser un UUID válido en formato PostgreSQL' })
+    @IsUUID('all', { message: 'El ID debe ser un UUID válido en formato PostgreSQL' })
     user_id!: string;
 
     @ApiProperty({ example: 'coach@example.com', maxLength: 50 })

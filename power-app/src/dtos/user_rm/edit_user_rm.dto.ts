@@ -7,13 +7,13 @@ export class EditUserRmDto {
     @ApiProperty({ example: 'uuid-1234', description: 'ID del usuario' })
     @Type(() => String)
     @IsNotEmpty()
-    @IsUUID('4', { message: 'El UserID debe ser un UUID válido en formato PostgreSQL' })
+    @IsUUID('all', { message: 'El UserID debe ser un UUID válido en formato PostgreSQL' })
     user_id!: string;
 
     @ApiProperty({ example: 'uuid-5678', description: 'ID del ejercicio' })
     @Type(() => String)
     @IsNotEmpty()
-    @IsUUID('4', { message: 'El ExerciseID debe ser un UUID válido en formato PostgreSQL' })
+    @IsUUID('all', { message: 'El ExerciseID debe ser un UUID válido en formato PostgreSQL' })
     exercise_id!: string;
 
     @ApiProperty({ example: 100.5, description: 'Peso en kg' })

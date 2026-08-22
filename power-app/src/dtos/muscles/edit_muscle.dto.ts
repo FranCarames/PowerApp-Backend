@@ -7,7 +7,7 @@ export class EditMuscleDto {
     @ApiProperty({ example: 'uuid-1234', description: 'ID del grupo muscular' })
     @Type(() => String)
     @IsNotEmpty()
-    @IsUUID('4', { message: 'El ID debe ser un UUID válido en formato PostgreSQL' })
+    @IsUUID('all', { message: 'El ID debe ser un UUID válido en formato PostgreSQL' })
     muscle_group_id!: string;
 
     @ApiProperty({ example: 'Pectoral mayor', maxLength: 50 })

@@ -6,6 +6,6 @@ export class ParameterIdDto {
     @ApiProperty({ example: 'uuid-1234' })
     @Type(() => String)
     @IsNotEmpty()
-    @IsUUID('4', { message: 'El ID debe ser un UUID válido en formato PostgreSQL' })
+    @IsUUID('all', { message: 'El ID debe ser un UUID válido en formato PostgreSQL' })
     id!: string;
 }
