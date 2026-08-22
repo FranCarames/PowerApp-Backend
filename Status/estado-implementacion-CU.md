@@ -7,21 +7,21 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 49 | 68% | Endpoint existe y su service ejecuta lógica real |
+| ✅ Implementado | 50 | 69% | Endpoint existe y su service ejecuta lógica real |
 | 🟡 Parcial | 1 | 1% | Funciona a medias / resuelto dentro de otro endpoint |
 | 🔵 Andamiaje | 14 | 19% | Ruta declarada pero service vacío y llamada comentada |
-| ⬜ No implementado | 8 | 11% | Sin endpoint, service ni módulo |
+| ⬜ No implementado | 7 | 10% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
 
-**50 de 72 CU con código implementado o parcial (~69%).** Los otros 22 son trabajo pendiente (andamiaje + no implementado).
-> **Nota (19/8):** la DB **está pendiente de regenerar**. La regeneración anterior cubrió las columnas `active` de `Membership` y `User`, pero el ajuste de modelo de circuitos (ver más abajo) cambió el schema otra vez: hasta correr `01` → `02` → `03` con los scripts actualizados, los endpoints de circuitos no se pueden probar en runtime.
+**51 de 72 CU con código implementado o parcial (~71%).** Los otros 21 son trabajo pendiente (andamiaje + no implementado).
+> **Nota (19/8):** la DB está **al día** con el modelo. El ajuste de circuitos se aplicó sobre la instancia existente con un delta puntual, sin recrearla, así que todos los endpoints se pueden probar en runtime.
 
 ### Cobertura por rol
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 14 | 1 | 2 | 3 | 70% |
-| Entrenador | 29 | 12 | 0 | 12 | 5 | 41% |
+| Entrenador | 29 | 13 | 0 | 12 | 4 | 45% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
 
 ## Cambios recientes (2026-08-19 · circuitos)
@@ -30,9 +30,13 @@
 - **`GET /routine/circuit/:id`** — no es un CU: es el «include» que CU-E-23 necesita para "abrir un circuito con sus ejercicios actuales". Devuelve el circuito con sus `Routine_Exercise` ordenados por `exercise_order` y sus `Exercise_Set` por `set_order`, aplanando las relaciones como hace `exercise.service.ts`. Responde también para circuitos inactivos, para que se puedan inspeccionar los dados de baja.
 - **CU-E-24 (eliminar circuito, lógico)** ✅: `POST /routine/circuit/set-active/:id` con body `{ active }`, mismo patrón que `/membership/set-active/:id` y `/users/set-active/:id`. Un solo endpoint da de baja y reactiva. **No toca `Routine_Circuit`**: las rutinas que referencian el circuito quedan intactas, que es la postcondición explícita del CU.
 - Los tres son `@Auth(coach, admin)` y viven en `routine.controller.ts` / `routine.service.ts`: **los circuitos no tienen módulo ni controller propio** (decisión del usuario — rutinas y circuitos dependen entre sí). El `RoutineService` deja de estar vacío.
-- **CU-E-22 y CU-E-23 quedan pendientes por decisión de diseño**, no por falta de tiempo: el contrato de alta/edición (lista completa de ejercicios con sus series + reconciliación) se refina antes de codificarse.
-- Sin cambios de entidades → `Db Creator` intacto. Sigue pendiente **regenerar la base** con el schema del ajuste de modelo de más abajo.
-- **`Db Creator/migraciones/`** (carpeta nueva): deltas escritos a mano para migrar una base **ya existente**, fuera del pipeline de `build_sql.py`. Incluye `2026-08-19-circuitos.sql` (aplicada) y su script de verificación de 12 chequeos. La base de Render quedó **migrada al schema nuevo**.
+- **CU-E-22 (crear circuito)** ✅: `POST /routine/circuit/create` da de alta la cabecera, sus ejercicios y sus series en **una sola transacción** (`QueryRunner`) — se aparta a propósito del patrón sin transacción de `createExercise`, porque con E-23 pausado un circuito creado a medias no se podría reparar desde la app. `exercise_order` y `set_order` los deriva el server de la posición en el array, así que no hay forma de recibir órdenes duplicados ni salteados. Responde `201` con el mismo formato anidado que el detalle, para que el front no tenga que hacer una segunda llamada.
+  - **Reglas de negocio validadas:** `exercise_id` **único** dentro del circuito (400) — si hace falta el mismo movimiento dos veces se usa una variación del catálogo, y a cambio `exercise_id` queda como clave natural para la reconciliación de E-23; `amrap_time` sólo con `amrap = true`; `rpe` y `rir` mutuamente excluyentes (misma escala invertida); `rm = true` exige `set_count = 1`. Rangos: `set_count` 1–20, `rep_count` 1–1000 (cubre aeróbicos como saltos de soga), `weight` ≤1000, `rpe` 1–10, `rir` 0–10, `rm_perc` 1–125 (permite supramáximo).
+  - **Semántica confirmada:** una fila de `Exercise_Set` es un **bloque de series iguales**, no una serie individual. Consecuencia asumida en CU-U-12: el alumno marca el bloque completo; tildar serie por serie sería maquillaje del front.
+  - **Refactor:** el armado de la respuesta anidada salió de `getCircuitById` a dos helpers privados (`findCircuitDetail` + `buildCircuitDetailResponse`) que comparten el alta y el detalle.
+- **CU-E-23 (editar circuito)** queda como el **único pendiente del bloque**, pausado por decisión de diseño: la reconciliación define qué pasa con los `Exercise_Set` que los alumnos ya marcaron como hechos vía `Routine_Exercise_Set_Finished`, y eso merece su propio refinamiento. Con `exercise_id` como clave única, va a poder resolverse con el mismo patrón que `editExercise` usa para los músculos.
+- Sin cambios de entidades → `Db Creator` intacto.
+- **La base ya está migrada al schema nuevo** (19/8): se aplicó el delta de circuitos sobre la instancia existente en vez de recrearla, así que los endpoints de circuitos se pueden probar en runtime.
 - **`ias_users` fuera del DDL:** era una tabla de otro proyecto arrastrada en `ddl.py`. Se sacó de los scripts para que no vuelva a crearse al regenerar; **la tabla existente en la base no se toca** (decisión del usuario). Ahora la correspondencia entidades ↔ tablas es 20 a 20, sin excepciones.
 - Spec: `Doc/specs/2026-08-19-circuitos-listado-y-baja-design.md` · plan: `Doc/plans/2026-08-19-circuitos-listado-y-baja-plan.md`.
 
@@ -44,7 +48,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 - **Nueva `Routine_Circuit`**: join M:N rutina ↔ circuito con `order`. **Sin unique sobre (`routine_id`, `circuit_id`)** — un mismo circuito puede repetirse dentro de la rutina y el `order` distingue las apariciones. FKs: `routine_id` CASCADE, `circuit_id` RESTRICT (la baja de circuitos es lógica, así que el RESTRICT sólo protege de un borrado manual en la base).
 - **`Routine_Exercise` pierde `finished` y `user_note`**: era estado per-usuario viviendo en la plantilla genérica y compartida del circuito. `coach_note` se queda.
 - **Nueva `Routine_Exercise_Set_Finished`**: `user_routine_id` + `routine_exercise_set_id` (→ `Exercise_Set.id`) + `user_note`, con unique del par. La existencia de la fila *es* el "hecho". Habilita **CU-U-12**, que sigue ⬜ hasta que existan los endpoints.
-- **`Db Creator`**: `ddl.py` + `01_estructura.sql` actualizados y regenerados con `build_sql.py`; `02` y `03` sin cambios de contenido. **Deuda abierta: hay que regenerar la base** para que este schema exista en Postgres — hasta entonces los endpoints que toquen estas tablas van a fallar.
+- **`Db Creator`**: `ddl.py` + `01_estructura.sql` actualizados y regenerados con `build_sql.py`; `02` y `03` sin cambios de contenido. El schema se aplicó a la base existente con un `ALTER` puntual (19/8), sin recrearla.
 - Verificado por compilación (`npm --prefix power-app run build`) y por chequeo cruzado columna a columna entre entidades y `01_estructura.sql`.
 
 ## Cambios recientes (2026-08-18)
@@ -103,11 +107,11 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 1. **Routine y Planification siguen siendo andamiaje** *(actualizado 19/8)*. Las rutas de rutinas y planificaciones están declaradas pero con la llamada al service comentada, y `planification.service.ts` sigue vacío. `routine.service.ts` **ya no está vacío**: tiene los métodos reales de circuitos (E-21/E-24), pero ninguno de rutinas. Siguen siendo **14 CU** (E-08→E-19, U-08, U-09): el mayor bloque de trabajo pendiente.
 2. ~~**El módulo `/auth` está completamente comentado.**~~ **Resuelto (2026-08-11):** el módulo viejo se eliminó; logout (U-03) y recuperar contraseña (U-04) se implementaron en `/users`. Queda pendiente el registro social (fuera de los 72 CU).
-3. **Circuitos: a mitad de camino** *(actualizado 19/8)*. Entidades ✅ (`Circuit` reutilizable + `Routine_Circuit`) y **E-21/E-24 implementados** — listado con filtros, detalle anidado y baja lógica, todo en `routine.controller.ts`/`routine.service.ts`: **no hay módulo ni controller propio de circuitos**, conviven con rutinas porque dependen entre sí. Faltan **E-22 y E-23** (crear/editar), pausados a propósito hasta refinar el contrato de alta/edición: reciben la lista completa de ejercicios con sus series y tienen que reconciliar (mantener / crear / eliminar), y esa reconciliación decide qué pasa con los `Exercise_Set` que los usuarios ya marcaron como hechos.
+3. **Circuitos: a mitad de camino** *(actualizado 19/8)*. Entidades ✅ (`Circuit` reutilizable + `Routine_Circuit`) y **E-21/E-24 implementados** — listado con filtros, detalle anidado y baja lógica, todo en `routine.controller.ts`/`routine.service.ts`: **no hay módulo ni controller propio de circuitos**, conviven con rutinas porque dependen entre sí. Falta sólo **E-23** (editar), pausado a propósito: recibe la lista completa de ejercicios con sus series y tiene que reconciliar (mantener / crear / eliminar), y esa reconciliación decide qué pasa con los `Exercise_Set` que los usuarios ya marcaron como hechos.
 4. **Falta la gestión de "Mi Cuenta" del usuario:** ~~cambiar contraseña (U-05), editar datos (U-06)~~ **resueltos (2026-08-18)**; siguen pendientes marcar serie (U-12) y notas del ejercicio (U-13), ambos atados al bloque de Rutinas. ~~RM potenciales (U-16)~~ **resuelto (2026-08-18)**.
 5. **Falta el tracking de entrenamientos (E-06/E-07).** ~~No hay endpoints de "alumnos" con filtro por rol/entrenador~~ **resuelto (2026-08-06)**: E-01→E-03 ✅ vía `GET /users/all` con filtros/paginación y `POST /users/set-active/:id`. ~~Ni estados/tipos de membresía agregados (E-26→E-28).~~ **Resuelto (2026-08-18).** Lo que queda es el historial de entrenamientos y su filtro por ejercicio, que dependen del bloque de Rutinas (28/8).
 6. ~~**La autorización es manual, no centralizada.**~~ **Resuelto (2026-08-11):** se centralizó con Guards + `@Auth(...)` en los 7 controllers (ver *Cambios recientes 2026-08-11*).
-7. **Sin infraestructura de migraciones y `synchronize: false`.** No existe carpeta `migrations`, `data-source` ni scripts typeorm en `package.json`: todo cambio de columna se aplica **regenerando la base** con `Db Creator` (01 → 02 → 03). **Consecuencia hoy (19/8):** el schema de circuitos existe en los scripts pero **no en Postgres** — hasta regenerar, los endpoints de circuitos no se pueden probar en runtime y fallarían por columnas inexistentes.
+7. **Sin infraestructura de migraciones y `synchronize: false`.** No existe carpeta `migrations`, `data-source` ni scripts typeorm en `package.json`: todo cambio de columna se aplica **regenerando la base** con `Db Creator` (01 → 02 → 03). **Consecuencia práctica:** cada cambio de entidad obliga a decidir cómo se aplica sobre la base viva. El de circuitos (19/8) se resolvió con un `ALTER` puntual escrito a mano y ya está aplicado, pero no queda registro versionado de ese delta: la única fuente reproducible sigue siendo regenerar de cero.
 
 ---
 
@@ -166,7 +170,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Entrenador (29 CU · 41%)
+## Detalle — Rol Entrenador (29 CU · 45%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -204,7 +208,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-E-21 | Obtener circuitos | ✅ Implementado | `GET /routine/circuit/all` · filtros keyword/type/include_inactive + `exercise_count` |
-| CU-E-22 | Crear circuito | ⬜ No implementado | pendiente de refinar el contrato de alta |
+| CU-E-22 | Crear circuito | ✅ Implementado | `POST /routine/circuit/create` · circuito + ejercicios + series en una transacción |
 | CU-E-23 | Editar circuito | ⬜ No implementado | pendiente de refinar la reconciliación |
 | CU-E-24 | Eliminar circuito (lógico) | ✅ Implementado | `POST /routine/circuit/set-active/:id` · flag `{ active }` |
 

@@ -6,19 +6,24 @@ Backend de **PowerApp**, una aplicación de gimnasio y entrenamiento. Expone una
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
 ![TypeORM](https://img.shields.io/badge/TypeORM-0.3-FE0803)
+[![Swagger](https://img.shields.io/badge/Swagger-API%20en%20vivo-85EA2D?logo=swagger&logoColor=000)](https://powerapp-backend.onrender.com/docs)
+
+> 🔌 **Todos los servicios de la API están documentados en Swagger:** **[powerapp-backend.onrender.com/docs](https://powerapp-backend.onrender.com/docs)**
+> Documentación interactiva, lista para probar desde el navegador (parámetros, DTOs, respuestas y autenticación Bearer JWT).
 
 ---
 
-## 📚 Documentación (GitHub Pages)
+## 📚 Documentación
 
-Toda la documentación visual está publicada en **[francarames.github.io/PowerApp-Backend](https://francarames.github.io/PowerApp-Backend/)**:
+La documentación visual está publicada en **[francarames.github.io/PowerApp-Backend](https://francarames.github.io/PowerApp-Backend/)** y la de la API, en **Swagger**. Todo es accesible desde la portada:
 
-| Vista | Descripción |
-|---|---|
-| 🧭 **[Portada](https://francarames.github.io/PowerApp-Backend/)** | Índice de toda la documentación |
-| 📱 **[Prototipo de interfaces](https://francarames.github.io/PowerApp-Backend/UI%20Front/powerapp-prototype.html)** | Mockups navegables de las pantallas, por rol |
-| 📊 **[Estado de implementación](https://francarames.github.io/PowerApp-Backend/Status/dashboard-estado-CU.html)** | Dashboard de avance: cada CU vs. el código |
-| 📄 **[Especificaciones de CU](https://francarames.github.io/PowerApp-Backend/Use%20Cases/)** | Las 72 especificaciones de casos de uso, por rol y paquete |
+| Vista | Dónde | Descripción |
+|---|---|---|
+| 🔌 **[API — Swagger](https://powerapp-backend.onrender.com/docs)** | Render | **Documentación de todos los servicios REST**: endpoints, parámetros, esquemas y pruebas en vivo |
+| 🧭 **[Portada](https://francarames.github.io/PowerApp-Backend/)** | GitHub Pages | Índice de toda la documentación |
+| 📱 **[Prototipo de interfaces](https://francarames.github.io/PowerApp-Backend/UI%20Front/powerapp-prototype.html)** | GitHub Pages | Mockups navegables de las pantallas, por rol |
+| 📊 **[Estado de implementación](https://francarames.github.io/PowerApp-Backend/Status/dashboard-estado-CU.html)** | GitHub Pages | Dashboard de avance: cada CU vs. el código |
+| 📄 **[Especificaciones de CU](https://francarames.github.io/PowerApp-Backend/Use%20Cases/)** | GitHub Pages | Las 72 especificaciones de casos de uso, por rol y paquete |
 
 ---
 
@@ -90,11 +95,19 @@ npm run build         # compilar
 
 ## 🔌 API
 
-- **Base URL:** `http://localhost:3000/api/v1`
-- **Documentación interactiva (Swagger):** `http://localhost:3000/docs`
-- **Auth:** Bearer JWT (`Authorization: Bearer <token>`)
+**Todos los servicios están documentados en Swagger** — es la referencia de la API: cada endpoint con su verbo, parámetros, DTO de entrada, esquema de respuesta y códigos de error, y se puede probar desde el propio navegador (botón *Authorize* para el Bearer JWT).
 
-Módulos principales: `users`, `coach`, `membership`, `muscles`, `exercise`, `planification`, `routine`, `user_rm`.
+| | Desplegado (Render) | Local |
+|---|---|---|
+| **Swagger** | **<https://powerapp-backend.onrender.com/docs>** | `http://localhost:3000/docs` |
+| **Base URL** | `https://powerapp-backend.onrender.com/api/v1` | `http://localhost:3000/api/v1` |
+
+- **Auth:** Bearer JWT (`Authorization: Bearer <token>`). El token de `login` / `register` vuelve en el **header `Authorization` de la respuesta**.
+- El prefijo `api/v1` es global; `/docs` queda **fuera** del prefijo.
+
+Módulos: `users`, `coach`, `membership`, `muscles`, `exercise`, `planification`, `routine`, `user_rm`.
+
+> ⏱️ El deploy corre en el free tier de Render: si el servicio estuvo inactivo, la primera carga de `/docs` puede demorar unos segundos mientras arranca.
 
 ---
 

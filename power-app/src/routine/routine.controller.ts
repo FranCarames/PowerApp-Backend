@@ -16,6 +16,7 @@ import { Routine } from '../entities/routine.entity';
 import { Circuit } from '../entities/circuit.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
+import { CreateCircuitDto } from '../dtos/circuit/create_circuit.dto';
 import { GetCircuitsQueryDto } from '../dtos/circuit/get_circuits_query.dto';
 import { SetCircuitActiveDto } from '../dtos/circuit/set_circuit_active.dto';
 import { CircuitListItemResponseDto } from '../dtos/circuit/circuit_list_item_response.dto';
@@ -81,6 +82,16 @@ export class RoutineController {
     }
 
     // ===================== CIRCUITOS (CU-E-21, CU-E-24) =====================
+
+    @Post('circuit/create')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 201, type: CircuitDetailResponseDto })
+    async createCircuit(
+        @Body() createCircuitDto: CreateCircuitDto,
+        @Res() res: Response,
+    ) {
+        this.routineService.createCircuit(createCircuitDto, res);
+    }
 
     @Get('circuit/all')
     @Auth(UserRole.coach, UserRole.admin)
