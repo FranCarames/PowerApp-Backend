@@ -86,9 +86,12 @@ CREATE TABLE public."Planification" (
     number_of_routines INTEGER     NOT NULL,
     type               VARCHAR(30),
     duration           VARCHAR(50),
+    active             BOOLEAN     NOT NULL DEFAULT true,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_planification_active ON public."Planification"(active);
 
 -- Circuit es una pieza global reutilizable: no depende de Routine
 CREATE TABLE public."Circuit" (
@@ -109,9 +112,12 @@ CREATE TABLE public."Routine" (
     routine_plan_id UUID,
     name            VARCHAR(20) NOT NULL,
     coach_note      VARCHAR(100),
+    active          BOOLEAN     NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_routine_active ON public."Routine"(active);
 
 
 -- =============================================================

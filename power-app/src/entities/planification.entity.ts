@@ -30,6 +30,10 @@ export class Planification {
     @Column({ length: 50, nullable: true })
     duration?: string;
 
+    @ApiProperty({ example: true })
+    @Column({ nullable: false, default: true })
+    active!: boolean;
+
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     created_at!: Date;

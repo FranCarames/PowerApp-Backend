@@ -24,6 +24,17 @@
 | Entrenador | 29 | 13 | 0 | 12 | 4 | 45% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
 
+## Cambios recientes (2026-08-22 · baja lógica en Rutinas y Planificaciones)
+
+Cambio de modelo: `Routine` y `Planification` suman `active` y pasan a **baja lógica**, como `Circuit`. **Ningún CU cambia de estado y los conteos no se mueven** — es sólo el modelo; los endpoints `set-active` se implementan con sus bloques (E-18 con Rutinas, E-11 con Planificaciones).
+
+- **El motivo es una cascada que destruye historial.** `Routine` tiene tres FKs apuntándole con `ON DELETE CASCADE`: un `DELETE` se lleva `Routine_Circuit`, `Routine_Asignation_User` y `Routine_Asignation`, y desde ahí `User_Routine` y `Routine_Exercise_Set_Finished`. O sea, **borrar una rutina borraba en silencio el historial de entrenamiento de todos los alumnos que la hicieron**. `Planification` tenía el mismo problema vía `Routine_Asignation`. La spec anterior lo cubría con un chequeo de "no está en uso", protección que dependía de que ese chequeo estuviera bien escrito; con baja lógica el error es imposible por construcción.
+- **Se hizo ahora y no después** porque las dos tablas están vacías (el `ALTER` no necesita backfill) y porque sus endpoints siguen siendo andamiaje: hacerlo más tarde obligaba a rehacer E-18, E-11 y los dos listados.
+- **Regla de comportamiento** (espejo de CU-E-24): la baja saca la pieza de circulación para **nuevos** ensamblados y asignaciones, pero lo ya asignado mantiene integridad y el alumno lo sigue viendo.
+- **Specs reescritas:** CU-E-18 y CU-E-11 pasan a "(Lógico)". Desaparece de ambas el camino alternativo *"en uso → impide la baja"*, reemplazado por una advertencia informativa: se puede dar de baja, pero eso no la quita de donde ya está asignada. CU-E-08 y CU-E-15 aclaran que listan las **activas**.
+- **`Db Creator`:** columna + índice en las dos tablas, `01_estructura.sql` regenerado; `02` y `03` sin cambios. El `ALTER` se aplicó sobre la base viva.
+- Diagramas de `Doc/` actualizados por el usuario (Miro → SVG/PDF). Plan: `Doc/plans/2026-08-22-baja-logica-rutinas-planificaciones-plan.md`.
+
 ## Cambios recientes (2026-08-19 · circuitos)
 
 - **CU-E-21 (obtener circuitos)** ✅: `GET /routine/circuit/all` con tres filtros opcionales — `keyword` (parcial, sin distinguir mayúsculas, sobre nombre y descripción), `type` (exacto, sin distinguir mayúsculas) e `include_inactive` (por defecto `false`, solo activos como pide la spec). Devuelve un array plano ordenado por nombre, con `exercise_count` por circuito resuelto con `loadRelationCountAndMap` (sin query extra).
@@ -193,7 +204,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-08 | Obtener planificaciones sistémicas | 🔵 Andamiaje | `GET /planification/all` · comentado |
 | CU-E-09 | Crear planificación sistémica | 🔵 Andamiaje | `POST /planification/create` · comentado |
 | CU-E-10 | Editar planificación sistémica | 🔵 Andamiaje | `POST /planification/edit/:id` · comentado |
-| CU-E-11 | Eliminar planificación sistémica | 🔵 Andamiaje | `DELETE /planification/:id` · comentado |
+| CU-E-11 | Eliminar planificación sistémica (lógico) | 🔵 Andamiaje | pasa a baja lógica (22/8): será `POST /planification/set-active/:id` |
 | CU-E-12 | Asignar rutina a planificación | 🔵 Andamiaje | `POST /planification/routine/assign` · comentado |
 | CU-E-13 | Asignar planificación a alumno | 🔵 Andamiaje | `POST /planification/user/assign` · comentado |
 | CU-E-14 | Eliminar planificación a alumno | 🔵 Andamiaje | `DELETE /planification/user/:id` · comentado |
@@ -204,7 +215,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-15 | Obtener rutinas sistémicas | 🔵 Andamiaje | `GET /routine/all` · comentado |
 | CU-E-16 | Crear rutina sistémica | 🔵 Andamiaje | `POST /routine/create` · comentado |
 | CU-E-17 | Editar rutina sistémica | 🔵 Andamiaje | `POST /routine/edit/:id` · comentado |
-| CU-E-18 | Eliminar rutina sistémica | 🔵 Andamiaje | `DELETE /routine/:id` · comentado |
+| CU-E-18 | Eliminar rutina sistémica (lógico) | 🔵 Andamiaje | pasa a baja lógica (22/8): será `POST /routine/set-active/:id` |
 | CU-E-19 | Asignar rutina a alumno | 🔵 Andamiaje | `POST /planification/routine/assign-user` · comentado |
 | CU-E-20 | Eliminar rutina a alumno | ⬜ No implementado | sin ruta para quitar routine-asignation-user |
 
