@@ -7,13 +7,13 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 51 | 71% | Endpoint existe y su service ejecuta lógica real |
+| ✅ Implementado | 52 | 72% | Endpoint existe y su service ejecuta lógica real |
 | 🟡 Parcial | 1 | 1% | Funciona a medias / resuelto dentro de otro endpoint |
-| 🔵 Andamiaje | 13 | 18% | Ruta declarada pero service vacío y llamada comentada |
+| 🔵 Andamiaje | 12 | 17% | Ruta declarada pero service vacío y llamada comentada |
 | ⬜ No implementado | 7 | 10% | Sin endpoint, service ni módulo |
 | **Total** | **72** | | |
 
-**52 de 72 CU con código implementado o parcial (~72%).** Los otros 20 son trabajo pendiente (andamiaje + no implementado).
+**53 de 72 CU con código implementado o parcial (~74%).** Los otros 19 son trabajo pendiente (andamiaje + no implementado).
 > **Nota (19/8):** la DB está **al día** con el modelo. El ajuste de circuitos se aplicó sobre la instancia existente con un delta puntual, sin recrearla, así que todos los endpoints se pueden probar en runtime.
 
 ### Cobertura por rol
@@ -21,8 +21,21 @@
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 14 | 1 | 2 | 3 | 70% |
-| Entrenador | 29 | 14 | 0 | 11 | 4 | 48% |
+| Entrenador | 29 | 15 | 0 | 10 | 4 | 52% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
+
+## Cambios recientes (2026-08-22 · crear rutina)
+
+- **CU-E-16 (crear rutina sistémica)** ✅: `POST /routine/create` da de alta la cabecera y sus `Routine_Circuit` en **una sola transacción** (`QueryRunner`), mismo patrón que E-22 un nivel más abajo. Responde `201` con el árbol completo, el mismo formato que `GET /routine/:id`, porque después de crear el front navega a la pantalla de la rutina y así se ahorra la segunda llamada. La rutina nace `active = true`; para desactivar está E-18.
+- **El `order` viaja en el body y el server lo normaliza — acá E-16 se aparta de E-22 a propósito.** En circuitos, `exercise_order` y `set_order` los deriva el server de la posición en el array; en rutinas el `order` es un campo explícito porque el front maneja el reordenamiento como dato propio. A cambio, el server se protege de lo que eso habilita: **`order` duplicado → `400`** (dos circuitos no pueden ocupar la misma posición), mientras que huecos o valores espaciados (`10, 20, 30`) se aceptan. **El valor recibido es una instrucción de ordenamiento, no lo que se guarda:** se ordena ASC y se persiste la posición resultante, así la base siempre queda `1..N` sin huecos. Por eso el `201` devuelve el `order` ya renumerado.
+- **Un mismo circuito PUEDE repetirse en la rutina, y el alta no valida nada al respecto.** `Routine_Circuit` no tiene unique sobre el par (decisión explícita del ajuste de modelo del 19/8) y el caso de uso es real: entrada en calor al principio y movilidad del mismo bloque al final. **Es al revés que en circuitos**, donde `exercise_id` sí es único. **Consecuencia para CU-E-17:** como `circuit_id` no es clave natural, la reconciliación **no puede** usar el patrón de `editExercise`; va por el **`Routine_Circuit.id`**, que es justo el que `/routine/all-plus` y `/routine/:id` ya exponen. La lista completa que reciba E-17 trae los ids de los vínculos que sobreviven, y los que no vengan se borran.
+- **Un circuito dado de baja no se puede ensamblar** (precondición de E-16 y postcondición de E-24). Se distinguen dos errores porque son dos problemas distintos: **`404`** si el `circuit_id` no está en la base, y **`400` con el nombre del circuito en el mensaje** si existe pero está inactivo — un `404` ahí sería mentira y mandaría al front a buscar un bug de ids inexistente, cuando en realidad alcanza con reactivarlo por `set-active`. No contradice que los listados devuelvan el `active` de cada circuito: eso es para ver las rutinas **viejas** que referencian una pieza de baja; la restricción aplica sólo al alta.
+- **El alta no acepta ningún campo de planificación.** El alcance de E-16 es "alta de Routine y de sus Routine_Circuit", y vincular a una planificación es exclusivamente CU-E-12. **Hallazgo nuevo:** `Routine.routine_plan_id` es una **columna obsoleta** — el vínculo rutina ↔ planificación lo modela `Routine_Asignation` (`routine_id` + `routine_plan_id` + `order`), que es lo que la spec de E-12 nombra explícitamente. La FK directa de `Routine` es un segundo camino que ningún CU usa. Queda nullable por ahora; sacarla conviene hacerlo con el bloque de planificaciones (ver hallazgo 8).
+- **Cambio de modelo: `Routine.name` pasa de `varchar(20)` a `varchar(50)`.** Con 20 no entraba un nombre real — *"Día A - Pecho y tríceps"* son 23 caracteres. Se alinea con `Planification.name`, que es el nivel de arriba del árbol. **Se hizo ahora y no después** por el mismo argumento que se usó para meter `active`: la tabla está vacía, así que el `ALTER` es instantáneo y sin backfill. `Db Creator`: `ddl.py` + `01_estructura.sql` regenerado; **`02` y `03` sin cambios** — no hay ningún INSERT a `Routine` en el seed. El `ALTER` sobre la base viva y el diagrama de Miro los aplica el usuario. **Ningún CU cambia de estado por esto.**
+- **Refactor (espejo del de E-22):** el armado del detalle de rutina salió de `getRoutineById` a dos helpers privados (`findRoutineDetail` + `buildRoutineDetailResponse`) que comparten el alta y el detalle. `buildRoutineDetailResponse` sigue delegando cada circuito a `buildCircuitDetailResponse`, que no se tocó.
+- **Guarda en el rollback:** la recarga del detalle pasa **después** del commit, así que el `catch` sólo hace `rollbackTransaction()` si `queryRunner.isTransactionActive`. Sin eso, una falla en la recarga disparaba un rollback sobre una transacción ya cerrada, que tira un error nuevo dentro del `catch` y —como el controller no espera la promesa— deja la request colgada en vez de devolver `500`. **`createCircuit` tiene el mismo agujero y conviene portarle la guarda** cuando se retome E-23.
+- **Esto destraba la verificación pendiente de la lectura:** ahora sí se puede crear una rutina y validar en runtime el **orden anidado de tres niveles** (`order` → `exercise_order` → `set_order`) que quedó sin probar el 22/8.
+- Spec: `Doc/specs/2026-08-22-crear-rutina-design.md` · plan: `Doc/plans/2026-08-22-crear-rutina-plan.md`.
 
 ## Cambios recientes (2026-08-22 · lectura de rutinas)
 
@@ -32,7 +45,7 @@
 - **`/routine/:id` quedó en coach + admin**, aunque el andamiaje declaraba también `user`. CU-U-09 pide esta misma estructura pero exige que la rutina pertenezca a una **asignación vigente del alumno**, y esa cadena todavía no existe: habilitar el rol `user` sin ese check dejaría que cualquier alumno leyera cualquier rutina. **U-09 sigue 🔵** y se cierra sumando el check cuando existan las asignaciones.
 - **Helper `buildRoutinesQuery`**, espejo del de circuitos, con los filtros compartidos por los dos listados.
 - Sin cambios de entidades → `Db Creator` intacto. Spec: `Doc/specs/2026-08-22-rutinas-lectura-design.md`.
-- **Pendiente de verificar en runtime:** no hay ninguna rutina cargada (E-16 no existe todavía), así que los listados devuelven `[]`. Para probar el detalle hay que insertar a mano una `Routine` y sus `Routine_Circuit`. En particular queda sin validar el **orden anidado de tres niveles** (`order` → `exercise_order` → `set_order`) de las find options de TypeORM.
+- ~~**Pendiente de verificar en runtime:** no hay ninguna rutina cargada (E-16 no existe todavía), así que los listados devuelven `[]`.~~ **Destrabado (22/8):** con E-16 implementado ya no hace falta insertar nada a mano — se crea una rutina por `POST /routine/create` y con eso se validan los tres endpoints de lectura, incluido el **orden anidado de tres niveles** (`order` → `exercise_order` → `set_order`) de las find options de TypeORM, que era lo único que quedaba sin probar.
 
 ## Cambios recientes (2026-08-22 · baja lógica en Rutinas y Planificaciones)
 
@@ -130,13 +143,14 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ## Hallazgos estructurales
 
-1. **Routine y Planification siguen siendo andamiaje** *(actualizado 19/8)*. Las rutas de rutinas y planificaciones están declaradas pero con la llamada al service comentada, y `planification.service.ts` sigue vacío. `routine.service.ts` **ya no está vacío**: tiene los métodos reales de circuitos (E-21/E-24), pero ninguno de rutinas. Siguen siendo **14 CU** (E-08→E-19, U-08, U-09): el mayor bloque de trabajo pendiente.
+1. **Rutinas a mitad de camino, Planification sigue siendo andamiaje** *(actualizado 22/8)*. `routine.service.ts` ya tiene los circuitos (E-21/E-22/E-24) **y la lectura y el alta de rutinas** (E-15, E-16, más `/all-plus` y el detalle). De rutinas faltan **E-17** (editar, con la reconciliación por `Routine_Circuit.id`) y **E-18** (baja lógica, ya decidida como `POST /routine/set-active/:id`). Planificaciones sigue entero: `planification.service.ts` vacío y todas las rutas comentadas. Quedan **12 CU** de este bloque (E-08→E-14, E-17→E-20, U-08, U-09).
 2. ~~**El módulo `/auth` está completamente comentado.**~~ **Resuelto (2026-08-11):** el módulo viejo se eliminó; logout (U-03) y recuperar contraseña (U-04) se implementaron en `/users`. Queda pendiente el registro social (fuera de los 72 CU).
-3. **Circuitos: a mitad de camino** *(actualizado 19/8)*. Entidades ✅ (`Circuit` reutilizable + `Routine_Circuit`) y **E-21/E-24 implementados** — listado con filtros, detalle anidado y baja lógica, todo en `routine.controller.ts`/`routine.service.ts`: **no hay módulo ni controller propio de circuitos**, conviven con rutinas porque dependen entre sí. Falta sólo **E-23** (editar), pausado a propósito: recibe la lista completa de ejercicios con sus series y tiene que reconciliar (mantener / crear / eliminar), y esa reconciliación decide qué pasa con los `Exercise_Set` que los usuarios ya marcaron como hechos.
+3. **Circuitos: cerrado salvo E-23** *(actualizado 22/8)*. Entidades ✅ (`Circuit` reutilizable + `Routine_Circuit`) y **E-21/E-24 implementados** — listado con filtros, detalle anidado y baja lógica, todo en `routine.controller.ts`/`routine.service.ts`: **no hay módulo ni controller propio de circuitos**, conviven con rutinas porque dependen entre sí. Falta sólo **E-23** (editar), pausado a propósito: recibe la lista completa de ejercicios con sus series y tiene que reconciliar (mantener / crear / eliminar), y esa reconciliación decide qué pasa con los `Exercise_Set` que los usuarios ya marcaron como hechos.
 4. **Falta la gestión de "Mi Cuenta" del usuario:** ~~cambiar contraseña (U-05), editar datos (U-06)~~ **resueltos (2026-08-18)**; siguen pendientes marcar serie (U-12) y notas del ejercicio (U-13), ambos atados al bloque de Rutinas. ~~RM potenciales (U-16)~~ **resuelto (2026-08-18)**.
 5. **Falta el tracking de entrenamientos (E-06/E-07).** ~~No hay endpoints de "alumnos" con filtro por rol/entrenador~~ **resuelto (2026-08-06)**: E-01→E-03 ✅ vía `GET /users/all` con filtros/paginación y `POST /users/set-active/:id`. ~~Ni estados/tipos de membresía agregados (E-26→E-28).~~ **Resuelto (2026-08-18).** Lo que queda es el historial de entrenamientos y su filtro por ejercicio, que dependen del bloque de Rutinas (28/8).
 6. ~~**La autorización es manual, no centralizada.**~~ **Resuelto (2026-08-11):** se centralizó con Guards + `@Auth(...)` en los 7 controllers (ver *Cambios recientes 2026-08-11*).
 7. **Sin infraestructura de migraciones y `synchronize: false`.** No existe carpeta `migrations`, `data-source` ni scripts typeorm en `package.json`: todo cambio de columna se aplica **regenerando la base** con `Db Creator` (01 → 02 → 03). **Consecuencia práctica:** cada cambio de entidad obliga a decidir cómo se aplica sobre la base viva. El de circuitos (19/8) se resolvió con un `ALTER` puntual escrito a mano y ya está aplicado, pero no queda registro versionado de ese delta: la única fuente reproducible sigue siendo regenerar de cero.
+8. **`Routine.routine_plan_id` es una columna obsoleta** *(nuevo 22/8)*. El modelo tiene **dos caminos** de `Routine` a `Planification`: la FK directa `Routine.routine_plan_id` (nullable, `ON DELETE SET NULL`) y la tabla `Routine_Asignation` (`routine_id` + `routine_plan_id` + `order`). **La spec de CU-E-12 nombra explícitamente la segunda**, y ningún CU usa la primera. Mantener las dos deja dos verdades posibles sobre el mismo hecho, que ningún endpoint reconcilia. **Decisión (22/8):** el alta de rutinas no la toca (queda en `null`) y la columna se deja nullable; sacarla implica `ALTER` + `ddl.py` + `01_estructura.sql` + diagrama, y conviene hacerlo junto al bloque de planificaciones (4/9), donde se implementa E-12.
 
 ---
 
@@ -148,7 +162,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 |---|---|---|
 | **14/8** ✅ | CU sin dependencias — **7 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**), ✅ editar datos personales (**U-06**), ✅ filtrar RMs por usuario (**U-11**), ✅ RMs potenciales (**U-16**), ✅ estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**) · 🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas |
 | **21/8** ✅ | Circuitos — **3 de 4** | ✅ obtener (**E-21**), ✅ crear (**E-22**), ✅ baja lógica (**E-24**), más el detalle y el listado con ejercicios (`/all-plus`). ⏸️ editar (**E-23**) pausado por decisión de diseño: hay que definir qué pasa con los sets ya marcados por los alumnos |
-| **28/8** | Rutinas | Implementar el service de rutinas (**E-15→E-18**); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
+| **28/8** | Rutinas — **2 de 4 del núcleo** | ✅ obtener (**E-15**) + `/all-plus` y el detalle, ✅ crear (**E-16**). Faltan editar (**E-17**, reconciliación por `Routine_Circuit.id`) y baja lógica (**E-18**, `POST /routine/set-active/:id`); asignar/desasignar rutinas a alumnos (**E-19, E-20**); marcar series realizadas (**U-12**) y notas del ejercicio (**U-13**); historial de entrenamientos y su filtro (**E-06, E-07**) |
 | **4/9** | Planificaciones y cierre | Service de planificaciones (**E-08→E-11**); asignar rutinas y planificaciones a alumnos (**E-12→E-14**); planificación activa y detalle de rutina del usuario (**U-08, U-09**); pruebas de integración sobre la API + Swagger. **🎯 Hito: servidor con los 72 CU cubiertos** |
 
 > Secuencia según dependencias: primero los CU independientes, luego **Circuitos**, sobre ellos las **Rutinas** y por último las **Planificaciones** que las agrupan.
@@ -195,7 +209,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Entrenador (29 CU · 48%)
+## Detalle — Rol Entrenador (29 CU · 52%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -223,7 +237,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-E-15 | Obtener rutinas sistémicas | ✅ Implementado | `GET /routine/all` · filtros keyword/include_inactive + `circuit_count` |
-| CU-E-16 | Crear rutina sistémica | 🔵 Andamiaje | `POST /routine/create` · comentado |
+| CU-E-16 | Crear rutina sistémica | ✅ Implementado | `POST /routine/create` · rutina + `Routine_Circuit` ordenados, en una transacción |
 | CU-E-17 | Editar rutina sistémica | 🔵 Andamiaje | `POST /routine/edit/:id` · comentado |
 | CU-E-18 | Eliminar rutina sistémica (lógico) | 🔵 Andamiaje | pasa a baja lógica (22/8): será `POST /routine/set-active/:id` |
 | CU-E-19 | Asignar rutina a alumno | 🔵 Andamiaje | `POST /planification/routine/assign-user` · comentado |

@@ -26,8 +26,8 @@ import { RoutineListItemResponseDto } from '../dtos/routine/routine_list_item_re
 import { RoutineListItemPlusResponseDto } from '../dtos/routine/routine_list_item_plus_response.dto';
 import { RoutineDetailResponseDto } from '../dtos/routine/routine_detail_response.dto';
 import { CircuitDetailResponseDto } from '../dtos/circuit/circuit_detail_response.dto';
+import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 // TODO: crear los siguientes DTOs en src/dtos/routine/
-// import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 // import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 
 @ApiTags('Routine')
@@ -72,12 +72,12 @@ export class RoutineController {
 
     @Post('/create')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 201, type: Routine })
+    @ApiResponse({ status: 201, type: RoutineDetailResponseDto })
     async createRoutine(
-        @Body() createRoutineDto: any,
+        @Body() createRoutineDto: CreateRoutineDto,
         @Res() res: Response,
     ) {
-        // this.routineService.createRoutine(createRoutineDto, res);
+        this.routineService.createRoutine(createRoutineDto, res);
     }
 
     @Post('/edit/:id')

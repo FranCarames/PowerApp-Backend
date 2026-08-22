@@ -15,8 +15,8 @@ export class Routine {
     @Column({ type: 'uuid', nullable: true })
     routine_plan_id?: string;
 
-    @ApiProperty({ example: 'Día A - Pecho', maxLength: 20 })
-    @Column({ length: 20, nullable: false })
+    @ApiProperty({ example: 'Día A - Pecho y tríceps', maxLength: 50 })
+    @Column({ length: 50, nullable: false })
     name!: string;
 
     @ApiPropertyOptional({ example: 'Enfocarse en la contracción', maxLength: 100 })

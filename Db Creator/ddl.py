@@ -117,7 +117,7 @@ CREATE INDEX idx_circuit_type   ON public."Circuit"(type);
 CREATE TABLE public."Routine" (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     routine_plan_id UUID,
-    name            VARCHAR(20) NOT NULL,
+    name            VARCHAR(50) NOT NULL,
     coach_note      VARCHAR(100),
     active          BOOLEAN     NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
