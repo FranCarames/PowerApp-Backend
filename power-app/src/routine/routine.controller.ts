@@ -17,6 +17,7 @@ import { Circuit } from '../entities/circuit.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
 import { CreateCircuitDto } from '../dtos/circuit/create_circuit.dto';
+import { EditCircuitDto } from '../dtos/circuit/edit_circuit.dto';
 import { GetCircuitsQueryDto } from '../dtos/circuit/get_circuits_query.dto';
 import { SetCircuitActiveDto } from '../dtos/circuit/set_circuit_active.dto';
 import { CircuitListItemResponseDto } from '../dtos/circuit/circuit_list_item_response.dto';
@@ -101,7 +102,7 @@ export class RoutineController {
         // this.routineService.deleteRoutine(idRoutine.id, res);
     }
 
-    // ===================== CIRCUITOS (CU-E-21, CU-E-24) =====================
+    // ===================== CIRCUITOS (CU-E-21, CU-E-22, CU-E-23, CU-E-24) =====================
 
     @Post('circuit/create')
     @Auth(UserRole.coach, UserRole.admin)
@@ -111,6 +112,19 @@ export class RoutineController {
         @Res() res: Response,
     ) {
         this.routineService.createCircuit(createCircuitDto, res);
+    }
+
+    // No hace falta cuidar el orden como con 'circuit/all-plus': 'circuit/edit/:id' tiene
+    // dos segmentos despues de circuit, asi que no matchea el patron 'circuit/:id'
+    @Post('circuit/edit/:id')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: CircuitDetailResponseDto })
+    async editCircuit(
+        @Param() idCircuit: ParameterIdDto,
+        @Body() editCircuitDto: EditCircuitDto,
+        @Res() res: Response,
+    ) {
+        this.routineService.editCircuit(idCircuit.id, editCircuitDto, res);
     }
 
     @Get('circuit/all')

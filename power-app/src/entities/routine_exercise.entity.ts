@@ -22,9 +22,19 @@ export class RoutineExercise {
     @Column({ type: 'integer', nullable: false })
     exercise_order!: number;
 
+    // Acepta null explicito: al editar el circuito el entrenador tiene que poder borrar
+    // una nota que ya no aplica, y TypeORM ignora las propiedades en undefined.
+    // El type: 'varchar' es obligatorio con la union: TS emite design:type = Object
+    // para string | null, y sin el tipo declarado TypeORM no sabe que columna crear
     @ApiPropertyOptional({ example: 'Bajar lento en 3 segundos', maxLength: 100 })
-    @Column({ length: 100, nullable: true })
-    coach_note?: string;
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    coach_note?: string | null;
+
+    // Baja logica: un ejercicio que sale del circuito pero que algun alumno ya completo
+    // no se borra, se apaga. Mismo patron que Circuit, Routine y Planification
+    @ApiProperty({ example: true })
+    @Column({ nullable: false, default: true })
+    active!: boolean;
 
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })

@@ -267,6 +267,7 @@ CREATE TABLE public."Routine_Exercise" (
     circuit_id      UUID         NOT NULL,
     exercise_order  INTEGER      NOT NULL,
     coach_note      VARCHAR(100),
+    active          BOOLEAN      NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_routine_exercise_exercise
@@ -340,21 +341,24 @@ CREATE INDEX idx_exercise_set_order               ON public."Exercise_Set"(routi
 --  TABLAS CON DEPENDENCIAS DE CUARTO NIVEL
 -- =============================================================
 
--- La existencia de la fila = ese set esta hecho en esa instancia de rutina
-CREATE TABLE public."Routine_Exercise_Set_Finished" (
-    id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_routine_id         UUID        NOT NULL,
-    routine_exercise_set_id UUID        NOT NULL,
-    user_note               VARCHAR(100),
-    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_resf_user_routine
-        FOREIGN KEY (user_routine_id)         REFERENCES public."User_Routine"(id) ON DELETE CASCADE,
-    CONSTRAINT fk_resf_exercise_set
-        FOREIGN KEY (routine_exercise_set_id) REFERENCES public."Exercise_Set"(id)  ON DELETE CASCADE,
-    CONSTRAINT uk_resf_user_routine_set UNIQUE (user_routine_id, routine_exercise_set_id)
+-- La existencia de la fila = ese ejercicio esta hecho en esa instancia de rutina
+CREATE TABLE public."Routine_Exercise_Finished" (
+    id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_routine_id     UUID        NOT NULL,
+    routine_exercise_id UUID        NOT NULL,
+    user_note           VARCHAR(100),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_ref_user_routine
+        FOREIGN KEY (user_routine_id)     REFERENCES public."User_Routine"(id)     ON DELETE CASCADE,
+    -- RESTRICT a proposito: la baja fisica de un Routine_Exercise solo ocurre cuando no
+    -- tiene historial, asi que si esta FK frena un delete es un bug de la reconciliacion
+    CONSTRAINT fk_ref_routine_exercise
+        FOREIGN KEY (routine_exercise_id) REFERENCES public."Routine_Exercise"(id) ON DELETE RESTRICT,
+    CONSTRAINT uk_ref_user_routine_exercise UNIQUE (user_routine_id, routine_exercise_id)
 );
 
-CREATE INDEX idx_resf_user_routine_id ON public."Routine_Exercise_Set_Finished"(user_routine_id);
+CREATE INDEX idx_ref_user_routine_id     ON public."Routine_Exercise_Finished"(user_routine_id);
+CREATE INDEX idx_ref_routine_exercise_id ON public."Routine_Exercise_Finished"(routine_exercise_id);
 
 """

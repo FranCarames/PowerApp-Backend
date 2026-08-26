@@ -194,7 +194,7 @@
       <span><b>72</b> casos de uso</span>
       <span><b>9</b> módulos</span>
       <span>Fuente: <b>especificaciones/</b> vs <b>power-app/src</b></span>
-      <span>Corte: <b>2026-08-22</b></span>
+      <span>Corte: <b>2026-08-25</b></span>
     </div>
   </header>
 
@@ -203,7 +203,7 @@
     <div class="sec-head"><h2>Panorama general</h2><span class="kicker">72 CU clasificados</span></div>
     <div class="tiles">
       <div class="tile done">
-        <div class="n">52</div><div class="lbl">Implementado</div><div class="pct">72% · endpoint + lógica</div>
+        <div class="n">53</div><div class="lbl">Implementado</div><div class="pct">74% · endpoint + lógica</div>
       </div>
       <div class="tile partial">
         <div class="n">1</div><div class="lbl">Parcial</div><div class="pct">1% · incompleto</div>
@@ -212,20 +212,20 @@
         <div class="n">12</div><div class="lbl">Andamiaje</div><div class="pct">17% · ruta sin lógica</div>
       </div>
       <div class="tile missing">
-        <div class="n">7</div><div class="lbl">No implementado</div><div class="pct">10% · sin endpoint</div>
+        <div class="n">6</div><div class="lbl">No implementado</div><div class="pct">8% · sin endpoint</div>
       </div>
     </div>
 
     <div class="bar-block">
-      <div class="bar" role="img" aria-label="52 implementados, 1 parcial, 12 andamiaje, 7 no implementados de 72">
-        <span class="s-done" style="width:72.22%"></span>
+      <div class="bar" role="img" aria-label="53 implementados, 1 parcial, 12 andamiaje, 6 no implementados de 72">
+        <span class="s-done" style="width:73.61%"></span>
         <span class="s-partial" style="width:1.39%"></span>
         <span class="s-stub" style="width:16.67%"></span>
-        <span class="s-missing" style="width:9.72%"></span>
+        <span class="s-missing" style="width:8.33%"></span>
       </div>
       <div class="bar-cap">
-        <span><b>53 de 72</b> CU con código implementado o parcial (74%)</span>
-        <span><b>19</b> pendientes de trabajo real (andamiaje + no implementado)</span>
+        <span><b>54 de 72</b> CU con código implementado o parcial (75%)</span>
+        <span><b>18</b> pendientes de trabajo real (andamiaje + no implementado)</span>
       </div>
     </div>
   </section>
@@ -255,17 +255,17 @@
 
       <div class="role-card">
         <h3>Entrenador <em>29 CU</em></h3>
-        <div class="role-pct" style="color:var(--stub)">52%</div>
-        <div class="role-sub">15 implementados · circuitos cerrados, rutinas con lectura y alta</div>
+        <div class="role-pct" style="color:var(--stub)">55%</div>
+        <div class="role-sub">16 implementados · circuitos cerrados 4 de 4, rutinas con lectura y alta</div>
         <div class="mini-bar">
-          <span style="width:51.72%;background:var(--done)"></span>
+          <span style="width:55.17%;background:var(--done)"></span>
           <span style="width:34.48%;background:var(--stub)"></span>
-          <span style="width:13.79%;background:var(--missing-line)"></span>
+          <span style="width:10.34%;background:var(--missing-line)"></span>
         </div>
         <div class="role-legend">
-          <i><span class="swatch" style="background:var(--done)"></span><b>15</b> impl.</i>
+          <i><span class="swatch" style="background:var(--done)"></span><b>16</b> impl.</i>
           <i><span class="swatch" style="background:var(--stub)"></span><b>10</b> andam.</i>
-          <i><span class="swatch" style="background:var(--missing-line)"></span><b>4</b> falta</i>
+          <i><span class="swatch" style="background:var(--missing-line)"></span><b>3</b> falta</i>
         </div>
       </div>
 
@@ -292,7 +292,7 @@
         <div class="fi">01</div>
         <div>
           <h4>Rutinas a mitad de camino, Planification sigue siendo andamiaje</h4>
-          <p><code>routine.service.ts</code> ya tiene los circuitos (E-21, E-22, E-24) <b>y la lectura y el alta de rutinas</b> (E-15, E-16, más <code>/all-plus</code> y el detalle). De rutinas faltan <b>E-17</b> (editar, con la reconciliación por <code>Routine_Circuit.id</code>) y <b>E-18</b> (baja lógica, <code>POST /routine/set-active/:id</code>). Planificaciones sigue entero: <code>planification.service.ts</code> vacío y todas las rutas comentadas. Quedan <b>12 CU</b> de este bloque (E-08 a E-14, E-17 a E-20, U-08, U-09).</p>
+          <p><code>routine.service.ts</code> ya tiene <b>los circuitos completos</b> (E-21 a E-24) <b>y la lectura y el alta de rutinas</b> (E-15, E-16, más <code>/all-plus</code> y el detalle). De rutinas faltan <b>E-17</b> (editar, con la reconciliación por <code>Routine_Circuit.id</code>) y <b>E-18</b> (baja lógica, <code>POST /routine/set-active/:id</code>). Planificaciones sigue entero: <code>planification.service.ts</code> vacío y todas las rutas comentadas. Quedan <b>12 CU</b> de este bloque (E-08 a E-14, E-17 a E-20, U-08, U-09).</p>
         </div>
       </div>
       <div class="finding">
@@ -305,8 +305,8 @@
       <div class="finding">
         <div class="fi">03</div>
         <div>
-          <h4>Circuitos: cerrado salvo E-23</h4>
-          <p>Entidades ✅ (<code>Circuit</code> reutilizable + <code>Routine_Circuit</code>) y <b>E-21/E-24 implementados</b> el 19/8 — listado con filtros, detalle anidado y baja lógica, todo en <code>routine.controller.ts</code> / <code>routine.service.ts</code>: <b>no hay módulo ni controller propio de circuitos</b>, conviven con rutinas porque dependen entre sí. Falta sólo <b>E-23</b> (editar), pausado a propósito: recibe la lista completa de ejercicios con sus series y tiene que reconciliar, y esa reconciliación decide qué pasa con los <code>Exercise_Set</code> que los usuarios ya marcaron como hechos.</p>
+          <h4>✅ Circuitos: cerrado, 4 de 4 (25/8)</h4>
+          <p>Entidades ✅ (<code>Circuit</code> reutilizable + <code>Routine_Circuit</code>) y <b>E-21 a E-24 implementados</b> — listado con filtros, detalle anidado, alta, edición con reconciliación y baja lógica, todo en <code>routine.controller.ts</code> / <code>routine.service.ts</code>: <b>no hay módulo ni controller propio de circuitos</b>, conviven con rutinas porque dependen entre sí. <b>E-23 se destrabó el 25/8</b> repuntando el registro de “hecho” de <code>Exercise_Set</code> a <code>Routine_Exercise</code> y dándole baja lógica: al sacar un ejercicio del circuito se borra físico si nadie lo completó y se apaga si hay historial. El paquete no tiene pendientes.</p>
         </div>
       </div>
       <div class="finding">
@@ -344,6 +344,13 @@
           <p>El modelo tiene <b>dos caminos</b> de <code>Routine</code> a <code>Planification</code>: la FK directa <code>Routine.routine_plan_id</code> (nullable, <code>ON DELETE SET NULL</code>) y la tabla <code>Routine_Asignation</code> (<code>routine_id</code> + <code>routine_plan_id</code> + <code>order</code>). <b>La spec de CU-E-12 nombra explícitamente la segunda</b>, y ningún CU usa la primera: mantener las dos deja dos verdades posibles sobre el mismo hecho, que ningún endpoint reconcilia. El alta de rutinas (E-16) no la toca y la deja en <code>null</code>. Sacarla implica <code>ALTER</code> + <code>ddl.py</code> + <code>01_estructura.sql</code> + diagrama, y conviene hacerlo con el bloque de planificaciones (4/9), donde se implementa E-12.</p>
         </div>
       </div>
+      <div class="finding">
+        <div class="fi">09</div>
+        <div>
+          <h4>Nuevo (25/8) — <code>updated_at</code> no se actualiza solo, en ninguna tabla</h4>
+          <p>Las entidades declaran <code>@Column({ onUpdate: 'CURRENT_TIMESTAMP' })</code>, que es <b>sintaxis de MySQL</b>: en Postgres no hace nada, y el DDL no tiene triggers ni las entidades usan <code>@UpdateDateColumn</code>. O sea que hoy <code>updated_at</code> queda <b>congelado en la fecha de alta</b> en las 20 tablas. Se resolvió sólo en <code>editCircuit</code>, seteandolo a mano, porque un endpoint de edición que devuelve la fecha vieja es directamente un dato incorrecto. Generalizarlo —trigger en <code>ddl.py</code> o <code>@UpdateDateColumn</code>— queda pendiente para el próximo cambio de DDL.</p>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -357,7 +364,7 @@
         </thead>
         <tbody>
           <tr><td class="cu">14/8 ✅</td><td class="name">CU sin dependencias <span class="muted">· 7 de 8 (+ U-10 parcial)</span></td><td>✅ cambiar contraseña (<b>U-05</b>), ✅ editar datos (<b>U-06</b>), ✅ filtrar RMs por usuario (<b>U-11</b>), ✅ RMs potenciales (<b>U-16</b>), ✅ estado y tipos de membresía + alumnos por estado/tipo (<b>E-26→E-28</b>). 🟡 detalle de ejercicio (<b>U-10</b>): ficha de catálogo expuesta, el resto depende de Rutinas</td></tr>
-          <tr><td class="cu">21/8 ✅</td><td class="name">Circuitos <span class="muted">· 3 de 4</span></td><td>✅ obtener (<b>E-21</b>), ✅ crear (<b>E-22</b>), ✅ baja lógica (<b>E-24</b>), más el detalle y el listado con ejercicios (<code>/all-plus</code>). ⏸️ editar (<b>E-23</b>) pausado por diseño: falta definir qué pasa con los sets ya marcados por los alumnos</td></tr>
+          <tr><td class="cu">21/8 ✅</td><td class="name">Circuitos <span class="muted">· 4 de 4</span></td><td>✅ obtener (<b>E-21</b>), ✅ crear (<b>E-22</b>), ✅ baja lógica (<b>E-24</b>), más el detalle y el listado con ejercicios (<code>/all-plus</code>). ✅ editar (<b>E-23</b>), cerrado el <b>25/8</b>: el “hecho” se repuntó a <code>Routine_Exercise</code> y la baja pasa a ser lógica cuando hay historial</td></tr>
           <tr><td class="cu">28/8</td><td class="name">Rutinas <span class="muted">· 2 de 4 del núcleo</span></td><td>✅ obtener (<b>E-15</b>) + <code>/all-plus</code> y el detalle, ✅ crear (<b>E-16</b>). Faltan editar (<b>E-17</b>) y baja lógica (<b>E-18</b>); asignar/desasignar rutinas a alumnos (<b>E-19, E-20</b>); marcar series (<b>U-12</b>) y notas del ejercicio (<b>U-13</b>); historial de entrenamientos y su filtro (<b>E-06, E-07</b>)</td></tr>
           <tr><td class="cu">4/9</td><td class="name">Planificaciones y cierre</td><td>Service de planificaciones (<b>E-08→E-11</b>); asignar rutinas y planificaciones a alumnos (<b>E-12→E-14</b>); planificación activa y detalle de rutina (<b>U-08, U-09</b>); pruebas de integración + Swagger. <b>🎯 Hito: servidor con los 72 CU</b></td></tr>
         </tbody>
@@ -388,7 +395,7 @@
           <tr><td class="cu">CU-U-09</td><td class="name">Ver detalle de rutina</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">GET</span> /routine/:id <span class="muted">· service vacío</span></td></tr>
           <tr><td class="cu">CU-U-10</td><td class="name">Ver detalle de un ejercicio</td><td><span class="chip partial"><span class="cd"></span>Parcial</span></td><td class="endpoint"><span class="verb">GET</span> /exercise/:id <span class="muted">· ficha de catálogo expuesta; falta el detalle en contexto de rutina (Exercise_Set) — depende de Rutinas</span></td></tr>
           <tr><td class="cu">CU-U-11</td><td class="name">Ver mis RMs de un ejercicio</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">GET</span> /user_rm/user/:idUser/exercise/:idExercise <span class="muted">· check de dueño</span></td></tr>
-          <tr><td class="cu">CU-U-12</td><td class="name">Marcar serie como realizado</td><td><span class="chip missing"><span class="cd"></span>No implementado</span></td><td class="endpoint"><span class="muted">sin endpoint (Exercise_Set)</span></td></tr>
+          <tr><td class="cu">CU-U-12</td><td class="name">Marcar serie como realizado</td><td><span class="chip missing"><span class="cd"></span>No implementado</span></td><td class="endpoint"><span class="muted">sin endpoint · el registro pasa a ser por ejercicio (Routine_Exercise_Finished)</span></td></tr>
           <tr><td class="cu">CU-U-13</td><td class="name">Dejar una nota en el ejercicio</td><td><span class="chip missing"><span class="cd"></span>No implementado</span></td><td class="endpoint"><span class="muted">sin endpoint</span></td></tr>
           <tr><td class="cu">CU-U-14</td><td class="name">Temporizador</td><td><span class="chip missing"><span class="cd"></span>No implementado</span></td><td class="endpoint"><span class="muted">sin endpoint (probable front-end)</span></td></tr>
           <tr><td class="cu">CU-U-15</td><td class="name">Consultar wiki de ejercicios</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">GET</span> /exercise/all</td></tr>
@@ -406,7 +413,7 @@
 
   <!-- DETAIL: ENTRENADOR -->
   <section>
-    <div class="sec-head"><h2>Rol Entrenador</h2><span class="kicker">29 CU · 52% implementado</span></div>
+    <div class="sec-head"><h2>Rol Entrenador</h2><span class="kicker">29 CU · 55% implementado</span></div>
     <div class="table-scroll">
       <table>
         <thead>
@@ -442,7 +449,7 @@
           <tr class="pkg"><td colspan="4"><span class="pkg-lbl">Administrar circuitos</span></td></tr>
           <tr><td class="cu">CU-E-21</td><td class="name">Obtener circuitos</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">GET</span> /routine/circuit/all <span class="muted">· keyword/type/include_inactive + exercise_count</span></td></tr>
           <tr><td class="cu">CU-E-22</td><td class="name">Crear circuito</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /routine/circuit/create <span class="muted">· circuito + ejercicios + series en una transacción</span></td></tr>
-          <tr><td class="cu">CU-E-23</td><td class="name">Editar circuito</td><td><span class="chip missing"><span class="cd"></span>No implementado</span></td><td class="endpoint"><span class="muted">pendiente de refinar la reconciliación</span></td></tr>
+          <tr><td class="cu">CU-E-23</td><td class="name">Editar circuito</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /routine/circuit/edit/:id <span class="muted">· reconciliación por exercise_id, baja lógica si hay historial</span></td></tr>
           <tr><td class="cu">CU-E-24</td><td class="name">Eliminar circuito (lógico)</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /routine/circuit/set-active/:id <span class="muted">· flag { active }</span></td></tr>
 
           <tr class="pkg"><td colspan="4"><span class="pkg-lbl">Gestionar membresías</span></td></tr>

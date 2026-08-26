@@ -13,9 +13,13 @@ export class Circuit {
     @Column({ length: 100, nullable: false })
     name!: string;
 
+    // Acepta null explicito: al editar el circuito hay que poder vaciar la descripcion,
+    // y TypeORM ignora las propiedades en undefined. El type: 'varchar' es obligatorio
+    // con la union: TS emite design:type = Object para string | null, y sin el tipo
+    // declarado TypeORM no sabe que columna crear
     @ApiPropertyOptional({ example: 'Movilidad de hombro y activación de manguito', maxLength: 100 })
-    @Column({ length: 100, nullable: true })
-    description?: string;
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    description?: string | null;
 
     @ApiProperty({ example: 'entrada en calor', maxLength: 30 })
     @Column({ length: 30, nullable: false })

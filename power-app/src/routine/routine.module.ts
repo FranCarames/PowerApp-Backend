@@ -7,7 +7,7 @@ import { Circuit } from '../entities/circuit.entity';
 import { RoutineCircuit } from '../entities/routine_circuit.entity';
 import { RoutineExercise } from '../entities/routine_exercise.entity';
 import { ExerciseSet } from '../entities/exercise_set.entity';
-import { RoutineExerciseSetFinished } from '../entities/routine_exercise_set_finished.entity';
+import { RoutineExerciseFinished } from '../entities/routine_exercise_finished.entity';
 import { UserRoutine } from '../entities/user_routine.entity';
 import { AuthModule } from '../authentication/auth.module';
 
@@ -18,7 +18,7 @@ import { AuthModule } from '../authentication/auth.module';
     RoutineCircuit,
     RoutineExercise,
     ExerciseSet,
-    RoutineExerciseSetFinished,
+    RoutineExerciseFinished,
     UserRoutine,
   ]), AuthModule],
   controllers: [RoutineController],
