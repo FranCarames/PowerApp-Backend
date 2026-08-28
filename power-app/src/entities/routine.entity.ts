@@ -19,9 +19,13 @@ export class Routine {
     @Column({ length: 50, nullable: false })
     name!: string;
 
+    // Acepta null explicito: al editar la rutina, el entrenador tiene que poder borrar
+    // una nota que ya no aplica, y TypeORM ignora las propiedades undefined.
+    // El type: 'varchar' es OBLIGATORIO con la union: TS emite design:type = Object
+    // para string | null, y sin el tipo declarado TypeORM no sabe que columna crear
     @ApiPropertyOptional({ example: 'Enfocarse en la contracción', maxLength: 100 })
-    @Column({ length: 100, nullable: true })
-    coach_note?: string;
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    coach_note?: string | null;
 
     @ApiProperty({ example: true })
     @Column({ nullable: false, default: true })

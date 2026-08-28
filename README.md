@@ -24,6 +24,7 @@ La documentación visual está publicada en **[francarames.github.io/PowerApp-Ba
 | 📱 **[Prototipo de interfaces](https://francarames.github.io/PowerApp-Backend/UI%20Front/powerapp-prototype.html)** | GitHub Pages | Mockups navegables de las pantallas, por rol |
 | 📊 **[Estado de implementación](https://francarames.github.io/PowerApp-Backend/Status/dashboard-estado-CU.html)** | GitHub Pages | Dashboard de avance: cada CU vs. el código |
 | 📄 **[Especificaciones de CU](https://francarames.github.io/PowerApp-Backend/Use%20Cases/)** | GitHub Pages | Las 72 especificaciones de casos de uso, por rol y paquete |
+| 🗃️ **[Modelo de datos](https://francarames.github.io/PowerApp-Backend/Doc/modelo-db.html)** | GitHub Pages | Visor del diagrama entidad-relación de la base, con zoom y arrastre ([PDF](https://francarames.github.io/PowerApp-Backend/Doc/PowerApp%20-%20Modelo%20DB.pdf)) |
 
 ---
 

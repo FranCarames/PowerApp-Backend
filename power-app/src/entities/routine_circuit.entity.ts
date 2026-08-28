@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Routine } from './routine.entity';
 import { Circuit } from './circuit.entity';
 
@@ -17,9 +17,19 @@ export class RoutineCircuit {
     @Column({ type: 'uuid', nullable: false })
     circuit_id!: string;
 
-    @ApiProperty({ example: 1 })
-    @Column({ type: 'integer', nullable: false })
-    order!: number;
+    // Nullable a proposito: el order se normaliza a 1..N en cada escritura, asi que un
+    // vinculo apagado no ocupa ninguna posicion. Dejarle el numero viejo haria que la
+    // columna signifique dos cosas y repitiera posiciones que ya ocupa otro circuito
+    @ApiPropertyOptional({ example: 1, description: 'null en los vinculos dados de baja' })
+    @Column({ type: 'integer', nullable: true })
+    order?: number | null;
+
+    // Baja logica: un circuito que sale de la rutina no se borra, se apaga. Ninguna FK
+    // apunta aca, asi que no es para proteger historial: es para conservar la traza de
+    // que circuitos integraron la rutina, que es lo que el alumno efectivamente ejecuto
+    @ApiProperty({ example: true })
+    @Column({ nullable: false, default: true })
+    active!: boolean;
 
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })

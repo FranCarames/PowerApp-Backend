@@ -16,6 +16,8 @@ import { CreateCircuitDto } from '../dtos/circuit/create_circuit.dto';
 import { EditCircuitDto } from '../dtos/circuit/edit_circuit.dto';
 import { GetRoutinesQueryDto } from '../dtos/routine/get_routines_query.dto';
 import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
+import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
+import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
 
 @Injectable()
 export class RoutineService {
@@ -118,13 +120,202 @@ export class RoutineService {
         }
     }
 
+    async editRoutine(
+        idRoutine: string,
+        editRoutineDto: EditRoutineDto,
+        res: Response
+    ) {
+        // Validaciones que no dependen de la base, antes de abrir la transaccion
+        const orders = editRoutineDto.circuits.map(circuit => circuit.order);
+
+        if (new Set(orders).size !== orders.length) {
+            return res.status(400).send({
+                error: 'Dos circuitos no pueden ocupar la misma posición: el campo order tiene valores repetidos.'
+            });
+        }
+
+        // El id identifica al VINCULO, no al circuito: mandarlo dos veces seria pedir que la
+        // misma fila ocupe dos posiciones. El circuit_id repetido, en cambio, es valido
+        const sentIds = editRoutineDto.circuits
+            .map(circuit => circuit.id)
+            .filter((id): id is string => !!id);
+
+        if (new Set(sentIds).size !== sentIds.length) {
+            return res.status(400).send({
+                error: 'Un mismo circuito de la rutina no puede venir dos veces en la lista.'
+            });
+        }
+
+        // El order es una instruccion de ordenamiento, no el valor que se guarda: se ordena
+        // por el y se persiste la posicion resultante, asi la base queda siempre 1..N
+        const circuitsInOrder = [...editRoutineDto.circuits].sort((a, b) => a.order - b.order);
+
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
+        try {
+            // Se cargan TODOS los Routine_Circuit, activos e inactivos: un id que apunte a un
+            // vinculo apagado se reactiva en vez de fallar. No deberia llegar nunca —las
+            // lecturas no los devuelven—, pero asi la operacion queda idempotente
+            const routine = await queryRunner.manager.findOne(Routine, {
+                where: { id: idRoutine },
+                relations: ['routineCircuits'],
+            });
+
+            if (!routine) {
+                await queryRunner.rollbackTransaction();
+                return res.status(404).send({ error: 'Rutina no encontrada' });
+            }
+
+            // Precondicion del CU: la rutina tiene que estar activa. Va 400 y no 404
+            // porque el id existe: alcanza con reactivarla por set-active
+            if (!routine.active) {
+                await queryRunner.rollbackTransaction();
+                return res.status(400).send({
+                    error: `La rutina "${routine.name}" está dada de baja y no se puede editar. Reactivala primero.`
+                });
+            }
+
+            const existingById = new Map(
+                routine.routineCircuits.map(routineCircuit => [routineCircuit.id, routineCircuit])
+            );
+
+            // Los ids que vienen tienen que ser vinculos de ESTA rutina y apuntar al mismo
+            // circuito que dice el body. Las dos cosas son bugs del front y no del entrenador,
+            // pero un mensaje explicito ahorra media hora de debug del otro lado
+            for (const circuit of circuitsInOrder) {
+                if (!circuit.id) {
+                    continue;
+                }
+
+                const existente = existingById.get(circuit.id);
+
+                if (!existente) {
+                    await queryRunner.rollbackTransaction();
+                    return res.status(400).send({
+                        error: `El circuito de rutina con id ${circuit.id} no pertenece a esta rutina.`
+                    });
+                }
+
+                if (existente.circuit_id !== circuit.circuit_id) {
+                    await queryRunner.rollbackTransaction();
+                    return res.status(400).send({
+                        error: `El circuito de rutina con id ${circuit.id} apunta a un circuito distinto del enviado.`
+                    });
+                }
+            }
+
+            // Se buscan por el set de ids unicos: un circuito repetido es una sola fila de Circuit
+            const uniqueCircuitIds = [...new Set(circuitsInOrder.map(circuit => circuit.circuit_id))];
+
+            const circuits = await queryRunner.manager.find(Circuit, {
+                where: { id: In(uniqueCircuitIds) },
+                select: { id: true, name: true, active: true },
+            });
+
+            if (circuits.length !== uniqueCircuitIds.length) {
+                await queryRunner.rollbackTransaction();
+                return res.status(404).send({ error: 'Algunos circuitos no fueron encontrados' });
+            }
+
+            // Un circuito de baja se puede CONSERVAR pero no AGREGAR. Rechazar tambien lo que
+            // ya estaba trabaria la edicion de toda rutina que contenga un circuito dado de
+            // baja, aunque el entrenador solo quisiera corregirle el nombre a la rutina.
+            // La presencia del id es justo lo que distingue los dos casos
+            const inactiveById = new Map(
+                circuits.filter(circuit => !circuit.active).map(circuit => [circuit.id, circuit])
+            );
+
+            const agregadoInactivo = circuitsInOrder.find(
+                circuit => !circuit.id && inactiveById.has(circuit.circuit_id)
+            );
+
+            if (agregadoInactivo) {
+                await queryRunner.rollbackTransaction();
+                return res.status(400).send({
+                    error: `El circuito '${inactiveById.get(agregadoInactivo.circuit_id)!.name}' está dado de baja y no puede agregarse a la rutina.`
+                });
+            }
+
+            // Los que estaban activos y no vuelven en la lista se apagan con order null: un
+            // vinculo que ya no esta en la rutina no ocupa ninguna posicion. No se borran
+            // fisicamente para conservar la traza de que circuitos integraron la rutina
+            const keptIds = new Set(sentIds);
+
+            for (const routineCircuit of routine.routineCircuits) {
+                if (routineCircuit.active && !keptIds.has(routineCircuit.id)) {
+                    routineCircuit.active = false;
+                    routineCircuit.order = null;
+                    await queryRunner.manager.save(routineCircuit);
+                }
+            }
+
+            // El order persistido sale de la posicion tras ordenar, no del valor recibido
+            for (const [index, circuit] of circuitsInOrder.entries()) {
+                if (circuit.id) {
+                    // Sobrevive o reaparece: en los dos casos queda activo y con el orden nuevo
+                    const existente = existingById.get(circuit.id)!;
+                    existente.active = true;
+                    existente.order = index + 1;
+                    await queryRunner.manager.save(existente);
+                } else {
+                    // Un circuito que se saco y se vuelve a agregar entra como vinculo NUEVO,
+                    // al reves que en editCircuit: circuit_id no identifica nada porque puede
+                    // repetirse en la rutina, asi que no hay una fila vieja que reactivar.
+                    // La apagada queda como traza de que ese circuito estuvo antes
+                    await queryRunner.manager.save(
+                        queryRunner.manager.create(RoutineCircuit, {
+                            routine_id: routine.id,
+                            circuit_id: circuit.circuit_id,
+                            order: index + 1,
+                            active: true,
+                        })
+                    );
+                }
+            }
+
+            // La cabecera se pisa entera. updated_at se setea a mano porque el onUpdate de
+            // las entidades es sintaxis de MySQL y en Postgres no hace nada: sin esto, una
+            // rutina editada seguiria mostrando la fecha del alta
+            routine.name = editRoutineDto.name;
+            routine.coach_note = editRoutineDto.coach_note ?? null;
+            routine.updated_at = new Date();
+            await queryRunner.manager.save(Routine, routine);
+
+            await queryRunner.commitTransaction();
+
+            // Se recarga con las relaciones para devolver el mismo formato que el detalle
+            const updated = await this.findRoutineDetail(routine.id);
+            return res.status(200).send(this.buildRoutineDetailResponse(updated!));
+        } catch (error) {
+            // La recarga del detalle pasa despues del commit: si falla ahi, la transaccion ya
+            // esta cerrada y un rollback incondicional tiraria un error nuevo dentro del catch
+            if (queryRunner.isTransactionActive) {
+                await queryRunner.rollbackTransaction();
+            }
+            console.error(error);
+            res.status(500).send({ error: 'Error al editar la rutina.' });
+        } finally {
+            await queryRunner.release();
+        }
+    }
+
     async getAllRoutines(
         query: GetRoutinesQueryDto,
         res: Response
     ) {
         try {
             const routines = await this.buildRoutinesQuery(query)
-                .loadRelationCountAndMap('routine.circuit_count', 'routine.routineCircuits')
+                // Los vinculos dados de baja no cuentan: circuit_count es de circuitos vigentes.
+                // Va literal y no como parametro (a diferencia de getAllCircuits) para no
+                // pisar el :active que buildRoutinesQuery usa para filtrar rutinas de baja
+                .loadRelationCountAndMap(
+                    'routine.circuit_count',
+                    'routine.routineCircuits',
+                    'routineCircuit',
+                    queryBuilder => queryBuilder.andWhere('routineCircuit.active = true'),
+                )
                 .getMany();
 
             res.status(200).send(routines);
@@ -141,7 +332,7 @@ export class RoutineService {
         try {
             // Con los circuitos ya cargados, el conteo sale del array
             const routines = await this.buildRoutinesQuery(query)
-                .leftJoinAndSelect('routine.routineCircuits', 'routineCircuit')
+                .leftJoinAndSelect('routine.routineCircuits', 'routineCircuit', 'routineCircuit.active = true')
                 .leftJoinAndSelect('routineCircuit.circuit', 'circuit')
                 .addOrderBy('routineCircuit.order', 'ASC')
                 .getMany();
@@ -188,6 +379,31 @@ export class RoutineService {
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener la rutina.' });
+        }
+    }
+
+    async setRoutineActive(
+        idRoutine: string,
+        setRoutineActiveDto: SetRoutineActiveDto,
+        res: Response
+    ) {
+        try {
+            const routine = await this.routineRepository.findOne({ where: { id: idRoutine } });
+
+            if (!routine) {
+                return res.status(404).send({ error: 'Rutina no encontrada' });
+            }
+
+            // La baja no cascadea nada: los circuitos son piezas reutilizables y las
+            // planificaciones que la referencian mantienen su integridad. La rutina sale de
+            // circulacion para ensamblados y asignaciones NUEVOS, lo ya asignado sigue
+            routine.active = setRoutineActiveDto.active;
+            await this.routineRepository.save(routine);
+
+            res.status(200).send(routine);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al actualizar el estado de la rutina.' });
         }
     }
 
@@ -588,8 +804,16 @@ export class RoutineService {
         });
     }
 
-    // Compartido por el detalle y por la respuesta del alta, para que el formato no se duplique
-    private buildRoutineDetailResponse(routine: Routine) {
+    // Compartido por el detalle y por las respuestas del alta y la edicion, para que el
+    // formato no se duplique.
+    // visibleInactiveIds: ids de Routine_Circuit dados de baja que SI hay que mostrar.
+    // Las lecturas del entrenador no pasan nada, asi que ven solo los activos: un circuito
+    // que sacaste de la rutina no reaparece en la pantalla de edicion. Las del alumno
+    // (U-08/U-09 y el historial E-06/E-07) van a pasar los vinculos apagados de los que ese
+    // User_Routine tenga algun ejercicio en Routine_Exercise_Finished — mismo contrato que
+    // buildCircuitDetailResponse un nivel mas abajo: se ve lo dado de baja que uno completo,
+    // y solo eso. Ojo: el vinculo apagado tiene order null, asi que no conserva su posicion
+    private buildRoutineDetailResponse(routine: Routine, visibleInactiveIds?: Set<string>) {
         return {
             id: routine.id,
             name: routine.name,
@@ -597,12 +821,14 @@ export class RoutineService {
             active: routine.active,
             created_at: routine.created_at,
             updated_at: routine.updated_at,
-            circuits: routine.routineCircuits.map(routineCircuit => ({
-                id: routineCircuit.id,
-                order: routineCircuit.order,
-                // Mismo formato que GET /routine/circuit/:id
-                circuit: this.buildCircuitDetailResponse(routineCircuit.circuit),
-            })),
+            circuits: routine.routineCircuits
+                .filter(routineCircuit => routineCircuit.active || visibleInactiveIds?.has(routineCircuit.id))
+                .map(routineCircuit => ({
+                    id: routineCircuit.id,
+                    order: routineCircuit.order,
+                    // Mismo formato que GET /routine/circuit/:id
+                    circuit: this.buildCircuitDetailResponse(routineCircuit.circuit),
+                })),
         };
     }
 

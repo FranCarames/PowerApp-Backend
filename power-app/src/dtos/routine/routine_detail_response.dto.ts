@@ -6,7 +6,7 @@ export class RoutineDetailCircuitDto {
     @ApiProperty({ example: 'uuid-1234', description: 'Id del Routine_Circuit (no el del Circuit)' })
     id!: string;
 
-    @ApiProperty({ example: 1 })
+    @ApiProperty({ example: 1, description: 'Posicion 1..N dentro de la rutina. Los vinculos dados de baja no se devuelven, asi que la lista nunca tiene huecos' })
     order!: number;
 
     @ApiProperty({ type: CircuitDetailResponseDto, description: 'El circuito completo, con el mismo formato que GET /routine/circuit/:id' })

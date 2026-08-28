@@ -790,9 +790,52 @@ entrenador filtran los inactivos.
 
 ## Pruebas en runtime (para el usuario)
 
-1. **Edición sin historial** — crear un circuito con 3 ejercicios, editarlo dejando 2. El tercero desaparece de `GET /routine/circuit/:id` y **no queda fila** en `Routine_Exercise` (`SELECT * FROM public."Routine_Exercise" WHERE circuit_id = '<id>'` devuelve 2).
-2. **Edición con historial** — insertar a mano una fila en `Routine_Exercise_Finished` para uno de los ejercicios, sacarlo de la lista y editar. La fila de `Routine_Exercise` queda con `active = false`, la de historial **sigue ahí**, y el ejercicio ya no aparece en el detalle ni en `circuit/all-plus`, ni suma al `exercise_count` de `circuit/all`.
-3. **Reactivación** — volver a agregar ese mismo ejercicio y editar. Vuelve al detalle **con el mismo `id`** que tenía antes (no se creó otra fila) y su historial sigue colgando de él.
-4. **Series reemplazadas** — editar un ejercicio que sobrevive cambiando sus series. Las series nuevas salen con `set_order` 1..N y las viejas ya no existen.
-5. **Errores** — circuito inexistente → `404`; circuito dado de baja por `set-active` → `400`; lista vacía → `400`; `exercise_id` repetido → `400`; `rm = true` con `set_count = 2` → `400`; `exercise_id` que no está en el catálogo → `404`.
-6. **Guards** — sin token → `401`; con token de rol `user` → `403`.
+> **Estado al 25/8:** patch aplicado sobre la base viva. **Probados y OK: 1, 4 y 6**, más un re-agregado que —al no haber corrido el 2— entró por la rama del `INSERT` y no por la de reactivar. **Pendientes: 2, 3 y 5**, o sea toda la rama de `active`.
+
+**Preparación.** Los escenarios 2 y 3 necesitan una fila en `Routine_Exercise_Finished`, cuya FK exige un `User_Routine` que el seed **no** genera (`dynamic_data.py` llega hasta `User_RM`). Esto arma la cadena entera y devuelve el id; requiere al menos una `Routine` en la base (si no hay, crearla con `POST /routine/create`):
+
+```sql
+WITH plan AS (
+  INSERT INTO public."Planification" (name, number_of_routines, type, duration)
+  VALUES ('TEST E-23', 1, 'test', '1 semana')
+  RETURNING id
+), asig AS (
+  INSERT INTO public."Routine_Asignation" (routine_id, routine_plan_id, "order")
+  SELECT r.id, plan.id, 1
+    FROM plan, public."Routine" r
+   ORDER BY r.created_at DESC
+   LIMIT 1
+  RETURNING id
+)
+INSERT INTO public."User_Routine" (routine_asignation_id, user_id, date)
+SELECT asig.id, u.id, CURRENT_DATE
+  FROM asig, public."User" u
+ WHERE u.email = 'lucia.fernandez@test.com'
+RETURNING id AS user_routine_id;
+```
+
+Con ese id, marcar un ejercicio como hecho es:
+
+```sql
+INSERT INTO public."Routine_Exercise_Finished" (user_routine_id, routine_exercise_id)
+VALUES ('<user_routine_id>', '<routine_exercise_id>');
+```
+
+El `routine_exercise_id` sale de `exercises[].id` del detalle del circuito (es el `Routine_Exercise`, no el `Exercise`). Query de control después de cada edición:
+
+```sql
+SELECT re.id, e.name, re.exercise_order, re.active
+  FROM public."Routine_Exercise" re
+  JOIN public."Exercise" e ON e.id = re.exercise_id
+ WHERE re.circuit_id = '<circuit_id>'
+ ORDER BY re.active DESC, re.exercise_order;
+```
+
+**Escenarios.**
+
+1. ✅ **Edición sin historial** — crear un circuito con 3 ejercicios, editarlo dejando 2. El tercero desaparece de `GET /routine/circuit/:id` y **no queda fila** en `Routine_Exercise` (la query de control devuelve 2).
+2. ⬜ **Edición con historial** — marcar un ejercicio como hecho con el `INSERT` de arriba, sacarlo de la lista y editar. La fila de `Routine_Exercise` queda con `active = false`, la de historial **sigue ahí**, y el ejercicio ya no aparece en el detalle ni en `circuit/all-plus`, ni suma al `exercise_count` de `circuit/all`.
+3. ⬜ **Reactivación** — volver a agregar ese mismo ejercicio y editar. Vuelve al detalle **con el mismo `id`** que tenía antes (no se creó otra fila) y su historial sigue colgando de él. **Sólo vale si antes corrió el 2:** sin una fila en `active = false` no hay nada que reactivar y el ejercicio entra por la rama del `INSERT`, que es la del escenario 1.
+4. ✅ **Series reemplazadas** — editar un ejercicio que sobrevive cambiando sus series. Las series nuevas salen con `set_order` 1..N y las viejas ya no existen.
+5. ⬜ **Errores** — circuito inexistente → `404`; circuito dado de baja por `set-active` → `400`; lista vacía → `400`; `exercise_id` repetido → `400`; `rm = true` con `set_count = 2` → `400`; `exercise_id` que no está en el catálogo → `404`.
+6. ✅ **Guards** — sin token → `401`; con token de rol `user` → `403`.

@@ -237,7 +237,13 @@ CREATE TABLE public."Routine_Circuit" (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     routine_id  UUID        NOT NULL,
     circuit_id  UUID        NOT NULL,
-    "order"     INTEGER     NOT NULL,
+    -- Nullable: el order se normaliza a 1..N en cada escritura, asi que un vinculo
+    -- dado de baja no ocupa ninguna posicion (ver active, abajo)
+    "order"     INTEGER,
+    -- Baja logica del vinculo rutina-circuito. Ninguna FK apunta a esta tabla, asi que
+    -- no es para proteger historial: es para conservar la traza de que circuitos
+    -- integraron la rutina, que es lo que el alumno efectivamente ejecuto
+    active      BOOLEAN     NOT NULL DEFAULT true,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_routine_circuit_routine

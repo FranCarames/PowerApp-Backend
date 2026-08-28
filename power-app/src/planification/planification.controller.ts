@@ -14,7 +14,6 @@ import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { Planification } from '../entities/planification.entity';
 import { UserPlanification } from '../entities/user_planification.entity';
 import { RoutineAsignation } from '../entities/routine_asignation.entity';
-import { RoutineAsignationUser } from '../entities/routine_asignation_user.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
 // TODO: crear los siguientes DTOs en src/dtos/planification/
@@ -23,7 +22,10 @@ import { Auth } from '../authentication/decorators/auth.decorator';
 // import { AssignRoutineToPlanificationDto } from '../dtos/planification/assign_routine_to_planification.dto';
 // import { AssignPlanificationToUserDto } from '../dtos/planification/assign_planification_to_user.dto';
 // import { EditUserPlanificationDto } from '../dtos/planification/edit_user_planification.dto';
-// import { AssignRoutineToUserDto } from '../dtos/planification/assign_routine_to_user.dto';
+// CU-E-19 y CU-E-20 (asignar/quitar rutina puntual a un alumno) salieron de aca el 27/8:
+// son del paquete "Administrar Rutinas", dependen de Routine_Asignation_User —declarada
+// post-MVP— y cuando se retomen van a vivir en routine/ (POST /routine/assign-user,
+// DELETE /routine/assign-user/:id, GET /routine/assigned/:userId)
 
 @ApiTags('Planification')
 @Controller('planification')
@@ -152,23 +154,4 @@ export class PlanificationController {
         // this.planificationService.deleteUserPlanification(idUserPlanification.id, res);
     }
 
-    @Post('/routine/assign-user')
-    @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 201, type: RoutineAsignationUser })
-    async assignRoutineToUser(
-        @Body() assignRoutineToUserDto: any,
-        @Res() res: Response,
-    ) {
-        // this.planificationService.assignRoutineToUser(assignRoutineToUserDto, res);
-    }
-
-    @Get('/user/:id/routines')
-    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [RoutineAsignationUser] })
-    async getUserRoutines(
-        @Param() idUser: ParameterIdDto,
-        @Res() res: Response,
-    ) {
-        // this.planificationService.getUserRoutines(idUser.id, res);
-    }
 }

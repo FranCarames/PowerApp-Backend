@@ -2,7 +2,6 @@ import {
     Controller,
     Get,
     Post,
-    Delete,
     Body,
     Param,
     Query,
@@ -28,8 +27,8 @@ import { RoutineListItemPlusResponseDto } from '../dtos/routine/routine_list_ite
 import { RoutineDetailResponseDto } from '../dtos/routine/routine_detail_response.dto';
 import { CircuitDetailResponseDto } from '../dtos/circuit/circuit_detail_response.dto';
 import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
-// TODO: crear los siguientes DTOs en src/dtos/routine/
-// import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
+import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
+import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
 
 @ApiTags('Routine')
 @Controller('routine')
@@ -83,23 +82,27 @@ export class RoutineController {
 
     @Post('/edit/:id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: Routine })
+    @ApiResponse({ status: 200, type: RoutineDetailResponseDto })
     async editRoutine(
         @Param() idRoutine: ParameterIdDto,
-        @Body() editRoutineDto: any,
+        @Body() editRoutineDto: EditRoutineDto,
         @Res() res: Response,
     ) {
-        // this.routineService.editRoutine(idRoutine.id, editRoutineDto, res);
+        this.routineService.editRoutine(idRoutine.id, editRoutineDto, res);
     }
 
-    @Delete('/:id')
+    // Reemplaza al DELETE /:id del andamiaje: desde el 22/8 la rutina tiene baja logica,
+    // asi que no hay ningun caso en que se borre fisicamente. Es POST con body y no DELETE
+    // porque el mismo endpoint tambien reactiva. Espejo de circuit/set-active/:id
+    @Post('/set-active/:id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200 })
-    async deleteRoutine(
+    @ApiResponse({ status: 200, type: Routine })
+    async setRoutineActive(
         @Param() idRoutine: ParameterIdDto,
+        @Body() setRoutineActiveDto: SetRoutineActiveDto,
         @Res() res: Response,
     ) {
-        // this.routineService.deleteRoutine(idRoutine.id, res);
+        this.routineService.setRoutineActive(idRoutine.id, setRoutineActiveDto, res);
     }
 
     // ===================== CIRCUITOS (CU-E-21, CU-E-22, CU-E-23, CU-E-24) =====================
