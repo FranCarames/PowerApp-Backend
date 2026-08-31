@@ -209,6 +209,7 @@ CREATE TABLE public."Routine_Asignation" (
     routine_id      UUID        NOT NULL,
     routine_plan_id UUID        NOT NULL,
     "order" 		INTEGER		NOT NULL,
+    active          BOOLEAN     NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_routine_asignation_routine
@@ -229,6 +230,7 @@ CREATE TABLE public."User_Planification" (
     duration           VARCHAR(50),
     start_date         DATE         NOT NULL,
     end_date           DATE         NOT NULL,
+    active             BOOLEAN      NOT NULL DEFAULT true,
     created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_user_planification_user
@@ -307,6 +309,7 @@ CREATE TABLE public."User_Routine" (
     routine_asignation_id UUID        NOT NULL,
     user_id               UUID        NOT NULL,
     date                  DATE        NOT NULL,
+    active                BOOLEAN     NOT NULL DEFAULT true,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_user_routine_routine_asignation

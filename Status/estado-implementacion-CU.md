@@ -24,6 +24,24 @@
 | Entrenador | 29 | 22 | 0 | 3 | 4 | 76% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
 
+## Cambios recientes (2026-08-31 · baja lógica en las asignaciones)
+
+- **Tres columnas `active` nuevas**, en `Routine_Asignation`, `User_Planification` y `User_Routine`. El modelo de `Doc/` se actualizó primero y el código lo siguió. Con esto el proyecto pasa de **9 a 12 tablas con baja lógica** y queda cerrada la última cadena de borrado físico que destruía historial.
+- **El motivo son las cascadas que ya existían:** `Planification` → `Routine_Asignation` → `User_Routine` → `Routine_Exercise_Finished`, todas con `ON DELETE CASCADE`. Un `DELETE` de **una sola** `Routine_Asignation` —quitarle una rutina a una planificación— se llevaba puestas todas las `User_Routine` derivadas y con ellas **lo que los alumnos efectivamente entrenaron**. Es el mismo agujero que se tapó el 22/8 un nivel más arriba con `Routine` y `Planification`.
+- **Los tres `active` se llaman igual pero los dispara algo distinto**, y esto es lo que E-12, E-13 y E-14 tienen que implementar:
+
+| Campo | Qué significa `false` | Quién lo dispara |
+|---|---|---|
+| `Routine_Asignation.active` | La rutina ya no forma parte de la planificación **sistémica** | El entrenador, al sacar una rutina del plan (paquete de CU-E-12) |
+| `User_Planification.active` | El alumno **terminó** ese plan (o el entrenador se lo quitó) | CU-E-14, o la finalización del plan |
+| `User_Routine.active` | Esa instancia de rutina ya no pertenece al plan vigente, pero **el registro de que existió y lo que el alumno completó se conserva** | **En bloque:** cuando su `User_Planification` pasa a inactiva, todas sus rutinas se apagan con ella |
+
+- **Se sumaron los filtros al ABM de planificaciones** cerrado el mismo día: las tres lecturas de `planification.service.ts` (el conteo del listado, el join de `/all-plus` y el builder del detalle) ahora descartan los vínculos dados de baja, así que `routine_count` y `routines` son de rutinas vigentes. Hoy no cambia ninguna respuesta —las tablas están vacías— pero evita que el código quede contradiciendo al modelo cuando E-12 escriba la primera fila.
+- **Sin índices sobre `active` en estas tres.** En el proyecto sólo los tienen `Coach`, `Planification`, `Circuit` y `Routine`, que se listan filtrando por estado; las tablas de vínculo análogas (`Routine_Circuit`, `Routine_Exercise`) no lo tienen, y acá siempre se consulta por el id del padre junto con `active`.
+- **`Routine_Asignation_User` quedó afuera** a propósito: también cuelga de `Routine_Asignation` con CASCADE, pero es post-MVP y arrastra la limpieza pendiente del 27/8. Se decide con E-19 y E-20.
+- **CU-E-14 reescrita** como baja lógica en cascada (título "(Lógico)", postcondición que preserva el historial y camino alternativo nuevo), y **CU-E-12 ajustada** con la baja del vínculo en "Fuera de alcance". **Ningún CU cambia de estado y los conteos no se mueven.**
+- **Anotado para E-12:** el andamiaje tiene un `DELETE /planification/routine/:id` para quitar una rutina del plan que **no corresponde a ningún CU de los 72**. Con este cambio debería pasar a `set-active`; hay que decidir si se documenta como CU nuevo.
+
 ## Cambios recientes (2026-08-31 · ABM de planificaciones sistémicas)
 
 - **CU-E-08 a CU-E-11** 🔵 → ✅: el service de planificaciones pasó de 4 líneas vacías a seis endpoints. `GET /planification/all` (con `keyword`, `type` e `include_inactive`, más `routine_count`), `GET /planification/all-plus`, `GET /planification/:id`, `POST /planification/create`, `POST /planification/edit/:id` y `POST /planification/set-active/:id`, que **reemplaza al `DELETE /:id`** del andamiaje. El bloque **no tocó el esquema**: `Db Creator` se regeneró y quedó byte por byte idéntico.
@@ -273,7 +291,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-11 | Eliminar planificación sistémica (lógico) | ✅ Implementado | `POST /planification/set-active/:id` · baja y reactivación |
 | CU-E-12 | Asignar rutina a planificación | 🔵 Andamiaje | `POST /planification/routine/assign` · comentado |
 | CU-E-13 | Asignar planificación a alumno | 🔵 Andamiaje | `POST /planification/user/assign` · comentado |
-| CU-E-14 | Eliminar planificación a alumno | 🔵 Andamiaje | `DELETE /planification/user/:id` · comentado |
+| CU-E-14 | Eliminar planificación a alumno | 🔵 Andamiaje | pasa a baja lógica en cascada (31/8): será `POST /planification/user/set-active/:id`, apaga la `User_Planification` y sus `User_Routine` |
 
 ### Administrar rutinas
 | CU | Caso de uso | Estado | Endpoint / nota |

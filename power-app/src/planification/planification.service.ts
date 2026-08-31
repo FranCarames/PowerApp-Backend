@@ -24,12 +24,15 @@ export class PlanificationService {
         res: Response
     ) {
         try {
-            // Routine_Asignation no tiene baja logica, asi que el conteo no filtra nada
-            // (a diferencia de circuit_count en rutinas, que descarta los vinculos apagados)
+            // Los vinculos dados de baja no cuentan: routine_count es de rutinas vigentes.
+            // El true va literal y no como parametro para no pisar el :active que
+            // buildPlanificationsQuery usa para filtrar las planificaciones de baja
             const planifications = await this.buildPlanificationsQuery(query)
                 .loadRelationCountAndMap(
                     'planification.routine_count',
                     'planification.routineAsignations',
+                    'routineAsignation',
+                    queryBuilder => queryBuilder.andWhere('routineAsignation.active = true'),
                 )
                 .getMany();
 
@@ -47,7 +50,7 @@ export class PlanificationService {
         try {
             // Con las rutinas ya cargadas, el conteo sale del array
             const planifications = await this.buildPlanificationsQuery(query)
-                .leftJoinAndSelect('planification.routineAsignations', 'routineAsignation')
+                .leftJoinAndSelect('planification.routineAsignations', 'routineAsignation', 'routineAsignation.active = true')
                 .leftJoinAndSelect('routineAsignation.routine', 'routine')
                 .addOrderBy('routineAsignation.order', 'ASC')
                 .getMany();
@@ -223,6 +226,15 @@ export class PlanificationService {
     // Compartido por el detalle, el alta, la edicion y cada fila de /all-plus, para que
     // el formato no se duplique
     private buildPlanificationDetailResponse(planification: Planification) {
+        // Los vinculos dados de baja no se muestran ni cuentan: una rutina que el entrenador
+        // saco del plan no reaparece. findPlanificationDetail carga con relations, que no
+        // admite condicion, asi que el filtro va aca — mismo patron que
+        // buildRoutineDetailResponse. En /all-plus el join ya filtro y esto es redundante
+        // a proposito: el builder es el unico lugar que decide que se ve
+        const asignaciones = planification.routineAsignations.filter(
+            routineAsignation => routineAsignation.active
+        );
+
         return {
             id: planification.id,
             name: planification.name,
@@ -231,10 +243,10 @@ export class PlanificationService {
             type: planification.type,
             duration: planification.duration,
             active: planification.active,
-            routine_count: planification.routineAsignations.length,
+            routine_count: asignaciones.length,
             created_at: planification.created_at,
             updated_at: planification.updated_at,
-            routines: planification.routineAsignations.map(routineAsignation => ({
+            routines: asignaciones.map(routineAsignation => ({
                 id: routineAsignation.id,
                 order: routineAsignation.order,
                 routine: {

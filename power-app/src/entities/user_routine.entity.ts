@@ -21,6 +21,10 @@ export class UserRoutine {
     @Column({ type: 'date', nullable: false })
     date!: Date;
 
+    @ApiProperty({ example: true })
+    @Column({ nullable: false, default: true })
+    active!: boolean;
+
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     created_at!: Date;
