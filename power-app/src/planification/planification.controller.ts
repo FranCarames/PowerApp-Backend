@@ -5,6 +5,7 @@ import {
     Delete,
     Body,
     Param,
+    Query,
     Res,
 } from '@nestjs/common';
 import { ApiTags, ApiResponse } from '@nestjs/swagger';
@@ -16,9 +17,13 @@ import { UserPlanification } from '../entities/user_planification.entity';
 import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
-// TODO: crear los siguientes DTOs en src/dtos/planification/
-// import { CreatePlanificationDto } from '../dtos/planification/create_planification.dto';
-// import { EditPlanificationDto } from '../dtos/planification/edit_planification.dto';
+import { GetPlanificationsQueryDto } from '../dtos/planification/get_planifications_query.dto';
+import { CreatePlanificationDto } from '../dtos/planification/create_planification.dto';
+import { EditPlanificationDto } from '../dtos/planification/edit_planification.dto';
+import { SetPlanificationActiveDto } from '../dtos/planification/set_planification_active.dto';
+import { PlanificationListItemResponseDto } from '../dtos/planification/planification_list_item_response.dto';
+import { PlanificationDetailResponseDto } from '../dtos/planification/planification_detail_response.dto';
+// TODO: crear los siguientes DTOs en src/dtos/planification/ (CU-E-12, E-13 y E-14)
 // import { AssignRoutineToPlanificationDto } from '../dtos/planification/assign_routine_to_planification.dto';
 // import { AssignPlanificationToUserDto } from '../dtos/planification/assign_planification_to_user.dto';
 // import { EditUserPlanificationDto } from '../dtos/planification/edit_user_planification.dto';
@@ -33,55 +38,76 @@ export class PlanificationController {
 
     constructor(private planificationService: PlanificationService) {}
 
+    // ===================== PLANIFICACIONES SISTEMICAS (CU-E-08 a CU-E-11) =====================
+
     @Get('/all')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [Planification] })
+    @ApiResponse({ status: 200, type: [PlanificationListItemResponseDto] })
     async getAllPlanifications(
+        @Query() query: GetPlanificationsQueryDto,
         @Res() res: Response,
     ) {
-        // this.planificationService.getAllPlanifications(res);
+        this.planificationService.getAllPlanifications(query, res);
+    }
+
+    // Va declarado ANTES de /:id: es de un solo segmento y si no la request cae en el
+    // :id y devuelve 400 por UUID invalido. Mismo caso que circuit/all-plus y routine/all-plus
+    @Get('/all-plus')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: [PlanificationDetailResponseDto] })
+    async getAllPlanificationsPlus(
+        @Query() query: GetPlanificationsQueryDto,
+        @Res() res: Response,
+    ) {
+        this.planificationService.getAllPlanificationsPlus(query, res);
     }
 
     @Get('/:id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: Planification })
+    @ApiResponse({ status: 200, type: PlanificationDetailResponseDto })
     async getPlanificationById(
         @Param() idPlanification: ParameterIdDto,
         @Res() res: Response,
     ) {
-        // this.planificationService.getPlanificationById(idPlanification.id, res);
+        this.planificationService.getPlanificationById(idPlanification.id, res);
     }
 
     @Post('/create')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 201, type: Planification })
+    @ApiResponse({ status: 201, type: PlanificationDetailResponseDto })
     async createPlanification(
-        @Body() createPlanificationDto: any,
+        @Body() createPlanificationDto: CreatePlanificationDto,
         @Res() res: Response,
     ) {
-        // this.planificationService.createPlanification(createPlanificationDto, res);
+        this.planificationService.createPlanification(createPlanificationDto, res);
     }
 
     @Post('/edit/:id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: Planification })
+    @ApiResponse({ status: 200, type: PlanificationDetailResponseDto })
     async editPlanification(
         @Param() idPlanification: ParameterIdDto,
-        @Body() editPlanificationDto: any,
+        @Body() editPlanificationDto: EditPlanificationDto,
         @Res() res: Response,
     ) {
-        // this.planificationService.editPlanification(idPlanification.id, editPlanificationDto, res);
+        this.planificationService.editPlanification(idPlanification.id, editPlanificationDto, res);
     }
 
-    @Delete('/:id')
+    // Baja logica: reemplaza al DELETE /:id del andamiaje. Se elige POST con body porque
+    // no es un borrado y porque reactivar necesita el mismo camino.
+    // Espejo exacto de POST /routine/set-active/:id
+    @Post('/set-active/:id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200 })
-    async deletePlanification(
+    @ApiResponse({ status: 200, type: Planification })
+    async setPlanificationActive(
         @Param() idPlanification: ParameterIdDto,
+        @Body() setPlanificationActiveDto: SetPlanificationActiveDto,
         @Res() res: Response,
     ) {
-        // this.planificationService.deletePlanification(idPlanification.id, res);
+        this.planificationService.setPlanificationActive(idPlanification.id, setPlanificationActiveDto, res);
     }
+
+    // ===================== ASIGNACIONES (CU-E-12, E-13, E-14, U-08) =====================
 
     @Post('/routine/assign')
     @Auth(UserRole.coach, UserRole.admin)

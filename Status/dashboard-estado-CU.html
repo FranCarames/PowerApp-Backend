@@ -210,13 +210,13 @@
     <div class="sec-head"><h2>Panorama general</h2><span class="kicker">72 CU clasificados</span></div>
     <div class="tiles">
       <div class="tile done">
-        <div class="n">55</div><div class="lbl">Implementado</div><div class="pct">76% · endpoint + lógica</div>
+        <div class="n">59</div><div class="lbl">Implementado</div><div class="pct">82% · endpoint + lógica</div>
       </div>
       <div class="tile partial">
         <div class="n">1</div><div class="lbl">Parcial</div><div class="pct">1% · incompleto</div>
       </div>
       <div class="tile stub">
-        <div class="n">9</div><div class="lbl">Andamiaje</div><div class="pct">13% · ruta sin lógica</div>
+        <div class="n">5</div><div class="lbl">Andamiaje</div><div class="pct">7% · ruta sin lógica</div>
       </div>
       <div class="tile missing">
         <div class="n">7</div><div class="lbl">No implementado</div><div class="pct">10% · sin endpoint</div>
@@ -224,15 +224,15 @@
     </div>
 
     <div class="bar-block">
-      <div class="bar" role="img" aria-label="55 implementados, 1 parcial, 9 andamiaje, 7 no implementados de 72">
-        <span class="s-done" style="width:76.39%"></span>
+      <div class="bar" role="img" aria-label="59 implementados, 1 parcial, 5 andamiaje, 7 no implementados de 72">
+        <span class="s-done" style="width:81.94%"></span>
         <span class="s-partial" style="width:1.39%"></span>
-        <span class="s-stub" style="width:12.50%"></span>
+        <span class="s-stub" style="width:6.94%"></span>
         <span class="s-missing" style="width:9.72%"></span>
       </div>
       <div class="bar-cap">
-        <span><b>56 de 72</b> CU con código implementado o parcial (78%)</span>
-        <span><b>16</b> pendientes de trabajo real (andamiaje + no implementado)</span>
+        <span><b>60 de 72</b> CU con código implementado o parcial (83%)</span>
+        <span><b>12</b> pendientes de trabajo real (andamiaje + no implementado)</span>
       </div>
     </div>
   </section>
@@ -262,11 +262,11 @@
 
       <div class="role-card">
         <h3>Entrenador <em>29 CU</em></h3>
-        <div class="role-pct" style="color:var(--stub)">62%</div>
-        <div class="role-sub">18 implementados · circuitos 4 de 4 y rutinas cerradas salvo E-19/E-20 (post-MVP)</div>
+        <div class="role-pct" style="color:var(--done)">76%</div>
+        <div class="role-sub">22 implementados · circuitos, rutinas y el ABM de planificaciones cerrados; quedan las asignaciones (E-12→E-14)</div>
         <div class="mini-bar">
-          <span style="width:62.07%;background:var(--done)"></span>
-          <span style="width:24.14%;background:var(--stub)"></span>
+          <span style="width:75.86%;background:var(--done)"></span>
+          <span style="width:10.34%;background:var(--stub)"></span>
           <span style="width:13.79%;background:var(--missing-line)"></span>
         </div>
         <div class="role-legend">
@@ -429,7 +429,7 @@
 
   <!-- DETAIL: ENTRENADOR -->
   <section>
-    <div class="sec-head"><h2>Rol Entrenador</h2><span class="kicker">29 CU · 62% implementado</span></div>
+    <div class="sec-head"><h2>Rol Entrenador</h2><span class="kicker">29 CU · 76% implementado</span></div>
     <div class="table-scroll">
       <table>
         <thead>
@@ -446,10 +446,10 @@
           <tr><td class="cu">CU-E-07</td><td class="name">Historial de entrenamientos — filtro ejercicio</td><td><span class="chip missing"><span class="cd"></span>No implementado</span></td><td class="endpoint"><span class="muted">sin endpoint</span></td></tr>
 
           <tr class="pkg"><td colspan="4"><span class="pkg-lbl">Administrar planificaciones</span></td></tr>
-          <tr><td class="cu">CU-E-08</td><td class="name">Obtener planificaciones sistémicas</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">GET</span> /planification/all <span class="muted">· comentado</span></td></tr>
-          <tr><td class="cu">CU-E-09</td><td class="name">Crear planificación sistémica</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">POST</span> /planification/create <span class="muted">· comentado</span></td></tr>
-          <tr><td class="cu">CU-E-10</td><td class="name">Editar planificación sistémica</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">POST</span> /planification/edit/:id <span class="muted">· comentado</span></td></tr>
-          <tr><td class="cu">CU-E-11</td><td class="name">Eliminar planificación sistémica (lógico)</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="muted">pasa a baja lógica (22/8): será </span><span class="verb">POST</span> /planification/set-active/:id</td></tr>
+          <tr><td class="cu">CU-E-08</td><td class="name">Obtener planificaciones sistémicas</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">GET</span> /planification/all <span class="muted">· keyword/type/include_inactive + routine_count</span></td></tr>
+          <tr><td class="cu">CU-E-09</td><td class="name">Crear planificación sistémica</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /planification/create <span class="muted">· 201 con el detalle</span></td></tr>
+          <tr><td class="cu">CU-E-10</td><td class="name">Editar planificación sistémica</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /planification/edit/:id <span class="muted">· 400 si está de baja · el opcional omitido borra</span></td></tr>
+          <tr><td class="cu">CU-E-11</td><td class="name">Eliminar planificación sistémica (lógico)</td><td><span class="chip done"><span class="cd"></span>Implementado</span></td><td class="endpoint"><span class="verb">POST</span> /planification/set-active/:id <span class="muted">· baja y reactivación</span></td></tr>
           <tr><td class="cu">CU-E-12</td><td class="name">Asignar rutina a planificación</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">POST</span> /planification/routine/assign <span class="muted">· comentado</span></td></tr>
           <tr><td class="cu">CU-E-13</td><td class="name">Asignar planificación a alumno</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">POST</span> /planification/user/assign <span class="muted">· comentado</span></td></tr>
           <tr><td class="cu">CU-E-14</td><td class="name">Eliminar planificación a alumno</td><td><span class="chip stub"><span class="cd"></span>Andamiaje</span></td><td class="endpoint"><span class="verb">DELETE</span> /planification/user/:id <span class="muted">· comentado</span></td></tr>
@@ -538,7 +538,7 @@
 
   <footer>
     <span>PowerApp Backend · auditoría de casos de uso</span>
-    <span>52 impl · 1 parc · 12 andam · 7 falta — de 72</span>
+    <span>59 impl · 1 parc · 5 andam · 7 falta — de 72</span>
   </footer>
 
 </div>
