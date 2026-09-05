@@ -1,19 +1,19 @@
 # PowerApp Backend — Estado de implementación vs. Casos de Uso
 
-> **Corte:** 2026-08-31 · **Fuente:** `Documentation/Especificaciones de CU/especificaciones/` comparado contra `power-app/src`
-> **Método:** mapeo 1:1 de los 72 CU contra los `controller` y `service` presentes en el código.
+> **Corte:** 2026-09-04 · **Fuente:** `Documentation/Especificaciones de CU/especificaciones/` comparado contra `power-app/src`
+> **Método:** mapeo 1:1 de los 75 CU contra los `controller` y `service` presentes en el código.
 
 ## Resumen
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 59 | 82% | Endpoint existe y su service ejecuta lógica real |
+| ✅ Implementado | 63 | 84% | Endpoint existe y su service ejecuta lógica real |
 | 🟡 Parcial | 1 | 1% | Funciona a medias / resuelto dentro de otro endpoint |
-| 🔵 Andamiaje | 5 | 7% | Ruta declarada pero service vacío y llamada comentada |
-| ⬜ No implementado | 7 | 10% | Sin endpoint, service ni módulo |
-| **Total** | **72** | | |
+| 🔵 Andamiaje | 4 | 5% | Ruta declarada pero service vacío y llamada comentada |
+| ⬜ No implementado | 7 | 9% | Sin endpoint, service ni módulo |
+| **Total** | **75** | | |
 
-**60 de 72 CU con código implementado o parcial (~83%).** Los otros 12 son trabajo pendiente (andamiaje + no implementado).
+**64 de 75 CU con código implementado o parcial (~85%).** Los otros 11 son trabajo pendiente (andamiaje + no implementado).
 > **Nota (19/8):** la DB está **al día** con el modelo. El ajuste de circuitos se aplicó sobre la instancia existente con un delta puntual, sin recrearla, así que todos los endpoints se pueden probar en runtime.
 
 ### Cobertura por rol
@@ -21,8 +21,21 @@
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
 |---|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 14 | 1 | 2 | 3 | 70% |
-| Entrenador | 29 | 22 | 0 | 3 | 4 | 76% |
+| Entrenador | 32 | 26 | 0 | 2 | 4 | 81% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 100% |
+
+> **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+
+## Cambios recientes (2026-09-04 · asignar rutinas a planificaciones)
+
+- **CU-E-12 se reestructura y se cierra** 🔵 → ✅. Pasa de ser un CU con una sola operación a un **CU agrupador con cuatro operaciones anidadas** (`CU-E-12a` a `CU-E-12d`), una por endpoint. El agrupador concentra las reglas comunes —el `order` como etiqueta, la repetición permitida, la baja siempre lógica, el todo-o-nada de los lotes— y cada anidado documenta lo suyo. **El total del proyecto pasa de 72 a 75 CU**: el agrupador no se cuenta a sí mismo y sus cuatro hijos sí. Los endpoints: `POST /planification/routine/assign` (con `order` opcional), `POST /planification/routine/assign-bulk`, `POST /planification/routine/set-active/:id` —que **reemplaza al `DELETE /planification/routine/:id`** del andamiaje— y `POST /planification/routine/set-active-bulk`. Con esto el `routines` y el `routine_count` del ABM, que devolvían `[]` y `0` desde el 31/8, **se pueden llenar por fin**.
+- **Se eliminó `Routine.routine_plan_id`**, cerrando la deuda anotada el 29/8. La columna era una FK directa de `Routine` a `Planification` que **nunca estuvo en el diagrama de `Doc/`** —ni en la versión anterior del modelo—: existía sólo en la entidad y en `ddl.py`, nadie la leía ni la escribía, y todas las filas la tenían en `NULL`. La relación rutina↔planificación queda con **un solo camino**, `Routine_Asignation`, que es además el único que soporta el `order` y la repetición. Se fue con ella su FK diferida y el `@OneToMany routines` de `Planification`.
+- **`Routine_Asignation.routine_plan_id` pasó a llamarse `planification_id`** y **`order` pasó a ser nullable**, los dos siguiendo el modelo actualizado. El `order` nullable ya estaba en el `Doc/` committeado: era una desincronización preexistente que pasó desapercibida porque la tabla siempre estuvo vacía.
+- **`order` es una etiqueta de orden, no una secuencia.** A diferencia de `Routine_Circuit` y `Routine_Exercise` —que E-16 y E-23 normalizan a 1..N— acá puede tener **huecos** (la baja pone `order = null` y no renumera el resto) y **duplicados** (el alta con `order` explícito lo persiste tal cual, sin desplazar a nadie). Es una decisión deliberada para no tocar N registros en cada alta y en cada baja.
+- **Consecuencia obligatoria: el desempate.** Con `order` duplicado el orden de lectura deja de ser determinístico, así que `/all-plus` y el detalle ordenan por **`order ASC, created_at ASC`**: a igual posición, primero la que se asignó antes. Sin esto la pantalla del entrenador se reordena sola entre refrescos.
+- **Reactivar acepta el `order` por body.** Como la baja borra la posición, `set-active` con `active = true` recibe un `order` opcional: si viene se usa, si no la asignación vuelve al final. Mandarlo con `active = false` es un `400`.
+- **Una rutina puede repetirse en la misma planificación**, mismo criterio que `Routine_Circuit`: un "Día A" puede aparecer dos veces en la semana y la posición las distingue. Sin `UNIQUE` en la base. Esto dejó sin efecto el camino alternativo "vínculo duplicado → no duplica" que tenía el CU original.
+- **Los dos endpoints de alta devuelven el detalle del plan** (el `planification_id` viene en el body, así que siempre se sabe cuál es); **los dos `set-active` devuelven la o las asignaciones**, porque el lote puede cruzar planificaciones y no hay un plan único que devolver.
 
 ## Cambios recientes (2026-08-31 · baja lógica en las asignaciones)
 
@@ -221,7 +234,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | **14/8** ✅ | CU sin dependencias — **7 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**)<br>✅ editar datos personales (**U-06**)<br>✅ filtrar RMs por usuario (**U-11**)<br>✅ RMs potenciales (**U-16**)<br>✅ estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**)<br>🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas |
 | **21/8** ✅ | Circuitos — **4 de 4** | ✅ obtener (**E-21**)<br>✅ crear (**E-22**)<br>✅ editar (**E-23**), cerrado el **25/8**: el "hecho" se repuntó a `Routine_Exercise` y la baja pasa a ser lógica cuando hay historial<br>✅ baja lógica (**E-24**)<br>✅ el detalle y el listado con ejercicios (`/all-plus`) |
 | **28/8** ✅ | Rutinas — **el núcleo cerrado, 4 de 6** | ✅ obtener (**E-15**) + `/all-plus` y el detalle<br>✅ crear (**E-16**)<br>✅ editar (**E-17**), reconciliación por `Routine_Circuit.id` con baja lógica del vínculo<br>✅ baja lógica (**E-18**), `POST /routine/set-active/:id`<br>⬜ asignar rutina a alumno (**E-19**) — **post-MVP (27/8)**, depende de `Routine_Asignation_User`<br>⬜ desasignar rutina a alumno (**E-20**) — ídem<br>⬜ marcar series realizadas (**U-12**)<br>⬜ notas del ejercicio (**U-13**)<br>⬜ historial de entrenamientos y su filtro (**E-06, E-07**) |
-| **4/9** | Planificaciones y cierre | ✅ ABM de planificaciones (**E-08→E-11**), sin tocar el esquema<br>🔵 asignar rutinas y planificaciones a alumnos (**E-12→E-14**)<br>🔵 planificación activa y detalle de rutina del usuario (**U-08, U-09**)<br>Pruebas de integración sobre la API + Swagger<br>**🎯 Hito: servidor con los 72 CU cubiertos** |
+| **4/9** | Planificaciones y cierre | ✅ ABM de planificaciones (**E-08→E-11**), sin tocar el esquema<br>✅ asignar y quitar rutinas al plan (**E-12**), ampliado a 4 operaciones<br>🔵 asignar planificaciones a alumnos (**E-13, E-14**)<br>🔵 planificación activa y detalle de rutina del usuario (**U-08, U-09**)<br>Pruebas de integración sobre la API + Swagger<br>**🎯 Hito: servidor con 73 de los 75 CU** — E-19 y E-20 quedaron fuera del MVP el 27/8 |
 
 > Secuencia según dependencias: primero los CU independientes, luego **Circuitos**, sobre ellos las **Rutinas** y por último las **Planificaciones** que las agrupan.
 
@@ -289,7 +302,11 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-09 | Crear planificación sistémica | ✅ Implementado | `POST /planification/create` · 201 con el detalle |
 | CU-E-10 | Editar planificación sistémica | ✅ Implementado | `POST /planification/edit/:id` · 400 si está de baja · el opcional omitido borra |
 | CU-E-11 | Eliminar planificación sistémica (lógico) | ✅ Implementado | `POST /planification/set-active/:id` · baja y reactivación |
-| CU-E-12 | Asignar rutina a planificación | 🔵 Andamiaje | `POST /planification/routine/assign` · comentado |
+| CU-E-12 | Gestionar rutinas de una planificación | — *agrupador* | no se cuenta: agrupa a E-12a → E-12d |
+| CU-E-12a | Asignar una rutina a planificación | ✅ Implementado | `POST /planification/routine/assign` · `order` opcional, al final si se omite |
+| CU-E-12b | Asignar rutinas en lote | ✅ Implementado | `POST /planification/routine/assign-bulk` · transaccional, consecutivas al final |
+| CU-E-12c | Quitar o reincorporar una rutina (lógico) | ✅ Implementado | `POST /planification/routine/set-active/:id` · `order` opcional al reincorporar |
+| CU-E-12d | Quitar o reincorporar rutinas en lote (lógico) | ✅ Implementado | `POST /planification/routine/set-active-bulk` · transaccional |
 | CU-E-13 | Asignar planificación a alumno | 🔵 Andamiaje | `POST /planification/user/assign` · comentado |
 | CU-E-14 | Eliminar planificación a alumno | 🔵 Andamiaje | pasa a baja lógica en cascada (31/8): será `POST /planification/user/set-active/:id`, apaga la `User_Planification` y sus `User_Routine` |
 

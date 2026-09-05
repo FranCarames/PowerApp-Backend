@@ -23,8 +23,11 @@ import { EditPlanificationDto } from '../dtos/planification/edit_planification.d
 import { SetPlanificationActiveDto } from '../dtos/planification/set_planification_active.dto';
 import { PlanificationListItemResponseDto } from '../dtos/planification/planification_list_item_response.dto';
 import { PlanificationDetailResponseDto } from '../dtos/planification/planification_detail_response.dto';
-// TODO: crear los siguientes DTOs en src/dtos/planification/ (CU-E-12, E-13 y E-14)
-// import { AssignRoutineToPlanificationDto } from '../dtos/planification/assign_routine_to_planification.dto';
+import { AssignRoutineToPlanificationDto } from '../dtos/planification/assign_routine_to_planification.dto';
+import { AssignRoutinesToPlanificationDto } from '../dtos/planification/assign_routines_to_planification.dto';
+import { SetRoutineAsignationActiveDto } from '../dtos/planification/set_routine_asignation_active.dto';
+import { SetRoutineAsignationsActiveDto } from '../dtos/planification/set_routine_asignations_active.dto';
+// TODO: crear los siguientes DTOs en src/dtos/planification/ (CU-E-13 y E-14)
 // import { AssignPlanificationToUserDto } from '../dtos/planification/assign_planification_to_user.dto';
 // import { EditUserPlanificationDto } from '../dtos/planification/edit_user_planification.dto';
 // CU-E-19 y CU-E-20 (asignar/quitar rutina puntual a un alumno) salieron de aca el 27/8:
@@ -107,27 +110,52 @@ export class PlanificationController {
         this.planificationService.setPlanificationActive(idPlanification.id, setPlanificationActiveDto, res);
     }
 
-    // ===================== ASIGNACIONES (CU-E-12, E-13, E-14, U-08) =====================
+    // ===================== ASIGNACION DE RUTINAS AL PLAN (CU-E-12) =====================
 
     @Post('/routine/assign')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 201, type: RoutineAsignation })
+    @ApiResponse({ status: 201, type: PlanificationDetailResponseDto })
     async assignRoutineToPlanification(
-        @Body() assignRoutineDto: any,
+        @Body() assignRoutineDto: AssignRoutineToPlanificationDto,
         @Res() res: Response,
     ) {
-        // this.planificationService.assignRoutineToPlanification(assignRoutineDto, res);
+        this.planificationService.assignRoutineToPlanification(assignRoutineDto, res);
     }
 
-    @Delete('/routine/:id')
+    @Post('/routine/assign-bulk')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200 })
-    async removeRoutineFromPlanification(
-        @Param() idRoutineAsignation: ParameterIdDto,
+    @ApiResponse({ status: 201, type: PlanificationDetailResponseDto })
+    async assignRoutinesToPlanification(
+        @Body() assignRoutinesDto: AssignRoutinesToPlanificationDto,
         @Res() res: Response,
     ) {
-        // this.planificationService.removeRoutineFromPlanification(idRoutineAsignation.id, res);
+        this.planificationService.assignRoutinesToPlanification(assignRoutinesDto, res);
     }
+
+    // Reemplaza al DELETE /planification/routine/:id del andamiaje: la baja del vinculo
+    // es logica desde el 31/8, y el mismo endpoint reactiva
+    @Post('/routine/set-active/:id')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: RoutineAsignation })
+    async setRoutineAsignationActive(
+        @Param() idRoutineAsignation: ParameterIdDto,
+        @Body() setActiveDto: SetRoutineAsignationActiveDto,
+        @Res() res: Response,
+    ) {
+        this.planificationService.setRoutineAsignationActive(idRoutineAsignation.id, setActiveDto, res);
+    }
+
+    @Post('/routine/set-active-bulk')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: [RoutineAsignation] })
+    async setRoutineAsignationsActive(
+        @Body() setActiveDto: SetRoutineAsignationsActiveDto,
+        @Res() res: Response,
+    ) {
+        this.planificationService.setRoutineAsignationsActive(setActiveDto, res);
+    }
+
+    // ===================== ASIGNACIONES A ALUMNOS (CU-E-13, E-14, U-08) =====================
 
     @Post('/user/assign')
     @Auth(UserRole.coach, UserRole.admin)

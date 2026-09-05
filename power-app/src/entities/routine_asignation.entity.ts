@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Routine } from './routine.entity';
 import { Planification } from './planification.entity';
 import { RoutineAsignationUser } from './routine_asignation_user.entity';
@@ -17,11 +17,15 @@ export class RoutineAsignation {
 
     @ApiProperty({ example: 'uuid-1234' })
     @Column({ type: 'uuid', nullable: false })
-    routine_plan_id!: string;
+    planification_id!: string;
 
-    @ApiProperty({ example: 1 })
-    @Column({ type: 'integer', nullable: false })
-    order!: number;
+    // Nullable a proposito: la baja logica le borra la posicion (order = null) y NO se
+    // renumera el resto, asi que la secuencia puede tener huecos. Y como el alta persiste
+    // el order recibido tal cual, tambien puede tener duplicados: order es una etiqueta
+    // de orden, no una secuencia canonica. El desempate lo pone la lectura, por created_at
+    @ApiPropertyOptional({ example: 1 })
+    @Column({ type: 'integer', nullable: true })
+    order?: number | null;
 
     @ApiProperty({ example: true })
     @Column({ nullable: false, default: true })
@@ -41,7 +45,7 @@ export class RoutineAsignation {
     routine!: Routine;
 
     @ManyToOne(() => Planification, planification => planification.routineAsignations, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'routine_plan_id' })
+    @JoinColumn({ name: 'planification_id' })
     planification!: Planification;
 
     @OneToMany(() => RoutineAsignationUser, routineAsignationUser => routineAsignationUser.routineAsignation)

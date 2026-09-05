@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Routine } from './routine.entity';
 import { RoutineAsignation } from './routine_asignation.entity';
 import { UserPlanification } from './user_planification.entity';
 
@@ -48,9 +47,6 @@ export class Planification {
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS
-    @OneToMany(() => Routine, routine => routine.planification)
-    routines!: Routine[];
-
     @OneToMany(() => RoutineAsignation, routineAsignation => routineAsignation.planification)
     routineAsignations!: RoutineAsignation[];
 

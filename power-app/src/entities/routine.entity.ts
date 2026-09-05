@@ -1,6 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Planification } from './planification.entity';
 import { RoutineCircuit } from './routine_circuit.entity';
 import { RoutineAsignation } from './routine_asignation.entity';
 import { RoutineAsignationUser } from './routine_asignation_user.entity';
@@ -10,10 +9,6 @@ export class Routine {
     @ApiProperty({ example: 'uuid-1234' })
     @PrimaryGeneratedColumn('uuid')
     id!: string;
-
-    @ApiPropertyOptional({ example: 'uuid-1234' })
-    @Column({ type: 'uuid', nullable: true })
-    routine_plan_id?: string;
 
     @ApiProperty({ example: 'Día A - Pecho y tríceps', maxLength: 50 })
     @Column({ length: 50, nullable: false })
@@ -40,10 +35,6 @@ export class Routine {
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS
-    @ManyToOne(() => Planification, planification => planification.routines, { onDelete: 'SET NULL', nullable: true })
-    @JoinColumn({ name: 'routine_plan_id' })
-    planification?: Planification;
-
     @OneToMany(() => RoutineCircuit, routineCircuit => routineCircuit.routine)
     routineCircuits!: RoutineCircuit[];
 

@@ -116,7 +116,6 @@ CREATE INDEX idx_circuit_type   ON public."Circuit"(type);
 
 CREATE TABLE public."Routine" (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    routine_plan_id UUID,
     name            VARCHAR(50) NOT NULL,
     coach_note      VARCHAR(100),
     active          BOOLEAN     NOT NULL DEFAULT true,
@@ -199,23 +198,18 @@ CREATE INDEX idx_user_rm_user_id     ON public."User_RM"(user_id);
 CREATE INDEX idx_user_rm_exercise_id ON public."User_RM"(exercise_id);
 CREATE INDEX idx_user_rm_date        ON public."User_RM"(date);
 
--- FK diferida en Routine (depende de Planification)
-ALTER TABLE public."Routine"
-    ADD CONSTRAINT fk_routine_planification
-        FOREIGN KEY (routine_plan_id) REFERENCES public."Planification"(id) ON DELETE SET NULL;
-
 CREATE TABLE public."Routine_Asignation" (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     routine_id      UUID        NOT NULL,
-    routine_plan_id UUID        NOT NULL,
-    "order" 		INTEGER		NOT NULL,
+    planification_id UUID       NOT NULL,
+    "order" 		INTEGER,
     active          BOOLEAN     NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_routine_asignation_routine
         FOREIGN KEY (routine_id)      REFERENCES public."Routine"(id)       ON DELETE CASCADE,
     CONSTRAINT fk_routine_asignation_planification
-        FOREIGN KEY (routine_plan_id) REFERENCES public."Planification"(id) ON DELETE CASCADE
+        FOREIGN KEY (planification_id) REFERENCES public."Planification"(id) ON DELETE CASCADE
 );
 
 CREATE TABLE public."User_Planification" (
