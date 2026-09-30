@@ -16,10 +16,11 @@ Lista las planificaciones sistémicas (plantillas) disponibles para el entrenado
 
 **Cubre:**
 
-- Lectura del catálogo de Planification sistémicas.
+- Lectura del catálogo de Planification sistémicas **activas** (active = true).
 
 **Fuera de alcance:**
 
+- Las planificaciones dadas de baja lógicamente (active = false).
 - Las planificaciones asignadas a alumnos (User_Planification).
 
 ## Precondiciones

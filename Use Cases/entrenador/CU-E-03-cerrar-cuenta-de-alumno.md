@@ -48,3 +48,14 @@ Da de baja la cuenta de un alumno gestionado por el entrenador.
 
 1. El alumno posee datos que impiden la baja directa.
 2. El sistema aplica la política definida (baja lógica o impedimento) e informa el resultado.
+
+## Implementación
+
+Política elegida: **baja lógica** mediante el campo `User.active` (boolean, default `true`).
+
+- Endpoint: `POST /users/set-active/:id` con body `{ "active": false }` para cerrar la cuenta (o `{ "active": true }` para reactivarla). Mismo patrón que la baja/alta de membresías (`POST /membership/set-active/:id`).
+- Al cerrarse (`active = false`), el login queda bloqueado: `POST /users/login` responde **403** para cuentas inactivas, cumpliendo la postcondición «no puede iniciar sesión».
+- No se elimina el histórico de pagos ni entrenamientos (baja lógica, integridad preservada).
+
+> **Pendiente:** control de acceso por rol (que solo un Entrenador/Admin pueda cerrar cuentas). Hoy no hay guards; es un pendiente transversal.
+

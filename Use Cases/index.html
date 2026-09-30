@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PowerApp — Especificaciones de Casos de Uso</title>
-<meta name="description" content="Las 72 especificaciones de casos de uso del backend de PowerApp, navegables por rol y paquete.">
+<meta name="description" content="Las 75 especificaciones de casos de uso del backend de PowerApp, navegables por rol y paquete.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Saira:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -84,6 +84,8 @@
   .cu.active{background:color-mix(in srgb,var(--rc,var(--pri)) 12%,transparent);border-left-color:var(--rc,var(--pri));}
   .cu.active .name{color:var(--tp);font-weight:600;}
   .cu.active .code{color:var(--rc,var(--pri));}
+  .cu.sub{margin-left:14px;}
+  .cu .tag{margin-left:auto;flex:0 0 auto;font-family:var(--fMono);font-size:9.5px;color:var(--tm);border:1px solid var(--border);border-radius:20px;padding:1px 7px;}
 
   /* ---------- Main ---------- */
   .main{min-width:0;padding:clamp(28px,5vw,64px) clamp(22px,6vw,80px);}
@@ -255,9 +257,11 @@
       var ln = lines[k];
       if(m = ln.match(/^##\s+Rol\s+(.+?)\s*$/i)){ role={name:m[1].trim(),packages:[]}; roles.push(role); pkg=null; continue; }
       if(m = ln.match(/^###\s+(.+?)\s*$/)){ if(role){ pkg={name:m[1].trim(),items:[]}; role.packages.push(pkg); } continue; }
-      if(m = ln.match(/^\s*-\s+\[`([^`]+)`\s+(.+?)\]\((.+?)\)\s*$/)){
+      // Acepta texto despues del link ("— *agrupador*") y detecta los CU anidados por la sangria
+      if(m = ln.match(/^(\s*)-\s+\[`([^`]+)`\s+(.+?)\]\((.+?)\)(.*)$/)){
         if(pkg){
-          var it = { code:m[1].trim(), title:m[2].trim(), path:m[3].trim(),
+          var it = { code:m[2].trim(), title:m[3].trim(), path:m[4].trim(),
+                     sub:m[1].length>0, group:/agrupador/i.test(m[5]),
                      role:role.name, pkg:pkg.name, color:ROLE_COLORS[role.name]||'var(--pri)' };
           pkg.items.push(it); byPath[it.path] = it;
         }
@@ -268,11 +272,14 @@
   }
 
   /* ---------- Build sidebar ---------- */
+  // Un CU agrupador no se cuenta a si mismo: cuentan sus operaciones anidadas
+  function countCU(p){ return p.items.filter(function(i){ return !i.group; }).length; }
+
   function buildNav(roles){
     var frag = document.createDocumentFragment();
     roles.forEach(function(role){
       var color = ROLE_COLORS[role.name] || 'var(--pri)';
-      var count = role.packages.reduce(function(a,p){ return a + p.items.length; }, 0);
+      var count = role.packages.reduce(function(a,p){ return a + countCU(p); }, 0);
       var g = document.createElement('div'); g.className='role-group';
       var rh = document.createElement('div'); rh.className='role-head';
       rh.innerHTML = '<span class="dot" style="background:'+color+'"></span>Rol '+role.name+'<span class="n">'+count+'</span>';
@@ -281,10 +288,11 @@
         var ph = document.createElement('div'); ph.className='pkg-head'; ph.textContent = p.name; g.appendChild(ph);
         p.items.forEach(function(it){
           var a = document.createElement('a');
-          a.className='cu'; a.href = '#'+it.path; a.style.setProperty('--rc', it.color);
+          a.className='cu'+(it.sub?' sub':''); a.href = '#'+it.path; a.style.setProperty('--rc', it.color);
           a.dataset.path = it.path;
           a.dataset.search = (it.code+' '+it.title).toLowerCase();
-          a.innerHTML = '<span class="code">'+it.code+'</span><span class="name">'+it.title+'</span>';
+          a.innerHTML = '<span class="code">'+it.code+'</span><span class="name">'+it.title+'</span>'
+                      + (it.group ? '<span class="tag">agrupador</span>' : '');
           g.appendChild(a);
         });
       });
@@ -300,7 +308,7 @@
     var order=[['Usuario','var(--usuario)'],['Entrenador','var(--entrenador)'],['Admin','var(--admin)']];
     order.forEach(function(o){
       var r = roles.filter(function(x){return x.name===o[0];})[0];
-      var c = r ? r.packages.reduce(function(a,p){return a+p.items.length;},0) : 0;
+      var c = r ? r.packages.reduce(function(a,p){return a+countCU(p);},0) : 0;
       total += c;
       cards += '<div class="stat"><div class="big" style="color:'+o[1]+'">'+c+'</div>'
              + '<div class="lbl"><span class="dot" style="background:'+o[1]+'"></span>'+o[0]+'</div></div>';

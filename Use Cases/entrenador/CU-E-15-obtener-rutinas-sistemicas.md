@@ -16,10 +16,11 @@ Lista las rutinas sistémicas disponibles para el entrenador.
 
 **Cubre:**
 
-- Lectura del catálogo de Routine sistémicas.
+- Lectura del catálogo de Routine sistémicas **activas** (active = true).
 
 **Fuera de alcance:**
 
+- Las rutinas dadas de baja lógicamente (active = false).
 - Las rutinas instanciadas a alumnos (User_Routine).
 
 ## Precondiciones

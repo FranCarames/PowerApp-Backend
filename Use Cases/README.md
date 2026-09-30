@@ -1,6 +1,8 @@
 # PowerApp — Especificaciones de Casos de Uso
 
-Índice de casos de uso (72 en total). Un archivo Markdown por CU.
+Índice de casos de uso (75 en total). Un archivo Markdown por CU.
+
+> **CU-E-12** es un caso de uso **agrupador**: no se cuenta a sí mismo, sino sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`), que sí figuran en el total.
 
 ## Rol Usuario
 
@@ -53,9 +55,13 @@
 - [`CU-E-09` Crear Planificación Sistémica](entrenador/CU-E-09-crear-planificacion-sistemica.md)
 - [`CU-E-10` Editar Planificación Sistémica](entrenador/CU-E-10-editar-planificacion-sistemica.md)
 - [`CU-E-11` Eliminar Planificación Sistémica](entrenador/CU-E-11-eliminar-planificacion-sistemica.md)
-- [`CU-E-12` Asignar Rutina a Planificación Sistémica](entrenador/CU-E-12-asignar-rutina-a-planificacion-sistemica.md)
+- [`CU-E-12` Gestionar Rutinas de una Planificación Sistémica](entrenador/CU-E-12-gestionar-rutinas-de-planificacion-sistemica.md) — *agrupador*
+    - [`CU-E-12a` Asignar una Rutina a una Planificación Sistémica](entrenador/CU-E-12a-asignar-rutina-a-planificacion.md)
+    - [`CU-E-12b` Asignar Rutinas en Lote a una Planificación Sistémica](entrenador/CU-E-12b-asignar-rutinas-en-lote-a-planificacion.md)
+    - [`CU-E-12c` Quitar o Reincorporar una Rutina (Lógico)](entrenador/CU-E-12c-quitar-rutina-de-planificacion.md)
+    - [`CU-E-12d` Quitar o Reincorporar Rutinas en Lote (Lógico)](entrenador/CU-E-12d-quitar-rutinas-en-lote-de-planificacion.md)
 - [`CU-E-13` Asignar Planificación a Alumno](entrenador/CU-E-13-asignar-planificacion-a-alumno.md)
-- [`CU-E-14` Eliminar Planificación a Alumno](entrenador/CU-E-14-eliminar-planificacion-a-alumno.md)
+- [`CU-E-14` Eliminar Planificación a Alumno (Lógico)](entrenador/CU-E-14-eliminar-planificacion-a-alumno.md)
 
 ### Administrar Rutinas
 
