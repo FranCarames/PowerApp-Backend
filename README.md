@@ -15,16 +15,16 @@ Backend de **PowerApp**, una aplicación de gimnasio y entrenamiento. Expone una
 
 ## 📚 Documentación
 
-La documentación visual está publicada en **[francarames.github.io/PowerApp-Backend](https://francarames.github.io/PowerApp-Backend/)** y la de la API, en **Swagger**. Todo es accesible desde la portada:
+La documentación de la API está en **Swagger**. El resto (modelo de datos, especificaciones de CU, prototipos) vive en el repo **[PowerApp-Docs](https://github.com/FranCarames/PowerApp-Docs)** y se publica en **[francarames.github.io/PowerApp-Docs](https://francarames.github.io/PowerApp-Docs/)**. Todo es accesible desde la portada:
 
 | Vista | Dónde | Descripción |
 |---|---|---|
 | 🔌 **[API — Swagger](https://powerapp-backend.onrender.com/docs)** | Render | **Documentación de todos los servicios REST**: endpoints, parámetros, esquemas y pruebas en vivo |
-| 🧭 **[Portada](https://francarames.github.io/PowerApp-Backend/)** | GitHub Pages | Índice de toda la documentación |
-| 📱 **[Prototipo de interfaces](https://francarames.github.io/PowerApp-Backend/UI%20Front/powerapp-prototype-app.html)** | GitHub Pages | Mockups navegables de las pantallas, por rol — app mobile y [versión web](https://francarames.github.io/PowerApp-Backend/UI%20Front/powerapp-prototype-web.html) |
-| 📊 **[Estado de implementación](https://francarames.github.io/PowerApp-Backend/Status/dashboard-estado-CU.html)** | GitHub Pages | Dashboard de avance: cada CU vs. el código |
-| 📄 **[Especificaciones de CU](https://francarames.github.io/PowerApp-Backend/Use%20Cases/)** | GitHub Pages | Las 75 especificaciones de casos de uso, por rol y paquete |
-| 🗃️ **[Modelo de datos](https://francarames.github.io/PowerApp-Backend/Doc/modelo-db.html)** | GitHub Pages | Visor del diagrama entidad-relación de la base, con zoom y arrastre ([PDF](https://francarames.github.io/PowerApp-Backend/Doc/PowerApp%20-%20Modelo%20DB.pdf)) |
+| 🧭 **[Portada](https://francarames.github.io/PowerApp-Docs/)** | GitHub Pages | Índice de toda la documentación |
+| 📱 **[Prototipo de interfaces](https://francarames.github.io/PowerApp-Docs/UI%20Front/powerapp-prototype-app.html)** | GitHub Pages | Mockups navegables de las pantallas, por rol — app mobile y [versión web](https://francarames.github.io/PowerApp-Docs/UI%20Front/powerapp-prototype-web.html) |
+| 📊 **[Estado de implementación](https://francarames.github.io/PowerApp-Docs/Status/dashboard-estado-CU.html)** | GitHub Pages | Dashboard de avance: cada CU vs. el código |
+| 📄 **[Especificaciones de CU](https://francarames.github.io/PowerApp-Docs/Use%20Cases/)** | GitHub Pages | Las 75 especificaciones de casos de uso, por rol y paquete |
+| 🗃️ **[Modelo de datos](https://francarames.github.io/PowerApp-Docs/Doc/modelo-db.html)** | GitHub Pages | Visor del diagrama entidad-relación de la base, con zoom y arrastre ([PDF](https://francarames.github.io/PowerApp-Docs/Doc/PowerApp%20-%20Modelo%20DB.pdf)) |
 
 ---
 
@@ -42,13 +42,11 @@ La documentación visual está publicada en **[francarames.github.io/PowerApp-Ba
 
 ```
 power-app/         → Código de la API (NestJS). Entidades en src/entities.
-Use Cases/         → Especificaciones de los 75 casos de uso (1 .md por CU) + índice.
 Status/            → Informe y dashboard del avance de implementación por CU.
 Db Creator/        → Scripts (Python) que regeneran la base desde cero → 3 archivos .sql.
-Doc/               → Documentación vigente del proyecto (modelo de datos actualizado).
-UI Front/          → Prototipo HTML de las interfaces.
-index.html         → Portada de GitHub Pages.
 ```
+
+> La documentación (modelo de datos, especificaciones de CU, prototipos y el sitio de GitHub Pages) vive en el repo hermano **[PowerApp-Docs](https://github.com/FranCarames/PowerApp-Docs)**. `Status/` es la fuente del avance; el sitio publica una copia que se sincroniza a mano.
 
 > Las **entidades TypeORM** (`power-app/src/entities`) son la fuente de verdad del modelo ("código primero"): `synchronize` está en `false` y no hay migraciones, así que los cambios de schema se aplican **regenerando la base** con los scripts de `Db Creator/`.
 
@@ -114,6 +112,6 @@ Módulos: `users`, `coach`, `membership`, `muscles`, `exercise`, `planification`
 
 ## 📊 Estado del proyecto
 
-El avance se sigue caso de uso por caso de uso. Ver el **[dashboard de estado](https://francarames.github.io/PowerApp-Backend/Status/dashboard-estado-CU.html)** o el informe en [`Status/estado-implementacion-CU.md`](Status/estado-implementacion-CU.md).
+El avance se sigue caso de uso por caso de uso. Ver el **[dashboard de estado](https://francarames.github.io/PowerApp-Docs/Status/dashboard-estado-CU.html)** o el informe en [`Status/estado-implementacion-CU.md`](Status/estado-implementacion-CU.md).
 
 > ℹ️ La base de datos del proyecto es de un tier gratuito y puede expirar; si no hay una base viva, los cambios se verifican por **compilación**: `npm --prefix power-app run build`.

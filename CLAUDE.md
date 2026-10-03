@@ -10,17 +10,18 @@ Se implementa **caso de uso por caso de uso (CU)** contra las especificaciones. 
 
 ## Ubicaciones clave
 
-### Documentación actualizada del proyecto (`Doc/`)
-`Doc/` (raíz del backend) guarda la documentación **vigente** del proyecto — sobre todo el **modelo de datos actualizado**. Es la **fuente de verdad** ante cualquier duda de estructura/modelo: las entidades TypeORM del back pueden estar desactualizadas respecto de lo que hay acá, así que ante conflicto, este es el modelo que manda. Toda documentación nueva del proyecto se guarda en esta carpeta.
+### Documentación actualizada del proyecto (`Doc/`, repo PowerApp-Docs)
+`Doc/` vive en el **repo de documentación** (`D:\Power App\Docs\PowerApp-Docs\Doc`, GitHub `FranCarames/PowerApp-Docs`), no en este, y guarda la documentación **vigente** del proyecto — sobre todo el **modelo de datos actualizado**. Es la **fuente de verdad** ante cualquier duda de estructura/modelo: las entidades TypeORM del back pueden estar desactualizadas respecto de lo que hay acá, así que ante conflicto, este es el modelo que manda. Toda documentación nueva del proyecto, incluidas las specs y planes de cada cambio (`Doc/specs/`, `Doc/plans/`), se guarda en ese repo, no en este.
 
-### Especificaciones de Casos de Uso (72 CU)
-`D:\Power App\Documentation\Especificaciones de CU\especificaciones\` (directorio de Documentación, **fuera del repo**).
+### Especificaciones de Casos de Uso
+`D:\Power App\Docs\PowerApp-Docs\Use Cases\` (repo de documentación, **fuera de este repo**; es la fuente de verdad). La vieja copia en `D:\Power App\Documentation\` quedó como archivo histórico: no se usa.
 - Subcarpetas por rol: `admin/`, `entrenador/`, `usuario/`.
-- `README.md` es el índice de los 72 CU.
+- `README.md` es el índice de los CU.
 - Un `.md` por CU (ej. `entrenador/CU-E-03-cerrar-cuenta-de-alumno.md`).
 
 ### Artefactos de Status (`Status/`)
 Reflejan el avance de implementación de los CU. **Se mantienen a mano.**
+El repo de documentación (`PowerApp-Docs`) publica una **copia** de estos dos archivos, que **el usuario sincroniza a mano**. En el flujo de Status se editan **sólo** los de este repo: no tocar `PowerApp-Docs`.
 - `Status/estado-implementacion-CU.md` — informe: mapeo 1:1 de cada CU vs el código (estado, endpoint, notas), conteos por rol, hallazgos y sección "Cambios recientes".
 - `Status/dashboard-estado-CU.html` — dashboard visual del mismo informe (copia local del artifact publicado en claude.ai).
 
@@ -54,5 +55,7 @@ Mapa entidad → script que la referencia:
 1. Implementar el cambio en `power-app/src`.
 2. Verificar compilación: `npm --prefix power-app run build`.
 3. Si cambió la **estructura** de una entidad → actualizar los scripts de `Db Creator` (regla de arriba).
-4. Actualizar los **artefactos de Status** (informe `.md` + dashboard `.html`).
+4. Actualizar los **artefactos de Status** (informe `.md` + dashboard `.html`), sólo en este repo (la copia al sitio de `PowerApp-Docs` la sincroniza el usuario).
 5. Commit (el usuario commitea con su estilo).
+
+> Las **specs** (`Doc/specs/`) y **planes** (`Doc/plans/`) de cada cambio se escriben en el repo `PowerApp-Docs` y se dejan stageados ahí. Cada repo tiene su propio commit, que hace el usuario.
