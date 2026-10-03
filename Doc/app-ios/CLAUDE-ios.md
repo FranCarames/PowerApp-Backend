@@ -18,7 +18,7 @@ Todas viven en `../PowerApp-Backend/`. Al empezar cada sesión, corré `git -C .
 | Contrato HTTP real | `power-app/src/`: los controllers (rutas y roles), los services (la respuesta real está en `res.status(...).send(...)`), `dtos/` y `entities/` |
 | Qué hace cada CU | `Use Cases/` (el índice está en `README.md`) |
 | Qué existe hoy en el back | `Status/estado-implementacion-CU.md` |
-| Identidad visual | `UI Front/powerapp-prototype.html` |
+| Identidad visual | `UI Front/powerapp-prototype-app.html` |
 
 ## Hoja de ruta
 
