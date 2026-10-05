@@ -28,6 +28,15 @@ async function bootstrap() {
     })
   );
 
+  app.enableCors({
+    origin: [
+      'https://powerapp-web.onrender.com',
+      'http://localhost:5173', // Vite dev
+      'http://localhost:4173', // Vite preview
+    ],
+    exposedHeaders: ['Authorization'],
+  });
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
