@@ -19,6 +19,13 @@ import { ConfigService } from '@nestjs/config';
 /** Ventana de aviso por defecto, en días, si no se configura `MEMBERSHIP_EXPIRING_SOON_DAYS`. */
 const DEFAULT_EXPIRING_SOON_DAYS = 7;
 
+/**
+ * Textos del conflicto de unicidad entre tipos de membresía. El front compara el de duración
+ * literal (`MembershipTypeModal`) para mostrar su aviso: no cambiarlo sin tocar el front.
+ */
+const DUPLICATE_DURATION_ERROR = 'Ya existe una membresía con esa duración';
+const DUPLICATE_NAME_ERROR = 'Ya existe una membresía con ese nombre';
+
 @Injectable()
 export class MembershipService {
     /** Cuántos días antes del vencimiento se considera una membresía "por vencer". */
@@ -77,10 +84,16 @@ export class MembershipService {
         res: Response
     ) {
         try {
-            const membership = await this.membershipRepository.findOne({ where: { duration: createMembershipDto.duration } });
+            // Se comparan contra todos los tipos, también los dados de baja: reactivar uno
+            // nunca puede dejar dos con la misma duración o el mismo nombre.
+            const memberships = await this.membershipRepository.find();
 
-            if (membership) {
-                return res.status(400).send({ error: 'Ya existe una membresía con esa duración' });
+            if (memberships.some(m => m.duration === createMembershipDto.duration)) {
+                return res.status(400).send({ error: DUPLICATE_DURATION_ERROR });
+            }
+
+            if (this.isNameTaken(memberships, createMembershipDto.name)) {
+                return res.status(409).send({ error: DUPLICATE_NAME_ERROR });
             }
 
             const newMembership = this.membershipRepository.create(createMembershipDto);
@@ -101,6 +114,20 @@ export class MembershipService {
             const membership = await this.membershipRepository.findOne({ where: { id: idMembership } });
             if (!membership) {
                 return res.status(404).send({ error: 'Membresía no encontrada' });
+            }
+
+            // Sólo se controla lo que cambia (igual que `editUser` con el email): así un tipo con un
+            // duplicado heredado puede seguir editándose sin tocar el campo en conflicto.
+            const others = (await this.membershipRepository.find()).filter(m => m.id !== membership.id);
+
+            if (editMembershipDto.duration !== membership.duration
+                && others.some(m => m.duration === editMembershipDto.duration)) {
+                return res.status(400).send({ error: DUPLICATE_DURATION_ERROR });
+            }
+
+            if (this.normalizeName(editMembershipDto.name) !== this.normalizeName(membership.name)
+                && this.isNameTaken(others, editMembershipDto.name)) {
+                return res.status(409).send({ error: DUPLICATE_NAME_ERROR });
             }
 
             membership.name = editMembershipDto.name;
@@ -188,6 +215,20 @@ export class MembershipService {
             console.error(error);
             res.status(500).send({ error: 'Error al crear el pago de la membresía' });
         }
+    }
+
+    /** Nombre listo para compararlo: sin espacios en los extremos y sin distinguir mayúsculas. */
+    private normalizeName(name: string): string {
+        return name.trim().toLowerCase();
+    }
+
+    /**
+     * Si algún tipo de la lista ya tiene ese nombre. Se resuelve en memoria a propósito: hay un puñado
+     * de tipos, y así la comparación no depende del collation ni del LOWER de la base.
+     */
+    private isNameTaken(memberships: Membership[], name: string): boolean {
+        const wanted = this.normalizeName(name);
+        return memberships.some(m => this.normalizeName(m.name) === wanted);
     }
 
     /**

@@ -46,6 +46,8 @@ export class MembershipController {
     @Post('create')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 201, type: Membership })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, o ya existe una membresía con esa duración' })
+    @ApiResponse({ status: 409, description: 'Ya existe una membresía con ese nombre' })
     async createMembership(
         @Body() createMembershipDto: CreateMembershipDto,
         @Res() res: Response,
@@ -56,6 +58,9 @@ export class MembershipController {
     @Post('edit/:id')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: Membership })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, o otra membresía ya tiene esa duración' })
+    @ApiResponse({ status: 404, description: 'Membresía no encontrada' })
+    @ApiResponse({ status: 409, description: 'Otra membresía ya tiene ese nombre' })
     async editMembership(
         @Param() idMembership: ParameterIdDto,
         @Body() editMembershipDto: EditMembershipDto,
