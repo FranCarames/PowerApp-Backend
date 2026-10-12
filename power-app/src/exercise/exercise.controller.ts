@@ -34,6 +34,7 @@ export class ExerciseController {
     @Post('create')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 201, type: Exercise })
+    @ApiResponse({ status: 409, description: 'Ya existe un ejercicio con ese nombre' })
     async createExercise(
         @Body() createExerciseDto: CreateExerciseDto,
         @Res() res: Response,
@@ -44,6 +45,7 @@ export class ExerciseController {
     @Post('edit/:id')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: Exercise })
+    @ApiResponse({ status: 409, description: 'Otro ejercicio ya tiene ese nombre' })
     async editExercise(
         @Param() idExercise: ParameterIdDto,
         @Body() editExerciseDto: EditExerciseDto,

@@ -9,6 +9,9 @@ import { EditExerciseDto } from '../dtos/exercise/edit_exercise.dto';
 import { ExercisedMuscle } from '../entities/exercised_muscle.entity';
 import { MusclesService } from '../muscles/muscles.service';
 
+/** Conflicto de unicidad del nombre del ejercicio (CU-A-04 y CU-A-05). */
+const DUPLICATE_NAME_ERROR = 'Ya existe un ejercicio con ese nombre';
+
 @Injectable()
 export class ExerciseService {
     constructor(
@@ -66,6 +69,23 @@ export class ExerciseService {
         }
     }
 
+    /** Nombre listo para compararlo: sin espacios en los extremos y sin distinguir mayúsculas. */
+    private normalizeName(name: string): string {
+        return name.trim().toLowerCase();
+    }
+
+    /**
+     * Si otro ejercicio del catálogo ya tiene ese nombre. Se compara en memoria a propósito: el
+     * catálogo es de unos cientos de ejercicios, y así no depende del collation ni del LOWER de la
+     * base (los nombres llevan tildes y eñes).
+     */
+    private async isNameTaken(name: string, excludeId?: string): Promise<boolean> {
+        const wanted = this.normalizeName(name);
+        const exercises = await this.exerciseRepository.find({ select: { id: true, name: true } });
+
+        return exercises.some(e => e.id !== excludeId && this.normalizeName(e.name) === wanted);
+    }
+
     async _getExerciseById(idExercise: string): Promise<Exercise | null> {
         return this.exerciseRepository.findOne({ where: { id: idExercise } });
     }
@@ -115,6 +135,10 @@ export class ExerciseService {
         res: Response
     ) {
         try {
+            if (await this.isNameTaken(createExerciseDto.name)) {
+                return res.status(409).send({ error: DUPLICATE_NAME_ERROR });
+            }
+
             // Validar que todos los músculos existen en la base de datos
             const muscles = await this.musclesService.getMusclesByIds(createExerciseDto.exercised_muscles_ids);
 
@@ -161,6 +185,14 @@ export class ExerciseService {
             const exercise = await this.exerciseRepository.findOne({ where: { id: idExercise } });
             if (!exercise) {
                 return res.status(404).send({ error: 'Ejercicio no encontrado' });
+            }
+
+            // Sólo se controla si el nombre cambia (igual que `editUser` con el email) y antes de tocar
+            // los músculos, para no dejar una edición a medias. Un duplicado heredado no bloquea
+            // editar el resto de los datos.
+            if (this.normalizeName(editExerciseDto.name) !== this.normalizeName(exercise.name)
+                && await this.isNameTaken(editExerciseDto.name, exercise.id)) {
+                return res.status(409).send({ error: DUPLICATE_NAME_ERROR });
             }
 
             // Obtener las relaciones actuales de ExercisedMuscle para este ejercicio
