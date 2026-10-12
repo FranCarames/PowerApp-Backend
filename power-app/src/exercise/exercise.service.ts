@@ -7,10 +7,17 @@ import { Exercise } from '../entities/exercise.entity';
 import { CreateExerciseDto } from '../dtos/exercise/create_exercise.dto';
 import { EditExerciseDto } from '../dtos/exercise/edit_exercise.dto';
 import { ExercisedMuscle } from '../entities/exercised_muscle.entity';
+import { RoutineExercise } from '../entities/routine_exercise.entity';
+import { UserRM } from '../entities/user_rm.entity';
 import { MusclesService } from '../muscles/muscles.service';
 
 /** Conflicto de unicidad del nombre del ejercicio (CU-A-04 y CU-A-05). */
 const DUPLICATE_NAME_ERROR = 'Ya existe un ejercicio con ese nombre';
+
+/** Motivos por los que un ejercicio en uso no se puede eliminar (CU-A-06). */
+const DELETE_IN_CIRCUITS_ERROR = 'No se puede eliminar el ejercicio: está en uso en circuitos';
+const DELETE_TRAINED_ERROR = 'No se puede eliminar el ejercicio: ya se entrenó con él';
+const DELETE_WITH_RMS_ERROR = 'No se puede eliminar el ejercicio: hay alumnos con RMs registrados';
 
 @Injectable()
 export class ExerciseService {
@@ -19,6 +26,10 @@ export class ExerciseService {
         private exerciseRepository: Repository<Exercise>,
         @InjectRepository(ExercisedMuscle)
         private exercisedMuscleRepository: Repository<ExercisedMuscle>,
+        @InjectRepository(RoutineExercise)
+        private routineExerciseRepository: Repository<RoutineExercise>,
+        @InjectRepository(UserRM)
+        private userRmRepository: Repository<UserRM>,
         private musclesService: MusclesService
     ) {
     }
@@ -268,6 +279,29 @@ export class ExerciseService {
             if (!exercise) {
                 return res.status(404).send({ error: 'Ejercicio no encontrado' });
             }
+
+            // Un ejercicio en uso no se elimina (CU-A-06). Las FK de Routine_Exercise y User_RM son
+            // CASCADE, así que sin este control la baja sacaría el ejercicio de los circuitos y
+            // borraría los RMs de los alumnos. Una fila inactiva de Routine_Exercise sólo existe si
+            // alguien ya completó el ejercicio (editCircuit la deja de baja lógica por el historial):
+            // cualquier fila cuenta como uso.
+            const routineExercises = await this.routineExerciseRepository.find({
+                where: { exercise_id: exerciseId },
+                select: { id: true, active: true },
+            });
+
+            if (routineExercises.some(routineExercise => routineExercise.active)) {
+                return res.status(409).send({ error: DELETE_IN_CIRCUITS_ERROR });
+            }
+
+            if (routineExercises.length > 0) {
+                return res.status(409).send({ error: DELETE_TRAINED_ERROR });
+            }
+
+            if (await this.userRmRepository.count({ where: { exercise_id: exerciseId } }) > 0) {
+                return res.status(409).send({ error: DELETE_WITH_RMS_ERROR });
+            }
+
             await this.exerciseRepository.remove(exercise);
             res.status(200).send({ message: 'Ejercicio eliminado correctamente' });
         } catch (error) {

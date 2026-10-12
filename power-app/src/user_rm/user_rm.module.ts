@@ -8,13 +8,14 @@ import { Exercise } from '../entities/exercise.entity';
 import { ExercisedMuscle } from '../entities/exercised_muscle.entity';
 import { Muscle } from '../entities/muscle.entity';
 import { MuscleGroup } from '../entities/muscle_group.entity';
+import { RoutineExercise } from '../entities/routine_exercise.entity';
 import { UsersService } from '../users/users.service';
 import { ExerciseService } from '../exercise/exercise.service';
 import { MusclesService } from '../muscles/muscles.service';
 import { AuthModule } from '../authentication/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserRM, User, Exercise, ExercisedMuscle, Muscle, MuscleGroup]), AuthModule],
+  imports: [TypeOrmModule.forFeature([UserRM, User, Exercise, ExercisedMuscle, Muscle, MuscleGroup, RoutineExercise]), AuthModule],
   providers: [UserRmService, UsersService, ExerciseService, MusclesService],
   controllers: [UserRmController]
 })

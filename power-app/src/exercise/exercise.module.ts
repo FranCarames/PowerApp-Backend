@@ -7,11 +7,13 @@ import { Exercise } from '../entities/exercise.entity';
 import { ExercisedMuscle } from '../entities/exercised_muscle.entity';
 import { Muscle } from '../entities/muscle.entity';
 import { MuscleGroup } from '../entities/muscle_group.entity';
+import { RoutineExercise } from '../entities/routine_exercise.entity';
+import { UserRM } from '../entities/user_rm.entity';
 import { MusclesService } from '../muscles/muscles.service';
 import { AuthModule } from '../authentication/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Exercise, ExercisedMuscle, Muscle, MuscleGroup]), AuthModule],
+  imports: [TypeOrmModule.forFeature([Exercise, ExercisedMuscle, Muscle, MuscleGroup, RoutineExercise, UserRM]), AuthModule],
   controllers: [ExerciseController],
   providers: [ExerciseService, MusclesService]
 })

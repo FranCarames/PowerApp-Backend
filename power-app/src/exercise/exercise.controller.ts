@@ -57,6 +57,8 @@ export class ExerciseController {
     @Delete(':id')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 200 })
+    @ApiResponse({ status: 404, description: 'Ejercicio no encontrado' })
+    @ApiResponse({ status: 409, description: 'El ejercicio está en uso (en circuitos, ya se entrenó con él o hay RMs registrados) y no se puede eliminar' })
     async deleteExercise(
         @Param() idMuscle: ParameterIdDto,
         @Res() res: Response,
