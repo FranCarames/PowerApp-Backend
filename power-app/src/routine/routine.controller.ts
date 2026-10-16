@@ -43,7 +43,7 @@ export class RoutineController {
         @Query() query: GetRoutinesQueryDto,
         @Res() res: Response,
     ) {
-        this.routineService.getAllRoutines(query, res);
+        await this.routineService.getAllRoutines(query, res);
     }
 
     // Va antes de '/:id': al ser un solo segmento tambien matchea ese patron,
@@ -55,7 +55,7 @@ export class RoutineController {
         @Query() query: GetRoutinesQueryDto,
         @Res() res: Response,
     ) {
-        this.routineService.getAllRoutinesPlus(query, res);
+        await this.routineService.getAllRoutinesPlus(query, res);
     }
 
     // Sin el rol user: CU-U-09 exige que la rutina pertenezca a una asignacion vigente
@@ -67,7 +67,7 @@ export class RoutineController {
         @Param() idRoutine: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.routineService.getRoutineById(idRoutine.id, res);
+        await this.routineService.getRoutineById(idRoutine.id, res);
     }
 
     @Post('/create')
@@ -77,7 +77,7 @@ export class RoutineController {
         @Body() createRoutineDto: CreateRoutineDto,
         @Res() res: Response,
     ) {
-        this.routineService.createRoutine(createRoutineDto, res);
+        await this.routineService.createRoutine(createRoutineDto, res);
     }
 
     @Post('/edit/:id')
@@ -88,7 +88,7 @@ export class RoutineController {
         @Body() editRoutineDto: EditRoutineDto,
         @Res() res: Response,
     ) {
-        this.routineService.editRoutine(idRoutine.id, editRoutineDto, res);
+        await this.routineService.editRoutine(idRoutine.id, editRoutineDto, res);
     }
 
     // Reemplaza al DELETE /:id del andamiaje: desde el 22/8 la rutina tiene baja logica,
@@ -102,7 +102,7 @@ export class RoutineController {
         @Body() setRoutineActiveDto: SetRoutineActiveDto,
         @Res() res: Response,
     ) {
-        this.routineService.setRoutineActive(idRoutine.id, setRoutineActiveDto, res);
+        await this.routineService.setRoutineActive(idRoutine.id, setRoutineActiveDto, res);
     }
 
     // ===================== CIRCUITOS (CU-E-21, CU-E-22, CU-E-23, CU-E-24) =====================
@@ -114,7 +114,7 @@ export class RoutineController {
         @Body() createCircuitDto: CreateCircuitDto,
         @Res() res: Response,
     ) {
-        this.routineService.createCircuit(createCircuitDto, res);
+        await this.routineService.createCircuit(createCircuitDto, res);
     }
 
     // No hace falta cuidar el orden como con 'circuit/all-plus': 'circuit/edit/:id' tiene
@@ -127,7 +127,7 @@ export class RoutineController {
         @Body() editCircuitDto: EditCircuitDto,
         @Res() res: Response,
     ) {
-        this.routineService.editCircuit(idCircuit.id, editCircuitDto, res);
+        await this.routineService.editCircuit(idCircuit.id, editCircuitDto, res);
     }
 
     @Get('circuit/all')
@@ -137,7 +137,7 @@ export class RoutineController {
         @Query() query: GetCircuitsQueryDto,
         @Res() res: Response,
     ) {
-        this.routineService.getAllCircuits(query, res);
+        await this.routineService.getAllCircuits(query, res);
     }
 
     // Va antes de 'circuit/:id': al ser un solo segmento tambien matchea ese patron,
@@ -149,7 +149,7 @@ export class RoutineController {
         @Query() query: GetCircuitsQueryDto,
         @Res() res: Response,
     ) {
-        this.routineService.getAllCircuitsPlus(query, res);
+        await this.routineService.getAllCircuitsPlus(query, res);
     }
 
     @Get('circuit/:id')
@@ -159,7 +159,7 @@ export class RoutineController {
         @Param() idCircuit: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.routineService.getCircuitById(idCircuit.id, res);
+        await this.routineService.getCircuitById(idCircuit.id, res);
     }
 
     @Post('circuit/set-active/:id')
@@ -170,6 +170,6 @@ export class RoutineController {
         @Body() setCircuitActiveDto: SetCircuitActiveDto,
         @Res() res: Response,
     ) {
-        this.routineService.setCircuitActive(idCircuit.id, setCircuitActiveDto, res);
+        await this.routineService.setCircuitActive(idCircuit.id, setCircuitActiveDto, res);
     }
 }

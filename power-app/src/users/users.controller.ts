@@ -40,7 +40,7 @@ export class UsersController {
         @Query() query: GetUsersQueryDto,
         @Res() res: Response
     ) {
-        this.usersService.getAllUsers(query, res);
+        await this.usersService.getAllUsers(query, res);
     }
 
     @Get('/get/:id')
@@ -48,7 +48,7 @@ export class UsersController {
     @Owner('id')
     @ApiResponse({ status: 200, type: User })
     async getUserId(@Param() idUser: ParameterIdDto, @Res() res: Response) {
-        this.usersService.getUserId(idUser.id, res);
+        await this.usersService.getUserId(idUser.id, res);
     }
 
     @Post('/register')
@@ -59,7 +59,7 @@ export class UsersController {
         @Body() createUserDto: CreateUserDto,
         @Res() res: Response,
     ) {
-        this.usersService.createUser(createUserDto, res);
+        await this.usersService.createUser(createUserDto, res);
     }
 
     @Post('/login')
@@ -70,13 +70,13 @@ export class UsersController {
         @Body() loginUserDto: LoginUserDto,
         @Res() res: Response,
     ) {
-        this.usersService.loginUser(loginUserDto, res);
+        await this.usersService.loginUser(loginUserDto, res);
     }
 
     @Post('/logout')
     @ApiResponse({ status: 200 })
     async logout(@Res() res: Response) {
-        this.usersService.logout(res);
+        await this.usersService.logout(res);
     }
 
     @Post('/recover-password')
@@ -85,7 +85,7 @@ export class UsersController {
         @Body() recoverPasswordDto: RecoverPasswordDto,
         @Res() res: Response,
     ) {
-        this.usersService.recoverPassword(recoverPasswordDto, res);
+        await this.usersService.recoverPassword(recoverPasswordDto, res);
     }
 
     @Post('/set-active/:id')
@@ -99,7 +99,7 @@ export class UsersController {
         @Body() setUserActiveDto: SetUserActiveDto,
         @Res() res: Response,
     ) {
-        this.usersService.setUserActive(user, idUser.id, setUserActiveDto, res);
+        await this.usersService.setUserActive(user, idUser.id, setUserActiveDto, res);
     }
 
     @Post('/change-password')
@@ -111,7 +111,7 @@ export class UsersController {
         @Body() changePasswordDto: ChangePasswordDto,
         @Res() res: Response,
     ) {
-        this.usersService.changePassword(user.id, changePasswordDto, res);
+        await this.usersService.changePassword(user.id, changePasswordDto, res);
     }
 
     @Post('/edit')
@@ -123,6 +123,6 @@ export class UsersController {
         @Body() editUserDto: EditUserDto,
         @Res() res: Response,
     ) {
-        this.usersService.editUser(user.id, editUserDto, res);
+        await this.usersService.editUser(user.id, editUserDto, res);
     }
 }

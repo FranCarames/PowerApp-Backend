@@ -35,13 +35,13 @@ export class MembershipController {
     async getAllMemberships(
         @Res() res: Response
     ) {
-        this.membershipService.getAllMemberships(res);
+        await this.membershipService.getAllMemberships(res);
     }
 
     @Get('/get/:id')
     @ApiResponse({ status: 200, type: Membership })
     async getMembershipById(@Param() membershipId: ParameterIdDto, @Res() res: Response) {
-        this.membershipService.getMembershipById(membershipId.id, res);
+        await this.membershipService.getMembershipById(membershipId.id, res);
     }
 
     @Post('create')
@@ -53,7 +53,7 @@ export class MembershipController {
         @Body() createMembershipDto: CreateMembershipDto,
         @Res() res: Response,
     ) {
-        this.membershipService.createMembership(createMembershipDto, res);
+        await this.membershipService.createMembership(createMembershipDto, res);
     }
 
     @Post('edit/:id')
@@ -67,7 +67,7 @@ export class MembershipController {
         @Body() editMembershipDto: EditMembershipDto,
         @Res() res: Response,
     ) {
-        this.membershipService.editMembership(idMembership.id, editMembershipDto, res);
+        await this.membershipService.editMembership(idMembership.id, editMembershipDto, res);
     }
 
     @Post('set-active/:id')
@@ -78,7 +78,7 @@ export class MembershipController {
         @Body() setMembershipActiveDto: SetMembershipActiveDto,
         @Res() res: Response,
     ) {
-        this.membershipService.setMembershipActive(idMembership.id, setMembershipActiveDto, res);
+        await this.membershipService.setMembershipActive(idMembership.id, setMembershipActiveDto, res);
     }
 
     @Get('status/summary')
@@ -87,7 +87,7 @@ export class MembershipController {
     async getMembershipStatusSummary(
         @Res() res: Response,
     ) {
-        this.membershipService.getMembershipStatusSummary(res);
+        await this.membershipService.getMembershipStatusSummary(res);
     }
 
     @Get('status/users')
@@ -97,7 +97,7 @@ export class MembershipController {
         @Query() query: MembershipStatusQueryDto,
         @Res() res: Response,
     ) {
-        this.membershipService.getStudentsByMembershipStatus(query, res);
+        await this.membershipService.getStudentsByMembershipStatus(query, res);
     }
 
     @Get('type/users')
@@ -108,7 +108,7 @@ export class MembershipController {
         @Query() query: MembershipTypeQueryDto,
         @Res() res: Response,
     ) {
-        this.membershipService.getStudentsByMembershipType(query, res);
+        await this.membershipService.getStudentsByMembershipType(query, res);
     }
 
     @Get('payment/user/:id')
@@ -120,7 +120,7 @@ export class MembershipController {
         @Param() userId: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.membershipService.getUserMembershipPayments(userId.id, res);
+        await this.membershipService.getUserMembershipPayments(userId.id, res);
     }
 
     @Post('payment/register')
@@ -130,6 +130,6 @@ export class MembershipController {
         @Body() registerMembershipPaymentDto: RegisterMembershipPaymentDto,
         @Res() res: Response,
     ) {
-        this.membershipService.registerMembershipPayment(registerMembershipPaymentDto, res);
+        await this.membershipService.registerMembershipPayment(registerMembershipPaymentDto, res);
     }
 }

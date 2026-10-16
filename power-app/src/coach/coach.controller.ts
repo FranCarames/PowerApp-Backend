@@ -28,14 +28,14 @@ export class CoachController {
     async getAllCoaches(
         @Res() res: Response
     ) {
-        this.coachService.getAllCoaches(res);
+        await this.coachService.getAllCoaches(res);
     }
 
     @Get('/get/:id')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: Coach })
     async getUserId(@Param() idUser: ParameterIdDto, @Res() res: Response) {
-        this.coachService.getCoachId(idUser.id, res);
+        await this.coachService.getCoachId(idUser.id, res);
     }
 
     @Post('/promote_user')
@@ -45,7 +45,7 @@ export class CoachController {
         @Body() promoteCoachDto: PromoteCoachDto,
         @Res() res: Response,
     ) {
-        this.coachService.promoteUserToCoach(promoteCoachDto, res);
+        await this.coachService.promoteUserToCoach(promoteCoachDto, res);
     }
 
     @Post('/delete_coach/:id')
@@ -72,6 +72,6 @@ export class CoachController {
         @Param() idCoach: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.coachService.deleteCoach(idCoach.id, res);
+        await this.coachService.deleteCoach(idCoach.id, res);
     }
 }

@@ -34,7 +34,7 @@ export class UserRmController {
     async getAllUserRms(
         @Res() res: Response
     ) {
-        this.userRmService.getAllUserRms(res);
+        await this.userRmService.getAllUserRms(res);
     }
 
     @Get(':id')
@@ -44,7 +44,7 @@ export class UserRmController {
         @Param() idUserRm: ParameterIdDto,
         @Res() res: Response
     ) {
-        this.userRmService.getUserRmById(idUserRm.id, res);
+        await this.userRmService.getUserRmById(idUserRm.id, res);
     }
 
     @Get('/user/:id')
@@ -55,7 +55,7 @@ export class UserRmController {
         @Param() idUser: ParameterIdDto,
         @Res() res: Response
     ) {
-        this.userRmService.getAllUserRmsByUserId(idUser.id, res);
+        await this.userRmService.getAllUserRmsByUserId(idUser.id, res);
     }
 
     @Get('/user/:idUser/exercise/:idExercise')
@@ -66,7 +66,7 @@ export class UserRmController {
         @Param() params: UserExerciseParamsDto,
         @Res() res: Response
     ) {
-        this.userRmService.getUserRmsByUserAndExercise(params.idUser, params.idExercise, res);
+        await this.userRmService.getUserRmsByUserAndExercise(params.idUser, params.idExercise, res);
     }
 
     @Get('/exercise/:id')
@@ -76,7 +76,7 @@ export class UserRmController {
         @Param() idExercise: ParameterIdDto,
         @Res() res: Response
     ) {
-        this.userRmService.getAllUserRmsByExerciseId(idExercise.id, res);
+        await this.userRmService.getAllUserRmsByExerciseId(idExercise.id, res);
     }
 
     @Post('potential')
@@ -87,7 +87,7 @@ export class UserRmController {
         @Body() calculatePotentialRmDto: CalculatePotentialRmDto,
         @Res() res: Response,
     ) {
-        this.userRmService.calculatePotentialRms(calculatePotentialRmDto, res);
+        await this.userRmService.calculatePotentialRms(calculatePotentialRmDto, res);
     }
 
     @Post('create')
@@ -98,7 +98,7 @@ export class UserRmController {
         @Body() createUserRmDto: CreateUserRmDto,
         @Res() res: Response,
     ) {
-        this.userRmService.createUserRm(user.id, createUserRmDto, res);
+        await this.userRmService.createUserRm(user.id, createUserRmDto, res);
     }
 
     @Post('edit/:id')
@@ -110,7 +110,7 @@ export class UserRmController {
         @Body() editUserRmDto: EditUserRmDto,
         @Res() res: Response,
     ) {
-        this.userRmService.editUserRm(user.id, idUserRm.id, editUserRmDto, res);
+        await this.userRmService.editUserRm(user.id, idUserRm.id, editUserRmDto, res);
     }
 
     @Delete(':id')
@@ -121,6 +121,6 @@ export class UserRmController {
         @Param() idUserRm: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.userRmService.deleteUserRm(user.id, idUserRm.id, res);
+        await this.userRmService.deleteUserRm(user.id, idUserRm.id, res);
     }
 }

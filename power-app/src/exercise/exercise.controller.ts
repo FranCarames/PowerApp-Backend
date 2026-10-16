@@ -28,7 +28,7 @@ export class ExerciseController {
     async getAllExercises(
         @Res() res: Response
     ) {
-        this.exerciseService.getAllExercises(res);
+        await this.exerciseService.getAllExercises(res);
     }
 
     @Post('create')
@@ -39,7 +39,7 @@ export class ExerciseController {
         @Body() createExerciseDto: CreateExerciseDto,
         @Res() res: Response,
     ) {
-        this.exerciseService.createExercise(createExerciseDto, res);
+        await this.exerciseService.createExercise(createExerciseDto, res);
     }
 
     @Post('edit/:id')
@@ -51,7 +51,7 @@ export class ExerciseController {
         @Body() editExerciseDto: EditExerciseDto,
         @Res() res: Response,
     ) {
-        this.exerciseService.editExercise(idExercise.id, editExerciseDto, res);
+        await this.exerciseService.editExercise(idExercise.id, editExerciseDto, res);
     }
 
     @Delete(':id')
@@ -63,7 +63,7 @@ export class ExerciseController {
         @Param() idMuscle: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.exerciseService.deleteExercise(idMuscle.id, res);
+        await this.exerciseService.deleteExercise(idMuscle.id, res);
     }
 
     @Get('ExMuscles/all')
@@ -71,7 +71,7 @@ export class ExerciseController {
     async getAllExercisedMuscles(
         @Res() res: Response
     ) {
-        this.exerciseService.getAllExercisedMuscles(res);
+        await this.exerciseService.getAllExercisedMuscles(res);
     }
 
     @Get(':id')
@@ -82,6 +82,6 @@ export class ExerciseController {
         @Param() idExercise: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.exerciseService.getExerciseById(idExercise.id, res);
+        await this.exerciseService.getExerciseById(idExercise.id, res);
     }
 }

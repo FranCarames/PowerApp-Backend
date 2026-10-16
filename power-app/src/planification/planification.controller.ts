@@ -50,7 +50,7 @@ export class PlanificationController {
         @Query() query: GetPlanificationsQueryDto,
         @Res() res: Response,
     ) {
-        this.planificationService.getAllPlanifications(query, res);
+        await this.planificationService.getAllPlanifications(query, res);
     }
 
     // Va declarado ANTES de /:id: es de un solo segmento y si no la request cae en el
@@ -62,7 +62,7 @@ export class PlanificationController {
         @Query() query: GetPlanificationsQueryDto,
         @Res() res: Response,
     ) {
-        this.planificationService.getAllPlanificationsPlus(query, res);
+        await this.planificationService.getAllPlanificationsPlus(query, res);
     }
 
     @Get('/:id')
@@ -72,7 +72,7 @@ export class PlanificationController {
         @Param() idPlanification: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.planificationService.getPlanificationById(idPlanification.id, res);
+        await this.planificationService.getPlanificationById(idPlanification.id, res);
     }
 
     @Post('/create')
@@ -82,7 +82,7 @@ export class PlanificationController {
         @Body() createPlanificationDto: CreatePlanificationDto,
         @Res() res: Response,
     ) {
-        this.planificationService.createPlanification(createPlanificationDto, res);
+        await this.planificationService.createPlanification(createPlanificationDto, res);
     }
 
     @Post('/edit/:id')
@@ -93,7 +93,7 @@ export class PlanificationController {
         @Body() editPlanificationDto: EditPlanificationDto,
         @Res() res: Response,
     ) {
-        this.planificationService.editPlanification(idPlanification.id, editPlanificationDto, res);
+        await this.planificationService.editPlanification(idPlanification.id, editPlanificationDto, res);
     }
 
     // Baja logica: reemplaza al DELETE /:id del andamiaje. Se elige POST con body porque
@@ -107,7 +107,7 @@ export class PlanificationController {
         @Body() setPlanificationActiveDto: SetPlanificationActiveDto,
         @Res() res: Response,
     ) {
-        this.planificationService.setPlanificationActive(idPlanification.id, setPlanificationActiveDto, res);
+        await this.planificationService.setPlanificationActive(idPlanification.id, setPlanificationActiveDto, res);
     }
 
     // ===================== ASIGNACION DE RUTINAS AL PLAN (CU-E-12) =====================
@@ -119,7 +119,7 @@ export class PlanificationController {
         @Body() assignRoutineDto: AssignRoutineToPlanificationDto,
         @Res() res: Response,
     ) {
-        this.planificationService.assignRoutineToPlanification(assignRoutineDto, res);
+        await this.planificationService.assignRoutineToPlanification(assignRoutineDto, res);
     }
 
     @Post('/routine/assign-bulk')
@@ -129,7 +129,7 @@ export class PlanificationController {
         @Body() assignRoutinesDto: AssignRoutinesToPlanificationDto,
         @Res() res: Response,
     ) {
-        this.planificationService.assignRoutinesToPlanification(assignRoutinesDto, res);
+        await this.planificationService.assignRoutinesToPlanification(assignRoutinesDto, res);
     }
 
     // Reemplaza al DELETE /planification/routine/:id del andamiaje: la baja del vinculo
@@ -142,7 +142,7 @@ export class PlanificationController {
         @Body() setActiveDto: SetRoutineAsignationActiveDto,
         @Res() res: Response,
     ) {
-        this.planificationService.setRoutineAsignationActive(idRoutineAsignation.id, setActiveDto, res);
+        await this.planificationService.setRoutineAsignationActive(idRoutineAsignation.id, setActiveDto, res);
     }
 
     @Post('/routine/set-active-bulk')
@@ -152,7 +152,7 @@ export class PlanificationController {
         @Body() setActiveDto: SetRoutineAsignationsActiveDto,
         @Res() res: Response,
     ) {
-        this.planificationService.setRoutineAsignationsActive(setActiveDto, res);
+        await this.planificationService.setRoutineAsignationsActive(setActiveDto, res);
     }
 
     // ===================== ASIGNACIONES A ALUMNOS (CU-E-13, E-14, U-08) =====================

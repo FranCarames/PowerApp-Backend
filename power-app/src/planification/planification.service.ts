@@ -260,10 +260,13 @@ export class PlanificationService {
         res: Response
     ) {
         const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
 
         try {
+            // Dentro del try: si falla la conexion o el inicio de la transaccion, el finally
+            // libera igual el query runner (release sobre uno sin conectar no hace nada)
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
             const planification = await queryRunner.manager.findOne(Planification, {
                 where: { id: assignRoutinesDto.planification_id },
             });
@@ -385,10 +388,13 @@ export class PlanificationService {
         }
 
         const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
 
         try {
+            // Dentro del try: si falla la conexion o el inicio de la transaccion, el finally
+            // libera igual el query runner (release sobre uno sin conectar no hace nada)
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
             const asignaciones = await queryRunner.manager.find(RoutineAsignation, {
                 where: { id: In(ids) },
             });

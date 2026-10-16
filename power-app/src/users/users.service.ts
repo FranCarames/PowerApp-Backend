@@ -104,26 +104,32 @@ export class UsersService {
         createUserDto: CreateUserDto,
         res: Response
     ) {
-        const userEmailActivo = await this.usersRepository.findOne( { 
-            where: { email: createUserDto.email }
-        });
-        
-        if (userEmailActivo) {
-            res.status(409).send({ error: 'Ya existe un usuario con ese email' });
-        } else {
-            const hashedPassword = await this.authService.hashPassword(createUserDto.password);
+        try {
+            const userEmailActivo = await this.usersRepository.findOne( {
+                where: { email: createUserDto.email }
+            });
 
-            // Se fuerza el rol aunque el DTO ya lo valide: el registro nunca crea coaches ni admins.
-            const newUser = this.usersRepository.create({ ...createUserDto, role: UserRole.user });
+            if (userEmailActivo) {
+                res.status(409).send({ error: 'Ya existe un usuario con ese email' });
+            } else {
+                const hashedPassword = await this.authService.hashPassword(createUserDto.password);
 
-            newUser.password = hashedPassword;
+                // Se fuerza el rol aunque el DTO ya lo valide: el registro nunca crea coaches ni admins.
+                const newUser = this.usersRepository.create({ ...createUserDto, role: UserRole.user });
 
-            await this.usersRepository.save(newUser);
+                newUser.password = hashedPassword;
 
-            const accessToken = await this.authService.generateJwtToken(newUser.id);
-            res.setHeader('Authorization', `Bearer ${accessToken}`);
+                await this.usersRepository.save(newUser);
 
-            res.status(201).send(instanceToPlain(newUser));
+                const accessToken = await this.authService.generateJwtToken(newUser.id);
+                res.setHeader('Authorization', `Bearer ${accessToken}`);
+
+                res.status(201).send(instanceToPlain(newUser));
+            }
+        } catch (error) {
+            // CU-U-01, error de persistencia: se informa y la cuenta no queda creada.
+            console.error(error);
+            res.status(500).send({ error: 'Error al registrar el usuario' });
         }
     }
 
@@ -135,28 +141,33 @@ export class UsersService {
         // Primero la contraseña normal; si no coincide, la temporal (CU-U-04). Entrar con la
         // temporal obliga a cambiarla (paso 3): se informa con `password_change_required` y el
         // cliente es quien bloquea la navegación hasta el cambio (decisión del 16/10).
-        let authenticatedUser = await this.authService.authenticateUser(loginUserDto);
-        let passwordChangeRequired = false;
+        try {
+            let authenticatedUser = await this.authService.authenticateUser(loginUserDto);
+            let passwordChangeRequired = false;
 
-        if (!authenticatedUser) {
-            authenticatedUser = await this.authService.authenticateTemporaryPassword(loginUserDto);
-            passwordChangeRequired = authenticatedUser !== null;
+            if (!authenticatedUser) {
+                authenticatedUser = await this.authService.authenticateTemporaryPassword(loginUserDto);
+                passwordChangeRequired = authenticatedUser !== null;
+            }
+
+            if (!authenticatedUser) {
+                return res.status(401).send({ error: 'Credenciales inválidas' });
+            }
+
+            if (!authenticatedUser.active) {
+                return res.status(403).send({ error: 'La cuenta está cerrada' });
+            }
+
+            const accessToken = await this.authService.generateJwtToken(authenticatedUser.id);
+            res.setHeader('Authorization', `Bearer ${accessToken}`);
+            res.status(200).send({
+                ...instanceToPlain(authenticatedUser),
+                password_change_required: passwordChangeRequired,
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al iniciar sesión' });
         }
-
-        if (!authenticatedUser) {
-            return res.status(401).send({ error: 'Credenciales inválidas' });
-        }
-
-        if (!authenticatedUser.active) {
-            return res.status(403).send({ error: 'La cuenta está cerrada' });
-        }
-
-        const accessToken = await this.authService.generateJwtToken(authenticatedUser.id);
-        res.setHeader('Authorization', `Bearer ${accessToken}`);
-        res.status(200).send({
-            ...instanceToPlain(authenticatedUser),
-            password_change_required: passwordChangeRequired,
-        });
     }
 
     // CU-E-03 — Cerrar (o reactivar) la cuenta de un alumno

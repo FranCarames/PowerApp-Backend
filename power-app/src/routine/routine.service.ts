@@ -54,10 +54,13 @@ export class RoutineService {
         const circuitIds = circuitsInOrder.map(circuit => circuit.circuit_id);
 
         const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
 
         try {
+            // Dentro del try: si falla la conexion o el inicio de la transaccion, el finally
+            // libera igual el query runner (release sobre uno sin conectar no hace nada)
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
             // Se buscan por el set de ids unicos: un circuito repetido es una sola fila de Circuit
             const uniqueCircuitIds = [...new Set(circuitIds)];
 
@@ -151,10 +154,13 @@ export class RoutineService {
         const circuitsInOrder = [...editRoutineDto.circuits].sort((a, b) => a.order - b.order);
 
         const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
 
         try {
+            // Dentro del try: si falla la conexion o el inicio de la transaccion, el finally
+            // libera igual el query runner (release sobre uno sin conectar no hace nada)
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
             // Se cargan TODOS los Routine_Circuit, activos e inactivos: un id que apunte a un
             // vinculo apagado se reactiva en vez de fallar. No deberia llegar nunca —las
             // lecturas no los devuelven—, pero asi la operacion queda idempotente
@@ -422,10 +428,13 @@ export class RoutineService {
         const exerciseIds = createCircuitDto.exercises.map(exercise => exercise.exercise_id);
 
         const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
 
         try {
+            // Dentro del try: si falla la conexion o el inicio de la transaccion, el finally
+            // libera igual el query runner (release sobre uno sin conectar no hace nada)
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
             // Todos los ejercicios tienen que existir en el catálogo
             const exercises = await queryRunner.manager.find(Exercise, {
                 where: { id: In(exerciseIds) },
@@ -506,10 +515,13 @@ export class RoutineService {
         }
 
         const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
 
         try {
+            // Dentro del try: si falla la conexion o el inicio de la transaccion, el finally
+            // libera igual el query runner (release sobre uno sin conectar no hace nada)
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
             // Se cargan TODOS los Routine_Exercise, activos e inactivos: un ejercicio dado
             // de baja que vuelve a la lista se reactiva en vez de duplicarse, asi queda una
             // sola fila por (circuito, ejercicio) y exercise_id sigue siendo clave natural

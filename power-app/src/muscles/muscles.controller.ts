@@ -30,13 +30,13 @@ export class MusclesController {
     async getAllMuscles(
         @Res() res: Response
     ) {
-        this.musclesService.getAllMuscles(res);
+        await this.musclesService.getAllMuscles(res);
     }
 
     @Get('/get/:id')
     @ApiResponse({ status: 200, type: Muscle })
     async getMuscleById(@Param() muscleId: ParameterIdDto, @Res() res: Response) {
-        this.musclesService.getMuscleById(muscleId.id, res);
+        await this.musclesService.getMuscleById(muscleId.id, res);
     }
 
     @Post('create')
@@ -46,7 +46,7 @@ export class MusclesController {
         @Body() createMuscleDto: CreateMuscleDto,
         @Res() res: Response,
     ) {
-        this.musclesService.createMuscle(createMuscleDto, res);
+        await this.musclesService.createMuscle(createMuscleDto, res);
     }
 
     @Post('edit/:id')
@@ -57,7 +57,7 @@ export class MusclesController {
         @Body() editMuscleDto: EditMuscleDto,
         @Res() res: Response,
     ) {
-        this.musclesService.editMuscle(idMuscle.id, editMuscleDto, res);
+        await this.musclesService.editMuscle(idMuscle.id, editMuscleDto, res);
     }
 
     @Delete(':id')
@@ -67,7 +67,7 @@ export class MusclesController {
         @Param() idMuscle: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.musclesService.deleteMuscle(idMuscle.id, res);
+        await this.musclesService.deleteMuscle(idMuscle.id, res);
     }
 
     @Get('mg/all')
@@ -75,13 +75,13 @@ export class MusclesController {
     async getAllMuscleGroups(
         @Res() res: Response
     ) {
-        this.musclesService.getAllMuscleGroups(res);
+        await this.musclesService.getAllMuscleGroups(res);
     }
 
     @Get('mg/get/:id')
     @ApiResponse({ status: 200, type: MuscleGroup })
     async getMuscleGroupId(@Param() idMuscleGroup: ParameterIdDto, @Res() res: Response) {
-        this.musclesService.getMuscleGroupId(idMuscleGroup.id, res);
+        await this.musclesService.getMuscleGroupId(idMuscleGroup.id, res);
     }
 
     @Post('mg/create')
@@ -91,7 +91,7 @@ export class MusclesController {
         @Body() createMuscleGroupDto: CreateMuscleGroupDto,
         @Res() res: Response,
     ) {
-        this.musclesService.createMuscleGroup(createMuscleGroupDto, res);
+        await this.musclesService.createMuscleGroup(createMuscleGroupDto, res);
     }
 
     @Post('mg/edit/:id')
@@ -102,7 +102,7 @@ export class MusclesController {
         @Body() editMuscleGroupDto: EditMuscleGroupDto,
         @Res() res: Response,
     ) {
-        this.musclesService.editMuscleGroup(idMuscleGroup.id, editMuscleGroupDto, res);
+        await this.musclesService.editMuscleGroup(idMuscleGroup.id, editMuscleGroupDto, res);
     }
 
     @Delete('mg/:id')
@@ -112,6 +112,6 @@ export class MusclesController {
         @Param() idMuscleGroup: ParameterIdDto,
         @Res() res: Response,
     ) {
-        this.musclesService.deleteMuscleGroup(idMuscleGroup.id, res);
+        await this.musclesService.deleteMuscleGroup(idMuscleGroup.id, res);
     }
 }

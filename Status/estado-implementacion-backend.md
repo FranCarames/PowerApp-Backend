@@ -26,6 +26,24 @@
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
 
+## Cambios recientes (2026-10-16 · promesas sin esperar en los handlers)
+
+- **Cuarta tarea del roadmap (BE-04).** Los **70 handlers** de los 8 controllers llamaban al service sin `await` ni `return`. El handler resolvía al instante y Nest no se enteraba de lo que pasara después. Si el service rechazaba (la base caída, un error fuera de su `try`), quedaba un **rechazo sin manejar**, que en Node ≥ 15 **corta el proceso**: con un solo request se caía el servidor entero para todos. Los services con try/catch propio estaban cubiertos, pero `createUser` y `loginUser` no tenían, y los 6 métodos transaccionales hacían `connect()` y `startTransaction()` **antes** del `try`.
+- **Se usa `await`, no `return` como decía el roadmap. No volver a `return`.** Muchos services terminan en `return res.status(...).send(...)`, o sea que resuelven con el `Response` de Express. Si el handler lo devuelve, el `ClassSerializerInterceptor` global lo recibe y lo pasa por class-transformer, y eso **tira abajo el proceso** (un `error` sin manejar en el socket), aunque la respuesta ya se haya mandado. Con `await`, el handler resuelve `undefined` y el interceptor no lo toca. **Regla para los handlers nuevos con `@Res()`: `await this.service.x(...)`, nunca `return`.**
+- **Verificado en el framework real, sin la base:** un mini Nest descartable con las versiones del proyecto (controller con `@Res()`, `ClassSerializerInterceptor` global, `supertest`), cada escenario en un proceso aparte:
+
+  | Patrón | Service | Resultado |
+  |---|---|---|
+  | Sin `await` (el de antes) | la base falla | **el proceso muere**, sin respuesta |
+  | `await` (el de ahora) | la base falla | `500`, el proceso sigue vivo |
+  | `return` (el del roadmap) | `404` normal | **el proceso muere** |
+  | `await` (el de ahora) | `404` normal | `404`, el proceso sigue vivo |
+
+- **`createUser` y `loginUser` tienen try/catch**, con `500` en el formato de los demás services: `Error al registrar el usuario` (es el camino "error de persistencia" de CU-U-01) y `Error al iniciar sesión`. Con el `await`, el filtro de Nest ya convertía el rechazo en un `500`, pero en inglés y con otra forma. Ahora el filtro queda sólo como red para lo imprevisto.
+- **`connect()` y `startTransaction()` pasaron adentro del `try`** en `createRoutine`, `editRoutine`, `createCircuit`, `editCircuit`, `assignRoutinesToPlanification` y `setRoutineAsignationsActive`. Si `startTransaction` fallaba después de conectar, el `finally` no corría y **la conexión quedaba tomada del pool**. Es seguro moverlos: el `catch` ya pregunta `isTransactionActive` antes del rollback, y `release()` sobre un query runner que nunca se conectó no hace nada (se leyó en el código de TypeORM).
+- **Escaneo de los services:** ningún método que recibe `res` hace un `await` fuera de un `try`. Quedan con código antes del `try` siete métodos, todos con validaciones sincrónicas, y `logout`, que no hace nada asincrónico.
+- **Sin cambio de esquema ni de contrato:** las respuestas son las mismas, salvo los dos `500` nuevos. Ningún CU cambia de estado. Las cinco llamadas comentadas de `planification/user/*` no se tocaron: las rehacen BE-18 y BE-19.
+
 ## Cambios recientes (2026-10-16 · flag de contraseña temporal en el login)
 
 - **Tercera tarea del roadmap (BE-03), dependencia B9 del web.** CU-U-02 pide, en el paso 3, detectar el ingreso con la temporal y obligar a cambiarla. `loginUser` ya lo distinguía (prueba la contraseña normal y, si no coincide, la temporal), pero respondía igual en las dos ramas. Con una cuenta real **nunca se forzaba el cambio**: sólo lo simulaba la cuenta de demo del web (LOG-10 marcado como falla conocida).
