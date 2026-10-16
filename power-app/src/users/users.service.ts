@@ -112,7 +112,8 @@ export class UsersService {
         } else {
             const hashedPassword = await this.authService.hashPassword(createUserDto.password);
 
-            const newUser = this.usersRepository.create(createUserDto);
+            // Se fuerza el rol aunque el DTO ya lo valide: el registro nunca crea coaches ni admins.
+            const newUser = this.usersRepository.create({ ...createUserDto, role: UserRole.user });
 
             newUser.password = hashedPassword;
 

@@ -50,6 +50,8 @@ export class UsersController {
 
     @Post('/register')
     @ApiResponse({ status: 201, type: User, headers: { Authorization: { description: 'Bearer JWT token', schema: { type: 'string' } } } })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, o un `role` distinto de `user`: el registro sólo crea alumnos' })
+    @ApiResponse({ status: 409, description: 'Ya existe un usuario con ese email' })
     async createUser(
         @Body() createUserDto: CreateUserDto,
         @Res() res: Response,

@@ -26,6 +26,15 @@
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
 
+## Cambios recientes (2026-10-16 · el registro sólo crea alumnos)
+
+- **Primera tarea del [roadmap del 16/10](https://github.com/FranCarames/PowerApp-Docs/blob/main/Doc/plans/2026-10-16-roadmap-backend.md) (BE-01), por seguridad.** `POST /users/register` es público y guardaba el `role` que viniera en el body: `CreateUserDto` aceptaba cualquier valor de `UserRole` y `createUser` lo persistía tal cual con `repository.create(dto)`. **Cualquiera podía registrarse como admin** contra el deploy de Render. CU-U-01 es explícito: el alta crea un `User` con `role = usuario`; coaches y admins nacen por `promote_user` (CU-A-17) o por el seed.
+- **El campo `role` se conserva, a propósito.** El web manda `role: 'user'` explícito en cada registro (`useRegister.ts`), y con `forbidNonWhitelisted` borrar el campo del DTO haría que su registro empiece a dar `400`. Se descartó también ignorar el rol en silencio: quien manda `admin` recibiría un `201` engañoso.
+- **Contrato:** el DTO sólo acepta `user` (`@IsIn`). Con otro valor, el registro responde **`400`** con `El registro sólo crea cuentas de alumno (role = user)`. Sin `role`, o con `"user"`, responde `201` como siempre. El Swagger declara `enum: ['user']` y suma los `400` y `409` de `/register`, que no estaban.
+- **El service fuerza `role = user` igual**, aunque el DTO ya lo valide. No es redundante: `@IsOptional` deja pasar un `role: null` (se verificó contra el DTO compilado), y la barrera no tiene que depender de que nadie afloje el validador.
+- **Sin cambio de esquema:** `Db Creator` no se toca. Ningún CU cambia de estado: U-01 ya figuraba ✅, y lo que se cierra es su defecto (el ⚠ del inventario del roadmap).
+- **Pendiente del lado del usuario:** revisar en la base de Render si hay cuentas admin o coach que no sean del seed, creadas por este agujero. No se pudo verificar sin conectarse a la base.
+
 ## Cambios recientes (2026-10-12 · baja de un ejercicio en uso)
 
 - **Las pruebas de integración del módulo de ejercicios marcaron dos fallas en CU-A-06**: **DEL-03** (eliminar un ejercicio con RMs registrados lo borraba y se llevaba los RMs) y **DEL-04** (eliminar uno que está en un circuito lo borraba y lo sacaba del circuito). CU-A-06 pide lo contrario: *"el sistema impide la baja e informa la restricción de integridad"*. La causa es la misma en los dos: `deleteExercise` hacía `remove` sin verificar nada, y las FK de `User_RM.exercise_id` y `Routine_Exercise.exercise_id` son **`ON DELETE CASCADE`**, así que la base obedecía.
@@ -283,7 +292,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Administrar mi cuenta
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-U-01 | Registrar usuario | ✅ Implementado | `POST /users/register` |
+| CU-U-01 | Registrar usuario | ✅ Implementado | `POST /users/register` · siempre crea `role = user`; otro `role` en el body da `400` (16/10) |
 | CU-U-02 | Login | ✅ Implementado | `POST /users/login` |
 | CU-U-03 | Cerrar sesión | ✅ Implementado | `POST /users/logout` · ack 200, el cliente descarta el token |
 | CU-U-04 | Recuperar contraseña | ✅ Implementado | `POST /users/recover-password` · genera `temp_password`; email stubbeado |

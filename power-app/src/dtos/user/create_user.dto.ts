@@ -5,7 +5,7 @@ import {
   IsEmail,
   MinLength,
   MaxLength,
-  IsEnum
+  IsIn
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -40,9 +40,11 @@ export class CreateUserDto {
     @MaxLength(50)
     password!: string;
 
-    @ApiPropertyOptional({ enum: UserRole, default: UserRole.user })
+    // El registro sólo crea alumnos (CU-U-01). El campo se conserva porque el web manda `role: 'user'`
+    // explícito y `forbidNonWhitelisted` lo rechazaría; el service fuerza el rol igual.
+    @ApiPropertyOptional({ enum: [UserRole.user], default: UserRole.user, description: 'Sólo se acepta `user`: el registro siempre crea un alumno' })
     @IsOptional()
-    @IsEnum(UserRole)
+    @IsIn([UserRole.user], { message: 'El registro sólo crea cuentas de alumno (role = user)' })
     role: UserRole = UserRole.user;
 
     @ApiProperty({ example: '+54', maxLength: 10 })
