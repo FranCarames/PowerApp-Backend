@@ -23,6 +23,7 @@ import { Membership } from '../entities/membership.entity';
 import { MembershipPayment } from '../entities/membership_payment.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
+import { Owner } from '../authentication/decorators/owner.decorator';
 
 @ApiTags('Membership')
 @Controller('membership')
@@ -112,7 +113,9 @@ export class MembershipController {
 
     @Get('payment/user/:id')
     @Auth(UserRole.user, UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [MembershipPayment] })
+    @Owner('id')
+    @ApiResponse({ status: 200, type: [MembershipPayment], description: 'Del pago más reciente al más viejo' })
+    @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
     async getUserMembershipPayments(
         @Param() userId: ParameterIdDto,
         @Res() res: Response,

@@ -4,11 +4,10 @@ import { Response } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRM } from '../entities/user_rm.entity';
-import { User, UserRole } from '../entities/user.entity';
+import { User } from '../entities/user.entity';
 import { Exercise } from '../entities/exercise.entity';
 import { CreateUserRmDto } from '../dtos/user_rm/create_user_rm.dto';
 import { EditUserRmDto } from '../dtos/user_rm/edit_user_rm.dto';
-import { AuthUser } from '../authentication/auth-user.interface';
 import { CalculatePotentialRmDto } from '../dtos/user_rm/calculate_potential_rm.dto';
 import { PotentialRmItemDto } from '../dtos/user_rm/potential_rm_response.dto';
 // import { Exercise } from '../entities/exercise.entity';
@@ -168,18 +167,13 @@ export class UserRmService {
     }
 
     // CU-U-11 — Ver mis RMs de un ejercicio
+    // El check de dueño (un alumno sólo ve los suyos) lo hace `@Owner('idUser')` en el controller.
     async getUserRmsByUserAndExercise(
-        currentUser: AuthUser,
         idUser: string,
         idExercise: string,
         res: Response
     ) {
         try {
-            // Un alumno sólo puede consultar sus propios RMs; coach y admin ven los de cualquiera.
-            if (currentUser.role === UserRole.user && currentUser.id !== idUser) {
-                return res.status(403).send({ error: 'No podés consultar los RMs de otro usuario.' });
-            }
-
             const userRms = await this.userRmRepository.find({
                 where: { user_id: idUser, exercise_id: idExercise },
                 relations: ['exercise', 'user'],

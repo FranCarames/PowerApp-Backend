@@ -22,6 +22,7 @@ import { ChangePasswordDto } from '../dtos/user/change_password.dto';
 import { EditUserDto } from '../dtos/user/edit_user.dto';
 import { User, UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
+import { Owner } from '../authentication/decorators/owner.decorator';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
 import { AuthUser } from '../authentication/auth-user.interface';
 
@@ -32,7 +33,7 @@ export class UsersController {
     constructor(private usersService: UsersService) { }
 
     @Get('/all')
-    @Auth()
+    @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 200, type: PaginatedUsersResponseDto })
     async getAllUsers(
         @Query() query: GetUsersQueryDto,
@@ -43,6 +44,7 @@ export class UsersController {
 
     @Get('/get/:id')
     @Auth(UserRole.user, UserRole.coach, UserRole.admin)
+    @Owner('id')
     @ApiResponse({ status: 200, type: User })
     async getUserId(@Param() idUser: ParameterIdDto, @Res() res: Response) {
         this.usersService.getUserId(idUser.id, res);
@@ -86,12 +88,15 @@ export class UsersController {
     @Post('/set-active/:id')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 200, type: User })
+    @ApiResponse({ status: 403, description: 'Sobre la propia cuenta, o un entrenador sobre alguien que no es alumno' })
+    @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
     async setUserActive(
+        @CurrentUser() user: AuthUser,
         @Param() idUser: ParameterIdDto,
         @Body() setUserActiveDto: SetUserActiveDto,
         @Res() res: Response,
     ) {
-        this.usersService.setUserActive(idUser.id, setUserActiveDto, res);
+        this.usersService.setUserActive(user, idUser.id, setUserActiveDto, res);
     }
 
     @Post('/change-password')

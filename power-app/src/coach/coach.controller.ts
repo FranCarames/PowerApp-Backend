@@ -23,6 +23,7 @@ export class CoachController {
     constructor(private coachService: CoachService) { }
 
     @Get('/all')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: [Coach] })
     async getAllCoaches(
         @Res() res: Response
@@ -31,6 +32,7 @@ export class CoachController {
     }
 
     @Get('/get/:id')
+    @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: Coach })
     async getUserId(@Param() idUser: ParameterIdDto, @Res() res: Response) {
         this.coachService.getCoachId(idUser.id, res);

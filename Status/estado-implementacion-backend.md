@@ -26,6 +26,30 @@
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
 
+## Cambios recientes (2026-10-16 · autorización por rol y por dueño)
+
+- **Segunda tarea del roadmap (BE-02), por seguridad.** El rollout de guards del 11/8 dejó cada endpoint con su rol, pero el **check de dueño** quedó sólo en CU-U-11. Las otras lecturas abiertas al rol `user` devolvían los datos de **cualquier** alumno con sólo cambiar el id del path: datos personales (`/users/get/:id`), pagos (`/membership/payment/user/:id`) y RMs (`/user_rm/user/:id`). Además, `GET /coach/all` y `/coach/get/:id` eran **públicos sin token** y exponían el CUIL, y un coach podía cerrar la cuenta de otro coach, de un admin o la propia.
+- **El check de dueño pasó a ser declarativo: `@Owner('<param>')`** (decisión del 16/10, entre ponerlo en el guard o en un helper de cada service). `@Auth` ahora suma un tercer guard, `OwnerGuard`, que **no hace nada** salvo que el endpoint declare `@Owner`. Si lo declara y quien llama es un alumno, exige que ese parámetro del path sea su propio id (`403`, `No podés acceder a los datos de otro usuario.`); coach y admin pasan. Se eligió el guard porque la regla queda a la vista en el controller al lado de `@Auth`, los services no cambian de firma y **es el patrón que van a usar los endpoints del alumno del bloque A** (BE-12 en adelante). El orden de los guards lo fija `@Auth` (`Jwt` → `Roles` → `Owner`), así que el de dueño siempre corre con `request.user` resuelto.
+- **Los ids se comparan en minúscula.** El token trae el id de la base y el iOS manda `uuidString` en mayúscula: con la comparación literal que tenía U-11, **un alumno de iOS recibía 403 sobre sus propios RMs**. U-11 se migró al guard (`@Owner('idUser')`) y su check del service se borró. Su `403` cambia de forma: pasa de `{ error }` a la de Nest (`{ statusCode, message }`), la misma que ya devuelve el `403` de rol. El web lee las dos, y sólo cierra la sesión ante el texto literal de "cuenta deshabilitada", que es distinto.
+- **La matriz que quedó:**
+
+  | Endpoint | Antes | Ahora |
+  |---|---|---|
+  | `GET /users/all` | cualquier usuario autenticado | coach, admin |
+  | `GET /users/get/:id` | user, coach, admin | + `@Owner('id')` |
+  | `GET /membership/payment/user/:id` | user, coach, admin | + `@Owner('id')`, orden por `created_at` DESC |
+  | `GET /user_rm/user/:id` | user, coach, admin | + `@Owner('id')` |
+  | `GET /user_rm/user/:idUser/exercise/:idExercise` | check en el service | `@Owner('idUser')` |
+  | `GET /user_rm/exercise/:id` | user, coach, admin (un alumno veía los RMs de todos) | coach, admin |
+  | `GET /coach/all`, `GET /coach/get/:id` | **públicos** | admin |
+  | `POST /users/set-active/:id` | coach, admin | + reglas de destinatario en el service |
+
+- **Reglas de `set-active` (CU-E-03):** nadie cambia el estado de su **propia** cuenta (`403`, para que un admin no se deje afuera), y un **coach sólo actúa sobre alumnos**, tanto para cerrar como para reactivar (`403`). El admin actúa sobre cualquier otra cuenta. Viven en el service y no en el guard porque dependen del rol del destinatario, que sale de la base.
+- **CU-U-07 pide la lista ordenada por fecha** y salía en el orden de la relación. Ahora se consulta `Membership_Payment` directo con `order: { created_at: 'DESC' }`, después de confirmar que el usuario existe (el `404` se mantiene). No se ordenó dentro de la relación a propósito: el orden anidado de find options sigue **sin verificar en runtime** (ver la lectura de rutinas del 22/8), y esto es más simple. La forma de la respuesta no cambia.
+- **Se verificó que el web no se rompe:** sólo llama a `/users/all` desde pantallas de coach y admin (en `AccountPage`, sólo en el subtítulo del entrenador), a `/coach/*` sólo desde el admin, nunca a `/user_rm/exercise/:id`, y el alumno pide sus datos, pagos y RMs siempre con su propio id. Verificación por build, por el `OwnerGuard` compilado corrido sobre contextos falsos (incluido el id en mayúscula), por la metadata de los controllers compilados (roles, `@Owner` y los tres guards en orden en los 9 endpoints) y por las reglas de `set-active` con un repositorio falso. **Sin verificar en runtime:** que la inyección de `OwnerGuard` resuelva en cada módulo, aunque depende sólo de `Reflector`, igual que `RolesGuard`.
+- **Sin cambio de esquema:** `Db Creator` no se toca. Ningún CU cambia de estado. Del inventario del roadmap se cierran los defectos (⚠) de U-07, E-01, E-03 y A-16, y la falta de dueño de `GET /users/get/:id` (soporte de U-06). U-19 y E-04 conservan su ⚠ por el `exercise_id` que falta en la respuesta (V10, BE-05).
+- **Fuera de alcance, con su tarea:** `GET /planification/user/:id` y `/user/:id/active` siguen colgando y los rehacen BE-12 y BE-19, ya con `@Owner`. La nota vieja de CU-E-03 ("no hay guards") y su precondición "vinculado al coach" van en BE-38 y DA6. La matriz en el contexto del iOS va en BE-39.
+
 ## Cambios recientes (2026-10-16 · el registro sólo crea alumnos)
 
 - **Primera tarea del [roadmap del 16/10](https://github.com/FranCarames/PowerApp-Docs/blob/main/Doc/plans/2026-10-16-roadmap-backend.md) (BE-01), por seguridad.** `POST /users/register` es público y guardaba el `role` que viniera en el body: `CreateUserDto` aceptaba cualquier valor de `UserRole` y `createUser` lo persistía tal cual con `repository.create(dto)`. **Cualquiera podía registrarse como admin** contra el deploy de Render. CU-U-01 es explícito: el alta crea un `User` con `role = usuario`; coaches y admins nacen por `promote_user` (CU-A-17) o por el seed.
@@ -297,8 +321,8 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-U-03 | Cerrar sesión | ✅ Implementado | `POST /users/logout` · ack 200, el cliente descarta el token |
 | CU-U-04 | Recuperar contraseña | ✅ Implementado | `POST /users/recover-password` · genera `temp_password`; email stubbeado |
 | CU-U-05 | Cambiar contraseña | ✅ Implementado | `POST /users/change-password` · acepta contraseña actual o temporal; anula `temp_password` |
-| CU-U-06 | Editar datos personales | ✅ Implementado | `POST /users/edit` · sobre el propio registro (`@CurrentUser`), campos opcionales |
-| CU-U-07 | Obtener historial de pagos | ✅ Implementado | `GET /membership/payment/user/:id` |
+| CU-U-06 | Editar datos personales | ✅ Implementado | `POST /users/edit` · sobre el propio registro (`@CurrentUser`), campos opcionales; la lectura `GET /users/get/:id` con `@Owner` (16/10) |
+| CU-U-07 | Obtener historial de pagos | ✅ Implementado | `GET /membership/payment/user/:id` · `@Owner`, orden por fecha DESC (16/10) |
 
 ### Mi entrenamiento
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -306,7 +330,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-U-08 | Obtener mi planificación | 🔵 Andamiaje | `GET /planification/user/:id/active` · service vacío |
 | CU-U-09 | Ver detalle de rutina | 🔵 Andamiaje | `GET /routine/:id` · service vacío |
 | CU-U-10 | Ver detalle de un ejercicio | 🟡 Parcial | `GET /exercise/:id` ✅ expuesto (ficha de catálogo) · **falta** el detalle en contexto de rutina (`Exercise_Set` ordenadas, notas) — depende de Rutinas |
-| CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user`, orden por fecha DESC |
+| CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user` (`@Owner`, ids en minúscula desde el 16/10), orden por fecha DESC |
 | CU-U-12 | Marcar serie como realizado | ⬜ No implementado | sin endpoint · el registro pasa a ser por ejercicio (`Routine_Exercise_Finished`) |
 | CU-U-13 | Dejar una nota en el ejercicio | ⬜ No implementado | sin endpoint |
 | CU-U-14 | Temporizador | ⬜ No implementado | sin endpoint (probable front-end) |
@@ -318,7 +342,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-U-16 | Calcular mis RM potenciales | ✅ Implementado | `POST /user_rm/potential` · Epley, tabla 1RM→12RM, no persiste |
 | CU-U-17 | Registrar un RM | ✅ Implementado | `POST /user_rm/create` |
 | CU-U-18 | Editar un RM | ✅ Implementado | `POST /user_rm/edit/:id` |
-| CU-U-19 | Obtener mis RMs | ✅ Implementado | `GET /user_rm/user/:id` |
+| CU-U-19 | Obtener mis RMs | ✅ Implementado | `GET /user_rm/user/:id` · `@Owner` (16/10) |
 | CU-U-20 | Eliminar un RM | ✅ Implementado | `DELETE /user_rm/:id` |
 
 ---
@@ -328,10 +352,10 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-E-01 | Obtener alumnos | ✅ Implementado | `GET /users/all?role=user` · filtros rol/keyword/active + paginación |
+| CU-E-01 | Obtener alumnos | ✅ Implementado | `GET /users/all?role=user` · filtros rol/keyword/active + paginación; coach y admin (16/10) |
 | CU-E-02 | Obtener alumnos — filtro por nombre | ✅ Implementado | `GET /users/all?keyword=` · busca en nombre, apellido y email |
-| CU-E-03 | Cerrar cuenta de alumno | ✅ Implementado | `POST /users/set-active/:id` · baja lógica `{ active }` + bloqueo de login (403) |
-| CU-E-04 | Obtener RMs del alumno | ✅ Implementado | `GET /user_rm/user/:id` |
+| CU-E-03 | Cerrar cuenta de alumno | ✅ Implementado | `POST /users/set-active/:id` · baja lógica `{ active }` + bloqueo de login (403); el coach sólo sobre alumnos y nadie sobre sí mismo (16/10) |
+| CU-E-04 | Obtener RMs del alumno | ✅ Implementado | `GET /user_rm/user/:id` · mismo endpoint que U-19; el `@Owner` no limita a coach ni a admin |
 | CU-E-05 | Historial de pagos de alumno | ✅ Implementado | `GET /membership/payment/user/:id` |
 | CU-E-06 | Historial de entrenamientos de alumno | ⬜ No implementado | sin tracking ni endpoint |
 | CU-E-07 | Historial entrenamientos — filtro ejercicio | ⬜ No implementado | sin endpoint |
@@ -412,7 +436,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Administrar entrenadores
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-A-16 | Obtener entrenadores | ✅ Implementado | `GET /coach/all` |
+| CU-A-16 | Obtener entrenadores | ✅ Implementado | `GET /coach/all` · sólo admin; era público y exponía el CUIL (16/10) |
 | CU-A-17 | Convertir alumno a entrenador | ✅ Implementado | `POST /coach/promote_user` |
 | CU-A-18 | Editar datos de entrenador | ✅ Implementado | `POST /coach/promote_user` · si el user ya es coach, actualiza `coach_email`, `cuil`, `active` |
 | CU-A-19 | Eliminar entrenador | ✅ Implementado | `POST /coach/delete_coach/:id` · baja lógica (`active: false`) |

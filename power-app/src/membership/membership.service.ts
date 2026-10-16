@@ -170,13 +170,19 @@ export class MembershipService {
         res: Response
     ) {
         try {
-            const user = await this.userRepository.findOne({ 
-                where: { id: idUser }, relations: ['userMembershipPayments'] });
+            const user = await this.userRepository.findOne({ where: { id: idUser } });
 
             if (!user) {
                 return res.status(404).send({ error: 'Usuario no encontrado' });
             }
-            res.status(200).send(user.userMembershipPayments);
+
+            // CU-U-07 pide la lista ordenada por fecha: del pago más reciente al más viejo.
+            const payments = await this.membershipPaymentRepository.find({
+                where: { user_id: idUser },
+                order: { created_at: 'DESC' },
+            });
+
+            res.status(200).send(payments);
         } catch (error) {
             console.error(error);
             res.status(404).send({ error: 'Error al obtener las membresías del usuario' });

@@ -13,6 +13,7 @@ import { ChangePasswordDto } from '../dtos/user/change_password.dto';
 import { EditUserDto } from '../dtos/user/edit_user.dto';
 import { User, UserRole } from '../entities/user.entity';
 import { AuthService } from '../authentication/auth.service';
+import { AuthUser } from '../authentication/auth-user.interface';
 
 @Injectable()
 export class UsersService {
@@ -155,15 +156,27 @@ export class UsersService {
         }
     }
 
+    // CU-E-03 — Cerrar (o reactivar) la cuenta de un alumno
     async setUserActive(
+        currentUser: AuthUser,
         idUser: string,
         setUserActiveDto: SetUserActiveDto,
         res: Response
     ) {
         try {
+            // Nadie cambia el estado de su propia cuenta: un admin podría quedarse afuera.
+            if (currentUser.id.toLowerCase() === idUser.toLowerCase()) {
+                return res.status(403).send({ error: 'No podés cambiar el estado de tu propia cuenta.' });
+            }
+
             const user = await this.usersRepository.findOne({ where: { id: idUser } });
             if (!user) {
                 return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            // El coach sólo gestiona alumnos (cerrar y reactivar); el admin, cualquier cuenta.
+            if (currentUser.role === UserRole.coach && user.role !== UserRole.user) {
+                return res.status(403).send({ error: 'Un entrenador sólo puede cerrar o reactivar cuentas de alumnos.' });
             }
 
             user.active = setUserActiveDto.active;
