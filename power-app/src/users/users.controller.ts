@@ -16,6 +16,7 @@ import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
 import { GetUsersQueryDto } from '../dtos/user/get_users_query.dto';
 import { PaginatedUsersResponseDto } from '../dtos/user/paginated_users_response.dto';
+import { LoginResponseDto } from '../dtos/user/login_response.dto';
 import { SetUserActiveDto } from '../dtos/user/set_user_active.dto';
 import { RecoverPasswordDto } from '../dtos/user/recover_password.dto';
 import { ChangePasswordDto } from '../dtos/user/change_password.dto';
@@ -62,7 +63,9 @@ export class UsersController {
     }
 
     @Post('/login')
-    @ApiResponse({ status: 200, type: User, headers: { Authorization: { description: 'Bearer JWT token', schema: { type: 'string' } } } })
+    @ApiResponse({ status: 200, type: LoginResponseDto, headers: { Authorization: { description: 'Bearer JWT token', schema: { type: 'string' } } } })
+    @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
+    @ApiResponse({ status: 403, description: 'La cuenta está cerrada' })
     async loginUser(
         @Body() loginUserDto: LoginUserDto,
         @Res() res: Response,

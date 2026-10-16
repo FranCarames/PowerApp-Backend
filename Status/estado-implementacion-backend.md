@@ -26,6 +26,16 @@
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
 
+## Cambios recientes (2026-10-16 · flag de contraseña temporal en el login)
+
+- **Tercera tarea del roadmap (BE-03), dependencia B9 del web.** CU-U-02 pide, en el paso 3, detectar el ingreso con la temporal y obligar a cambiarla. `loginUser` ya lo distinguía (prueba la contraseña normal y, si no coincide, la temporal), pero respondía igual en las dos ramas. Con una cuenta real **nunca se forzaba el cambio**: sólo lo simulaba la cuenta de demo del web (LOG-10 marcado como falla conocida).
+- **Contrato:** el `200` del login sigue siendo el `User`, más **`password_change_required: boolean`**, con el nombre que propuso el web. **Viene siempre**: `true` si se entró con la temporal y `false` con la contraseña normal, así la forma de la respuesta no depende de cómo se entró. El Swagger lo declara con un `LoginResponseDto extends User`, y suma los `401` (credenciales inválidas) y `403` (cuenta cerrada) de `/login`, que no figuraban.
+- **La obligación la hace cumplir el cliente, no el backend** (decisión del 16/10). El web ya abre un modal bloqueante y sólo deja usar `/cambiar-contrasena`. Se descartó marcar el token y que `JwtAuthGuard` rechace todo menos `change-password` hasta el cambio: era más seguro, pero cambiaba el contenido del token y sumaba un `403` a mitad de sesión que el web y el iOS tendrían que manejar, por 2 a 3 h más. Queda asumido que un cliente que ignore el flag usa la sesión normalmente. Quien tiene la temporal es el dueño del mail.
+- **`loginUser` se unificó en un solo camino.** Las dos ramas repetían el chequeo de cuenta cerrada, el token y la respuesta, y ahora sólo difieren en el valor del flag. Fuera del campo nuevo, el comportamiento no cambia: la contraseña normal sigue entrando aunque haya una temporal pendiente (REC-07), y la temporal se anula al cambiar la contraseña (CPO-08). El try/catch que le falta es de BE-04.
+- **Observación, sin tocar:** si el usuario recuerda su contraseña y nunca la cambia, **la temporal sigue valiendo para siempre**, porque nada la anula salvo `change-password`. Anularla en un login normal, o darle vencimiento, sería un endurecimiento sin CU que lo pida.
+- **Verificación** por build y por `loginUser` corrido con un `authService` falso: normal → `200` con `false`; temporal → `200` con `true`; ninguna → `401`; temporal con la cuenta cerrada → `403`. En ningún caso el body trae `password` ni `temp_password`. La metadata de Swagger del DTO trae el campo nuevo y los heredados del `User`.
+- **Sin cambio de esquema.** Ningún CU cambia de estado en este informe, y del inventario del roadmap U-02 pasa de 🟡 a ✅. **Del lado del web:** B9 queda cubierto, así que puede borrar `LoginResponse` de `pending.ts` y apagar el mock del login (su T44). LOG-09, LOG-10 y REC-07 se pueden re-correr con una cuenta real.
+
 ## Cambios recientes (2026-10-16 · autorización por rol y por dueño)
 
 - **Segunda tarea del roadmap (BE-02), por seguridad.** El rollout de guards del 11/8 dejó cada endpoint con su rol, pero el **check de dueño** quedó sólo en CU-U-11. Las otras lecturas abiertas al rol `user` devolvían los datos de **cualquier** alumno con sólo cambiar el id del path: datos personales (`/users/get/:id`), pagos (`/membership/payment/user/:id`) y RMs (`/user_rm/user/:id`). Además, `GET /coach/all` y `/coach/get/:id` eran **públicos sin token** y exponían el CUIL, y un coach podía cerrar la cuenta de otro coach, de un admin o la propia.
@@ -317,7 +327,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-U-01 | Registrar usuario | ✅ Implementado | `POST /users/register` · siempre crea `role = user`; otro `role` en el body da `400` (16/10) |
-| CU-U-02 | Login | ✅ Implementado | `POST /users/login` |
+| CU-U-02 | Login | ✅ Implementado | `POST /users/login` · `password_change_required` en el `200`: `true` si se entró con la temporal (16/10) |
 | CU-U-03 | Cerrar sesión | ✅ Implementado | `POST /users/logout` · ack 200, el cliente descarta el token |
 | CU-U-04 | Recuperar contraseña | ✅ Implementado | `POST /users/recover-password` · genera `temp_password`; email stubbeado |
 | CU-U-05 | Cambiar contraseña | ✅ Implementado | `POST /users/change-password` · acepta contraseña actual o temporal; anula `temp_password` |

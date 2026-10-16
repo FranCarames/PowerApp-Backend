@@ -127,33 +127,36 @@ export class UsersService {
         }
     }
 
+    // CU-U-02 — Login
     async loginUser(
-        loginUserDto: LoginUserDto, 
+        loginUserDto: LoginUserDto,
         res: Response
     ) {
-        const authenticatedUser = await this.authService.authenticateUser(loginUserDto);
+        // Primero la contraseña normal; si no coincide, la temporal (CU-U-04). Entrar con la
+        // temporal obliga a cambiarla (paso 3): se informa con `password_change_required` y el
+        // cliente es quien bloquea la navegación hasta el cambio (decisión del 16/10).
+        let authenticatedUser = await this.authService.authenticateUser(loginUserDto);
+        let passwordChangeRequired = false;
 
-        if (authenticatedUser) {
-            if (!authenticatedUser.active) {
-                return res.status(403).send({ error: 'La cuenta está cerrada' });
-            }
-            const accessToken = await this.authService.generateJwtToken(authenticatedUser.id);
-            res.setHeader('Authorization', `Bearer ${accessToken}`);
-            res.status(200).send(instanceToPlain(authenticatedUser));
-        } else {
-            const authenticatedTempUser = await this.authService.authenticateTemporaryPassword(loginUserDto);
-
-            if (authenticatedTempUser) {
-                if (!authenticatedTempUser.active) {
-                    return res.status(403).send({ error: 'La cuenta está cerrada' });
-                }
-                const accessToken = await this.authService.generateJwtToken(authenticatedTempUser.id);
-                res.setHeader('Authorization', `Bearer ${accessToken}`);
-                res.status(200).send(instanceToPlain(authenticatedTempUser));
-            } else {
-                res.status(401).send({ error: 'Credenciales inválidas' });
-            }
+        if (!authenticatedUser) {
+            authenticatedUser = await this.authService.authenticateTemporaryPassword(loginUserDto);
+            passwordChangeRequired = authenticatedUser !== null;
         }
+
+        if (!authenticatedUser) {
+            return res.status(401).send({ error: 'Credenciales inválidas' });
+        }
+
+        if (!authenticatedUser.active) {
+            return res.status(403).send({ error: 'La cuenta está cerrada' });
+        }
+
+        const accessToken = await this.authService.generateJwtToken(authenticatedUser.id);
+        res.setHeader('Authorization', `Bearer ${accessToken}`);
+        res.status(200).send({
+            ...instanceToPlain(authenticatedUser),
+            password_change_required: passwordChangeRequired,
+        });
     }
 
     // CU-E-03 — Cerrar (o reactivar) la cuenta de un alumno
