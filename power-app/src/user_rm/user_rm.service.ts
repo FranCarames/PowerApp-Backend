@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindManyOptions, Repository } from 'typeorm';
 import { UserRM } from '../entities/user_rm.entity';
 import { User } from '../entities/user.entity';
 import { Exercise } from '../entities/exercise.entity';
@@ -21,6 +21,33 @@ import { ExerciseService } from '../exercise/exercise.service';
 /** Hasta qué nRM se arma la tabla de RMs potenciales. Más allá de 12 repeticiones Epley pierde precisión. */
 const MAX_RM_REPS = 12;
 
+/**
+ * La forma única de un RM en las respuestas (`UserRmDetailDto`): sus columnas, con las FK,
+ * más el ejercicio y el usuario recortados. La usan las lecturas y, releyendo, el alta y la edición.
+ */
+const RM_DETAIL_OPTIONS: Pick<FindManyOptions<UserRM>, 'relations' | 'select'> = {
+    relations: ['exercise', 'user'],
+    select: {
+        id: true,
+        user_id: true,
+        exercise_id: true,
+        weight: true,
+        reps: true,
+        date: true,
+        created_at: true,
+        updated_at: true,
+        exercise: {
+            id: true,
+            name: true
+        },
+        user: {
+            id: true,
+            first_name: true,
+            last_name: true
+        }
+    },
+};
+
 @Injectable()
 export class UserRmService {
     constructor(
@@ -32,29 +59,17 @@ export class UserRmService {
     ) {
     }
 
+    // Relee un RM con la forma de las respuestas: el alta y la edición devuelven lo mismo que las lecturas.
+    private findRmDetail(idUserRm: string): Promise<UserRM | null> {
+        return this.userRmRepository.findOne({ where: { id: idUserRm }, ...RM_DETAIL_OPTIONS });
+    }
+
     async getAllUserRms(
         res: Response
     ) {
         try {
             const userRms = await this.userRmRepository.find({
-                relations: ['exercise', 'user'],
-                select: {
-                    id: true,
-                    weight: true,
-                    reps: true,
-                    date: true,
-                    created_at: true,
-                    updated_at: true,
-                    exercise: {
-                        id: true,
-                        name: true
-                    },
-                    user: {
-                        id: true,
-                        first_name: true,
-                        last_name: true
-                    }
-                },
+                ...RM_DETAIL_OPTIONS,
             });
 
             res.status(200).send(userRms);
@@ -71,24 +86,7 @@ export class UserRmService {
         try {
             const userRm = await this.userRmRepository.find({
                 where: { id: userRmId },
-                relations: ['exercise', 'user'],
-                select: {
-                    id: true,
-                    weight: true,
-                    reps: true,
-                    date: true,
-                    created_at: true,
-                    updated_at: true,
-                    exercise: {
-                        id: true,
-                        name: true
-                    },
-                    user: {
-                        id: true,
-                        first_name: true,
-                        last_name: true
-                    }
-                },
+                ...RM_DETAIL_OPTIONS,
             });
 
             res.status(200).send(userRm);
@@ -105,24 +103,7 @@ export class UserRmService {
         try {
             const userRms = await this.userRmRepository.find({
                 where: { user_id: idUser },
-                relations: ['exercise', 'user'],
-                select: {
-                    id: true,
-                    weight: true,
-                    reps: true,
-                    date: true,
-                    created_at: true,
-                    updated_at: true,
-                    exercise: {
-                        id: true,
-                        name: true
-                    },
-                    user: {
-                        id: true,
-                        first_name: true,
-                        last_name: true
-                    }
-                },
+                ...RM_DETAIL_OPTIONS,
             });
 
             res.status(200).send(userRms);
@@ -139,24 +120,7 @@ export class UserRmService {
         try {
             const userRms = await this.userRmRepository.find({
                 where: { exercise_id: idExercise },
-                relations: ['exercise', 'user'],
-                select: {
-                    id: true,
-                    weight: true,
-                    reps: true,
-                    date: true,
-                    created_at: true,
-                    updated_at: true,
-                    exercise: {
-                        id: true,
-                        name: true
-                    },
-                    user: {
-                        id: true,
-                        first_name: true,
-                        last_name: true
-                    }
-                },
+                ...RM_DETAIL_OPTIONS,
             });
 
             res.status(200).send(userRms);
@@ -176,24 +140,7 @@ export class UserRmService {
         try {
             const userRms = await this.userRmRepository.find({
                 where: { user_id: idUser, exercise_id: idExercise },
-                relations: ['exercise', 'user'],
-                select: {
-                    id: true,
-                    weight: true,
-                    reps: true,
-                    date: true,
-                    created_at: true,
-                    updated_at: true,
-                    exercise: {
-                        id: true,
-                        name: true
-                    },
-                    user: {
-                        id: true,
-                        first_name: true,
-                        last_name: true
-                    }
-                },
+                ...RM_DETAIL_OPTIONS,
                 // Del más reciente al más viejo: sirve como referencia de progreso durante la ejecución.
                 order: { date: 'DESC' },
             });
@@ -297,7 +244,7 @@ export class UserRmService {
 
                 const savedUserRm = await this.userRmRepository.save(newUserRm);
 
-                res.status(201).send(savedUserRm);
+                res.status(201).send(await this.findRmDetail(savedUserRm.id));
             }
         } catch (error) {
             console.error(error);
@@ -357,7 +304,7 @@ export class UserRmService {
             userRm.date = normalizedDate;
 
             const savedUserRm = await this.userRmRepository.save(userRm);
-            res.status(201).send(savedUserRm);
+            res.status(201).send(await this.findRmDetail(savedUserRm.id));
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al crear el RM de usuario' });

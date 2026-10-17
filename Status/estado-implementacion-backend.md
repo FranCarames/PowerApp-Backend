@@ -26,6 +26,16 @@
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
 
+## Cambios recientes (2026-10-17 · una sola forma para los RMs)
+
+- **Quinta tarea del roadmap (BE-05), hallazgo V10 del web.** Las 5 lecturas de `user_rm` recortaban las FK con su `select`: mandaban el ejercicio y el usuario anidados (`exercise { id, name }`, `user { id, first_name, last_name }`), pero no `user_id` ni `exercise_id`. El Swagger las declaraba como `UserRM`, que es plano, con las FK y sin lo anidado, y con `date` como `date-time` cuando es un día sin hora. El web tipó la forma real a mano (`UserRmWithExercise`, pendiente de contrato).
+- **Además, el alta y la edición devolvían otra forma:** el RM plano, sin lo anidado, y con `date` como timestamp (`"2026-10-01T03:00:00.000Z"`, el `Date` de JS normalizado), mientras que las lecturas mandan el día (`"2026-10-01"`). **Se unificaron** (decisión del 17/10, entre esto y tocar sólo las lecturas): **todo endpoint de `user_rm` que devuelve RMs devuelve la misma forma**. Así el web y el iOS tipan un solo `UserRm`, en línea con la preferencia de contratos que no cambian de forma.
+- **Cómo:** el `select` estaba copiado 5 veces y ahora vive en una constante, `RM_DETAIL_OPTIONS`, que suma `user_id` y `exercise_id`. Un helper privado, `findRmDetail(id)`, relee el RM guardado con esas mismas opciones, y es lo que responden el alta y la edición. El costo es una consulta más por escritura. La respuesta de las escrituras cambió de forma, pero **el web no la usa**: después de guardar invalida la lista y la vuelve a pedir. Los códigos no cambian: el alta y la edición siguen en `201`, y pasar la edición a `200` es de BE-32.
+- **Swagger:** `UserRmDetailDto` (más `UserRmExerciseRefDto` y `UserRmUserRefDto` para lo anidado), con `date` como `string` de `format: date`, en los 7 endpoints que devuelven RMs. `GET /user_rm/:id` queda declarado como **array**, porque es lo que hoy devuelve (vacío si no existe), hasta que BE-32 lo pase a objeto y `404`. La edición declaraba un `200` que nunca respondía: ahora dice `201`.
+- **Verificación sin base:** se armó el `DataSource` con las entidades compiladas, sin conectarse, y se generó el SQL de `RM_DETAIL_OPTIONS`: selecciona `user_id` y `exercise_id` junto con los anidados. La metadata de Swagger del DTO tiene los 10 campos y `date` con `format: date`. Que el alta y la edición respondan con el día pelado sale de que la columna es `date`: TypeORM la hidrata como `YYYY-MM-DD`, igual que en las lecturas. **Sin verificar en runtime.**
+- **Observación, sin tocar (zona horaria):** el alta y la edición toman el día con `new Date(date)` y los getters **locales** del servidor. Un día pelado (`"2026-10-06"`) es la medianoche UTC, así que en un servidor al oeste de UTC (el local de desarrollo) **se guarda el día anterior**. El web lo esquiva mandando el mediodía (`T12:00:00`), pero un cliente que no lo sepa, como el iOS, lo pisaría. En Render (UTC) no pasa. Se puede resolver con BE-31 (DTOs) o con una tarea aparte: tomar `date` como día calendario.
+- **Sin cambio de esquema.** Ningún CU cambia de estado. Del inventario del roadmap se cierra el ⚠ de U-19 y E-04 (V10). **Del lado del web:** puede borrar `UserRmWithExercise` de `pending.ts` y tipar los RMs desde el contrato.
+
 ## Cambios recientes (2026-10-16 · promesas sin esperar en los handlers)
 
 - **Cuarta tarea del roadmap (BE-04).** Los **70 handlers** de los 8 controllers llamaban al service sin `await` ni `return`. El handler resolvía al instante y Nest no se enteraba de lo que pasara después. Si el service rechazaba (la base caída, un error fuera de su `try`), quedaba un **rechazo sin manejar**, que en Node ≥ 15 **corta el proceso**: con un solo request se caía el servidor entero para todos. Los services con try/catch propio estaban cubiertos, pero `createUser` y `loginUser` no tenían, y los 6 métodos transaccionales hacían `connect()` y `startTransaction()` **antes** del `try`.
@@ -368,9 +378,9 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-U-16 | Calcular mis RM potenciales | ✅ Implementado | `POST /user_rm/potential` · Epley, tabla 1RM→12RM, no persiste |
-| CU-U-17 | Registrar un RM | ✅ Implementado | `POST /user_rm/create` |
-| CU-U-18 | Editar un RM | ✅ Implementado | `POST /user_rm/edit/:id` |
-| CU-U-19 | Obtener mis RMs | ✅ Implementado | `GET /user_rm/user/:id` · `@Owner` (16/10) |
+| CU-U-17 | Registrar un RM | ✅ Implementado | `POST /user_rm/create` · responde el RM con la forma de las lecturas (17/10) |
+| CU-U-18 | Editar un RM | ✅ Implementado | `POST /user_rm/edit/:id` · responde el RM con la forma de las lecturas (17/10) |
+| CU-U-19 | Obtener mis RMs | ✅ Implementado | `GET /user_rm/user/:id` · `@Owner` (16/10); con `exercise_id` y `user_id` (17/10) |
 | CU-U-20 | Eliminar un RM | ✅ Implementado | `DELETE /user_rm/:id` |
 
 ---
@@ -383,7 +393,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-01 | Obtener alumnos | ✅ Implementado | `GET /users/all?role=user` · filtros rol/keyword/active + paginación; coach y admin (16/10) |
 | CU-E-02 | Obtener alumnos — filtro por nombre | ✅ Implementado | `GET /users/all?keyword=` · busca en nombre, apellido y email |
 | CU-E-03 | Cerrar cuenta de alumno | ✅ Implementado | `POST /users/set-active/:id` · baja lógica `{ active }` + bloqueo de login (403); el coach sólo sobre alumnos y nadie sobre sí mismo (16/10) |
-| CU-E-04 | Obtener RMs del alumno | ✅ Implementado | `GET /user_rm/user/:id` · mismo endpoint que U-19; el `@Owner` no limita a coach ni a admin |
+| CU-E-04 | Obtener RMs del alumno | ✅ Implementado | `GET /user_rm/user/:id` · mismo endpoint que U-19; el `@Owner` no limita a coach ni a admin; con `exercise_id` (17/10) |
 | CU-E-05 | Historial de pagos de alumno | ✅ Implementado | `GET /membership/payment/user/:id` |
 | CU-E-06 | Historial de entrenamientos de alumno | ⬜ No implementado | sin tracking ni endpoint |
 | CU-E-07 | Historial entrenamientos — filtro ejercicio | ⬜ No implementado | sin endpoint |

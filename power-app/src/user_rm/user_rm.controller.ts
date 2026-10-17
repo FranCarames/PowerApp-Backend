@@ -16,7 +16,7 @@ import { EditUserRmDto } from '../dtos/user_rm/edit_user_rm.dto';
 import { UserExerciseParamsDto } from '../dtos/user_rm/user_exercise_params.dto';
 import { CalculatePotentialRmDto } from '../dtos/user_rm/calculate_potential_rm.dto';
 import { PotentialRmResponseDto } from '../dtos/user_rm/potential_rm_response.dto';
-import { UserRM } from '../entities/user_rm.entity';
+import { UserRmDetailDto } from '../dtos/user_rm/user_rm_detail.dto';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
 import { Owner } from '../authentication/decorators/owner.decorator';
@@ -30,7 +30,7 @@ export class UserRmController {
 
     @Get('/all')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [UserRM] })
+    @ApiResponse({ status: 200, type: [UserRmDetailDto] })
     async getAllUserRms(
         @Res() res: Response
     ) {
@@ -39,7 +39,7 @@ export class UserRmController {
 
     @Get(':id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: UserRM })
+    @ApiResponse({ status: 200, type: [UserRmDetailDto], description: 'Hoy devuelve un array (vacío si no existe); BE-32 lo pasa a objeto y 404' })
     async getUserRmById(
         @Param() idUserRm: ParameterIdDto,
         @Res() res: Response
@@ -50,7 +50,7 @@ export class UserRmController {
     @Get('/user/:id')
     @Auth(UserRole.user, UserRole.coach, UserRole.admin)
     @Owner('id')
-    @ApiResponse({ status: 200, type: [UserRM] })
+    @ApiResponse({ status: 200, type: [UserRmDetailDto] })
     async getAllUserRmsByUserId(
         @Param() idUser: ParameterIdDto,
         @Res() res: Response
@@ -61,7 +61,7 @@ export class UserRmController {
     @Get('/user/:idUser/exercise/:idExercise')
     @Auth(UserRole.user, UserRole.coach, UserRole.admin)
     @Owner('idUser')
-    @ApiResponse({ status: 200, type: [UserRM] })
+    @ApiResponse({ status: 200, type: [UserRmDetailDto] })
     async getUserRmsByUserAndExercise(
         @Param() params: UserExerciseParamsDto,
         @Res() res: Response
@@ -71,7 +71,7 @@ export class UserRmController {
 
     @Get('/exercise/:id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [UserRM] })
+    @ApiResponse({ status: 200, type: [UserRmDetailDto] })
     async getAllUserRmsByExerciseId(
         @Param() idExercise: ParameterIdDto,
         @Res() res: Response
@@ -92,7 +92,7 @@ export class UserRmController {
 
     @Post('create')
     @Auth(UserRole.user)
-    @ApiResponse({ status: 201, type: UserRM })
+    @ApiResponse({ status: 201, type: UserRmDetailDto })
     async createUserRm(
         @CurrentUser() user: AuthUser,
         @Body() createUserRmDto: CreateUserRmDto,
@@ -103,7 +103,7 @@ export class UserRmController {
 
     @Post('edit/:id')
     @Auth(UserRole.user)
-    @ApiResponse({ status: 200, type: UserRM })
+    @ApiResponse({ status: 201, type: UserRmDetailDto })
     async editUserRm(
         @CurrentUser() user: AuthUser,
         @Param() idUserRm: ParameterIdDto,
