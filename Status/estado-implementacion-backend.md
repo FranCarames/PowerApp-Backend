@@ -1,30 +1,60 @@
 # PowerApp Backend — Estado de implementación vs. Casos de Uso
 
-> **Corte:** 2026-09-04 · **Fuente:** `Documentation/Especificaciones de CU/especificaciones/` comparado contra `power-app/src`
-> **Método:** mapeo 1:1 de los 75 CU contra los `controller` y `service` presentes en el código.
+> **Corte:** 2026-10-17 · **Fuente:** `Use Cases/` del repo PowerApp-Docs (fuente de verdad de los CU) comparado contra `power-app/src`
+> **Método:** mapeo 1:1 de los 75 CU contra los `controller` y `service` del código, con el criterio del inventario del [roadmap del 16/10](https://github.com/FranCarames/PowerApp-Docs/blob/main/Doc/plans/2026-10-16-roadmap-backend.md) (§9): un CU es ✅ sólo si **todos los caminos de su spec** se cumplen.
 
 ## Resumen
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 63 | 84% | Endpoint existe y su service ejecuta lógica real |
-| 🟡 Parcial | 1 | 1% | Funciona a medias / resuelto dentro de otro endpoint |
-| 🔵 Andamiaje | 4 | 5% | Ruta declarada pero service vacío y llamada comentada |
-| ⬜ No implementado | 7 | 9% | Sin endpoint, service ni módulo |
+| ✅ Implementado | 57 | 76% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
+| 🟡 Parcial | 8 | 11% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
+| 🔵 Andamiaje | 3 | 4% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
+| ⬜ No implementado | 6 | 8% | Sin endpoint |
+| — Sin backend | 1 | 1% | Por su spec es del cliente (CU-U-14) |
 | **Total** | **75** | | |
 
-**64 de 75 CU con código implementado o parcial (~85%).** Los otros 11 son trabajo pendiente (andamiaje + no implementado).
-> **Nota (19/8):** la DB está **al día** con el modelo. El ajuste de circuitos se aplicó sobre la instancia existente con un delta puntual, sin recrearla, así que todos los endpoints se pueden probar en runtime.
+**57 de los 74 CU con backend están completos (77%).** Faltan 17: 8 parciales, 3 en andamiaje y 6 sin implementar. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
+> **Nota (17/10):** los ✅ bajan de 63 (corte del 4/9) a 57 porque **cambió el criterio, no porque se rompiera algo**. El de antes daba ✅ a todo endpoint con lógica real; el del roadmap exige además que se cumpla cada camino de la spec. Por eso pasaron a 🟡 CU-U-04 (no envía el mail), CU-A-10 y CU-A-15 (borran en cascada en vez de impedirlo), CU-A-13 y CU-A-14 (no validan el nombre único) y CU-A-17 (falta "ya es entrenador"). Ver los cambios del 17/10.
+> **Base de datos:** la de Render se recreó el 3/10 con el esquema vigente (dato del Status web). Es free tier y **vence alrededor del 2/11** (*sin verificar*), así que hay que regenerarla antes (BE-23).
 
 ### Cobertura por rol
 
-| Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | % implementado |
-|---|---:|---:|---:|---:|---:|---:|
-| Usuario | 20 | 14 | 1 | 2 | 3 | 70% |
-| Entrenador | 32 | 26 | 0 | 2 | 4 | 81% |
-| Admin | 23 | 23 | 0 | 0 | 0 | 100% |
+| Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | Sin backend | % ✅ (sobre los CU con backend) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Usuario | 20 | 13 | 3 | 1 | 2 | 1 | 68% |
+| Entrenador | 32 | 26 | 0 | 2 | 4 | 0 | 81% |
+| Admin | 23 | 18 | 5 | 0 | 0 | 0 | 78% |
+| **Total** | **75** | **57** | **8** | **3** | **6** | **1** | **77%** |
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+
+## Cambios recientes (2026-10-17 · corte nuevo con el inventario del roadmap)
+
+- **Octava tarea del roadmap (BE-08), sin código: cierra la fase 1 (hito H1).** El resumen era del 4/9 y el dashboard, del 27/8. Este corte toma el inventario del roadmap (§9, 16/10), que se armó leyendo el código CU por CU, y le aplica lo cerrado el 16 y 17/10 (BE-01 a BE-07).
+- **Criterio más estricto.** Un CU es ✅ sólo si se cumplen **todos los caminos de su spec**: no alcanza con que el endpoint exista y ejecute lógica. Pasaron a 🟡:
+  - **U-04:** no envía el mail; se resuelve en BE-29.
+  - **A-10:** borra el músculo en cascada; BE-24.
+  - **A-15:** borra el grupo y sus músculos en cascada; BE-25.
+  - **A-13 y A-14:** no validan el nombre único; BE-26.
+  - **A-17:** falta el camino "ya es entrenador"; BE-27.
+
+  Se verificó contra el código de hoy: no hay ningún chequeo de uso ni de nombre en `muscles.service.ts`. **No es una regresión.** Con el criterio viejo esos seis seguirían en ✅.
+- **Reclasificaciones:**
+  - **U-09**, de 🔵 a 🟡: `GET /routine/:id` ya arma el árbol completo; falta abrirlo al rol `user` con el check de asignación (BE-13).
+  - **U-14**, de ⬜ a "— sin backend": su spec lo deja en el cliente, y el web lo tiene.
+  - **U-02**, de 🟡 a ✅ con BE-03.
+  - **E-19 y E-20** siguen en ⬜, pero **entran al MVP** (decisión del 16/10, BE-10 y BE-11).
+- **⚠ (un ✅ con un defecto abierto):** quedan dos. **E-29** acepta un tipo de membresía dado de baja y un destinatario que no es alumno (BE-28). **A-04** tiene la `description` opcional en el DTO y NOT NULL en la base, y responde 500 (BE-31). Los otros siete del inventario se cerraron con BE-01, BE-02 y BE-05.
+- **Conteos:** 57 ✅, 8 🟡, 3 🔵, 6 ⬜ y 1 sin backend, de 75. Son **57 de los 74 CU con backend (77%)**. El porcentaje por rol pasa a calcularse sobre los CU con backend.
+- **Se corrigió lo que había quedado viejo:**
+  - Se cerraron los hallazgos 1 (planificaciones vacío, resuelto el 31/8 y el 4/9) y 3 (`Routine.routine_plan_id`, borrada el 4/9). El 2 y el 4 conservan su número, porque el roadmap los cita así.
+  - El encabezado citaba la carpeta vieja `Documentation/`, y el detalle del Entrenador decía "29 CU · 62%": son 32.
+  - A-23 decía "pendiente: columna `active` en DB", que existe desde que se regeneró la base.
+  - U-08, E-13 y E-14 decían "service vacío", cuando el problema real es que **cuelgan**: la ruta existe, la llamada está comentada y, con `@Res()`, nunca responden.
+  - Lo que sigue abierto lleva la tarea del roadmap que lo cierra (BE-xx).
+- **"Próximas semanas" y "Orden sugerido" se reemplazaron por "Plan de trabajo"**: el link al roadmap y sus 5 fases. El cronograma por viernes terminó el 4/9; la historia de esos bloques sigue en los cambios de agosto y septiembre.
+- **Dashboard sincronizado** con los mismos números. Suma un estado "sin backend", y corrige la tarjeta del Entrenador, cuya leyenda decía "18 impl. · 7 andam." y no coincidía con su propio 81%.
 
 ## Cambios recientes (2026-10-17 · aviso al web: C2 y novedades del contrato)
 
@@ -341,37 +371,31 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ## Hallazgos estructurales
 
-> Lista de **hallazgos abiertos**. Los que se cerraron salieron de acá y quedan registrados en *Cambios recientes*: módulo `/auth` comentado (resuelto 11/8), autorización manual sin Guards (11/8), gestión de cuenta del usuario — U-05, U-06, U-16 (18/8), alumnos y membresías — E-01→E-03, E-26→E-28 (6/8 y 18/8) y circuitos incompletos (cerrado 25/8, 4 de 4).
+> Lista de **hallazgos abiertos**, con el número que les dan el changelog y el roadmap (por eso faltan el 1 y el 3). Los que se cerraron salieron de acá y quedan registrados en *Cambios recientes*: módulo `/auth` comentado (resuelto 11/8), autorización manual sin Guards (11/8), gestión de cuenta del usuario — U-05, U-06, U-16 (18/8), alumnos y membresías — E-01→E-03, E-26→E-28 (6/8 y 18/8), circuitos incompletos (cerrado 25/8, 4 de 4), **1 · planificaciones sin service** (cerrado el 31/8 y el 4/9, con E-08→E-12d) y **3 · `Routine.routine_plan_id` obsoleta** (la columna se borró el 4/9).
 
-1. **Rutinas cerrado salvo E-19/E-20; Planification sigue siendo andamiaje** *(actualizado 27/8)*. `routine.service.ts` tiene **los circuitos completos** (E-21→E-24) y **el ciclo de vida entero de la rutina**: lectura (E-15, más `/all-plus` y el detalle), alta (E-16), edición (E-17) y baja lógica (E-18). Lo único que queda del bloque es **E-19/E-20** (asignar y quitar rutina puntual a un alumno), **post-MVP por decisión del 27/8**: dependen de `Routine_Asignation_User`, cuya FK obligatoria a `Routine_Asignation` hace imposible el "sin planificación" que pide el CU (ver los cambios del 27/8 para el contrato acordado). Planificaciones sigue entero: `planification.service.ts` está **vacío** (4 líneas) y las 12 rutas que le quedan al controller responden con la llamada comentada. De acá salen los **9 CU en andamiaje** (E-08→E-14, U-08, U-09), más E-19 y E-20 sin ruta.
-2. **Nada escribe el registro de ejecución de entrenamientos** *(nuevo 25/8 — absorbe lo que quedaba vivo de los hallazgos 4 y 5 anteriores)*. `Routine_Exercise_Finished` existe como entidad y como tabla, pero en todo el código **sólo se lee**: la única consulta está en `editCircuit`, para detectar historial y decidir si la baja es lógica. **Ningún endpoint inserta una fila.** De ahí cuelgan 4 CU: marcar serie realizada (**U-12**) y nota del ejercicio (**U-13**) del lado del alumno, e historial de entrenamientos (**E-06**) y su filtro por ejercicio (**E-07**) del lado del entrenador. Es también lo que mantiene a **U-10** en parcial — la ficha de catálogo está expuesta, falta el detalle en contexto de rutina. Todo depende del bloque de Rutinas (28/8). **Consecuencia inmediata:** es lo que dejó la rama de `active` de CU-E-23 **sin verificar en runtime** (ver los cambios del 25/8) — para probarla hay que insertar el "hecho" a mano, y eso obliga a armar la cadena `Planification` → `Routine_Asignation` → `User_Routine` que el seed tampoco genera.
-3. **`Routine.routine_plan_id` es una columna obsoleta** *(22/8)*. El modelo tiene **dos caminos** de `Routine` a `Planification`: la FK directa `Routine.routine_plan_id` (nullable, `ON DELETE SET NULL`) y la tabla `Routine_Asignation` (`routine_id` + `routine_plan_id` + `order`). **La spec de CU-E-12 nombra explícitamente la segunda**, y ningún CU usa la primera. Mantener las dos deja dos verdades posibles sobre el mismo hecho, que ningún endpoint reconcilia. **Decisión (22/8):** el alta de rutinas no la toca (queda en `null`) y la columna se deja nullable; sacarla implica `ALTER` + `ddl.py` + `01_estructura.sql` + diagrama, y conviene hacerlo junto al bloque de planificaciones (4/9), donde se implementa E-12.
-4. **`updated_at` no se actualiza solo, en ninguna tabla** *(25/8)*. Las entidades declaran `@Column({ onUpdate: 'CURRENT_TIMESTAMP' })` en 18 archivos, que es **sintaxis de MySQL**: en Postgres no hace nada, el DDL no tiene triggers y ninguna entidad usa `@UpdateDateColumn`. O sea que hoy `updated_at` queda **congelado en la fecha de alta** en las 20 tablas. Se resolvió a mano en `editCircuit` y, desde el 27/8, también en `editRoutine`, porque un endpoint de edición que devuelve la fecha vieja es directamente un dato incorrecto. **Ya son dos endpoints parcheando lo mismo**, así que conviene generalizarlo —trigger en `ddl.py` o `@UpdateDateColumn` en las entidades— antes de que sean cinco; el bloque de planificaciones (4/9) es la próxima oportunidad, porque va a tocar el DDL igual.
+- **2 · Nada escribe el registro de ejecución de entrenamientos** *(25/8; actualizado 17/10)*. `Routine_Exercise_Finished` existe como entidad y como tabla, pero en todo el código **sólo se lee**: la única consulta está en `editCircuit`, para detectar historial y decidir si la baja es lógica. **Ningún endpoint inserta una fila.** De ahí cuelgan 4 CU: marcar un ejercicio como hecho (**U-12**) y dejarle una nota (**U-13**), del lado del alumno, y el historial de entrenamientos (**E-06**) con su filtro por ejercicio (**E-07**), del lado del entrenador. También falta el detalle en contexto de rutina de **U-09/U-10**. **Lo resuelve el bloque A del roadmap** (BE-09 a BE-16, fase 2), que además define cómo se ejecuta una rutina puntual: hoy `User_Routine` sólo cuelga de una planificación (DA1). **Consecuencia que sigue vigente:** la rama de baja lógica de CU-E-23 nunca se verificó en runtime. Para probarla hace falta un "hecho" que nada escribe y la cadena `Planification` → `Routine_Asignation` → `User_Routine`, que el seed no genera (BE-21 y BE-35).
+- **4 · `updated_at` no se actualiza solo, en ninguna tabla** *(25/8; actualizado 17/10)*. Las entidades declaran `@Column({ onUpdate: 'CURRENT_TIMESTAMP' })` en 18 archivos, y eso es **sintaxis de MySQL**: en Postgres no hace nada, el DDL no tiene triggers y ninguna entidad usa `@UpdateDateColumn`. Así que `updated_at` queda **congelado en la fecha de alta**, salvo en los métodos que lo setean a mano (`editCircuit`, `editRoutine` y algunos de `users`). `editPlanification`, por ejemplo, no lo setea. **Lo resuelve BE-30**, con `@UpdateDateColumn` en todas las entidades.
 
 ---
 
-## Próximas semanas — cronograma del servidor (hasta 4/9)
+## Plan de trabajo
 
-> Organizado por **viernes** (clases). El **7/8** (infra y transversales) está **cerrado**: DB regenerada, autorización centralizada con Guards y CU-U-03/U-04 implementados. El **14/8** quedó **parcial** (ver abajo). Lo que sigue, hasta la **fecha límite de entrega del servidor (4/9)**:
+> Desde el 16/10 el plan es el **[roadmap para terminar el backend](https://github.com/FranCarames/PowerApp-Docs/blob/main/Doc/plans/2026-10-16-roadmap-backend.md)** (repo PowerApp-Docs): 39 tareas (BE-01 a BE-39) en 5 fases, con su detalle, sus dependencias y las decisiones pendientes. Reemplaza al cronograma por viernes, que terminó el 4/9. **Entrega: 20/11.**
 
-| Viernes | Foco | Casos de uso |
-|---|---|---|
-| **14/8** ✅ | CU sin dependencias — **7 de 8** (+ U-10 parcial) | ✅ cambiar contraseña (**U-05**)<br>✅ editar datos personales (**U-06**)<br>✅ filtrar RMs por usuario (**U-11**)<br>✅ RMs potenciales (**U-16**)<br>✅ estado y tipos de membresía + alumnos por estado/tipo (**E-26→E-28**)<br>🟡 detalle de ejercicio (**U-10**): ficha de catálogo expuesta, el resto depende de Rutinas |
-| **21/8** ✅ | Circuitos — **4 de 4** | ✅ obtener (**E-21**)<br>✅ crear (**E-22**)<br>✅ editar (**E-23**), cerrado el **25/8**: el "hecho" se repuntó a `Routine_Exercise` y la baja pasa a ser lógica cuando hay historial<br>✅ baja lógica (**E-24**)<br>✅ el detalle y el listado con ejercicios (`/all-plus`) |
-| **28/8** ✅ | Rutinas — **el núcleo cerrado, 4 de 6** | ✅ obtener (**E-15**) + `/all-plus` y el detalle<br>✅ crear (**E-16**)<br>✅ editar (**E-17**), reconciliación por `Routine_Circuit.id` con baja lógica del vínculo<br>✅ baja lógica (**E-18**), `POST /routine/set-active/:id`<br>⬜ asignar rutina a alumno (**E-19**) — **post-MVP (27/8)**, depende de `Routine_Asignation_User`<br>⬜ desasignar rutina a alumno (**E-20**) — ídem<br>⬜ marcar series realizadas (**U-12**)<br>⬜ notas del ejercicio (**U-13**)<br>⬜ historial de entrenamientos y su filtro (**E-06, E-07**) |
-| **4/9** | Planificaciones y cierre | ✅ ABM de planificaciones (**E-08→E-11**), sin tocar el esquema<br>✅ asignar y quitar rutinas al plan (**E-12**), ampliado a 4 operaciones<br>🔵 asignar planificaciones a alumnos (**E-13, E-14**)<br>🔵 planificación activa y detalle de rutina del usuario (**U-08, U-09**)<br>Pruebas de integración sobre la API + Swagger<br>**🎯 Hito: servidor con 73 de los 75 CU** — E-19 y E-20 quedaron fuera del MVP el 27/8 |
+| Fase | Foco | Tareas | Ventana | Hito | Estado |
+|---|---|---|---|---|---|
+| **1** | Seguridad y contrato inmediato | BE-01 a BE-08 | 16 al 19/10 | **H1:** sin agujeros de seguridad conocidos, el web avisado de C2 y el Status con conteos reales | ✅ cerrada el 17/10 |
+| **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | ⏭ sigue |
+| ⏱ | Regenerar la base de Render | BE-23 | ≈ 1/11 | Esquema del bloque A aplicado, antes de que venza la base | fecha fija |
+| **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | |
+| **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | |
+| **5** | Verificación y cierre | BE-35 a BE-39 | 12 al 17/11 | **H5:** criterios de "backend terminado" cumplidos y código congelado | |
 
-> Secuencia según dependencias: primero los CU independientes, luego **Circuitos**, sobre ellos las **Rutinas** y por último las **Planificaciones** que las agrupan.
-
-> **Riesgo abierto (18/8):** los 6 CU pausados del 14/8 no bloquean a nadie, pero **Circuitos sí** — es la base de las Rutinas (28/8) y éstas de las Planificaciones (4/9). Si el 21/8 se corre, se corre toda la cadena hasta el hito del servidor.
-
-> **Actualización (27/8):** **Rutinas deja de ser el cuello de botella.** E-15→E-18 están implementados, así que **Planificaciones (4/9) ya se puede arrancar** sobre rutinas reales. **Pero el hito del 4/9 cambia de forma:** con E-19 y E-20 fuera del MVP, el objetivo pasa de "los 72 CU cubiertos" a **70 de 72**, y los dos que faltan quedan documentados con su contrato para retomarlos después de la entrega.
-
-> **Actualización (22/8):** **Circuitos deja de ser el cuello de botella.** E-21, E-22 y E-24 están implementados y la base está migrada, así que **Rutinas (28/8) ya se puede arrancar**: `Routine_Circuit` existe y hay circuitos reales para ensamblar. ~~E-23 quedó pausado a propósito y **no bloquea a Rutinas**.~~ **Cerrado el 25/8:** el bloque de circuitos ya no tiene pendientes.
+> **Dependencias del usuario:** el diagrama de `Doc/` actualizado antes de BE-10 (el modelo manda), la fecha real de vencimiento de la base de Render (BE-23), la cuenta del proveedor de mail (BE-29) y la corrida del plan de pruebas (BE-35).
 
 ---
 
-## Detalle — Rol Usuario (20 CU · 70%)
+## Detalle — Rol Usuario (20 CU · 68%)
 
 ### Administrar mi cuenta
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -379,7 +403,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-U-01 | Registrar usuario | ✅ Implementado | `POST /users/register` · siempre crea `role = user`; otro `role` en el body da `400` (16/10) |
 | CU-U-02 | Login | ✅ Implementado | `POST /users/login` · `password_change_required` en el `200`: `true` si se entró con la temporal (16/10) |
 | CU-U-03 | Cerrar sesión | ✅ Implementado | `POST /users/logout` · ack 200, el cliente descarta el token |
-| CU-U-04 | Recuperar contraseña | ✅ Implementado | `POST /users/recover-password` · genera `temp_password`; email stubbeado |
+| CU-U-04 | Recuperar contraseña | 🟡 Parcial | `POST /users/recover-password` · genera la temporal pero **no envía el mail** que pide el camino principal; el stub de consola quedó detrás de `LOG_TEMP_PASSWORD` (17/10) · BE-29 |
 | CU-U-05 | Cambiar contraseña | ✅ Implementado | `POST /users/change-password` · acepta contraseña actual o temporal; anula `temp_password` |
 | CU-U-06 | Editar datos personales | ✅ Implementado | `POST /users/edit` · sobre el propio registro (`@CurrentUser`), campos opcionales; la lectura `GET /users/get/:id` con `@Owner` (16/10) |
 | CU-U-07 | Obtener historial de pagos | ✅ Implementado | `GET /membership/payment/user/:id` · `@Owner`, orden por fecha DESC (16/10) |
@@ -387,13 +411,13 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Mi entrenamiento
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-U-08 | Obtener mi planificación | 🔵 Andamiaje | `GET /planification/user/:id/active` · service vacío |
-| CU-U-09 | Ver detalle de rutina | 🔵 Andamiaje | `GET /routine/:id` · service vacío |
-| CU-U-10 | Ver detalle de un ejercicio | 🟡 Parcial | `GET /exercise/:id` ✅ expuesto (ficha de catálogo) · **falta** el detalle en contexto de rutina (`Exercise_Set` ordenadas, notas) — depende de Rutinas |
+| CU-U-08 | Obtener mi planificación | 🔵 Andamiaje | `GET /planification/user/:id/active` · llamada comentada: **cuelga** · BE-12 (vía puntual) y BE-20 (vía plan) |
+| CU-U-09 | Ver detalle de rutina | 🟡 Parcial | `GET /routine/:id` arma el árbol completo, pero es sólo de coach y admin: falta el rol `user` con el check de asignación vigente · BE-13 |
+| CU-U-10 | Ver detalle de un ejercicio | 🟡 Parcial | `GET /exercise/:id` expone la ficha de catálogo · **falta** el detalle en contexto de rutina (series y notas) · BE-13 |
 | CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user` (`@Owner`, ids en minúscula desde el 16/10), orden por fecha DESC |
-| CU-U-12 | Marcar serie como realizado | ⬜ No implementado | sin endpoint · el registro pasa a ser por ejercicio (`Routine_Exercise_Finished`) |
-| CU-U-13 | Dejar una nota en el ejercicio | ⬜ No implementado | sin endpoint |
-| CU-U-14 | Temporizador | ⬜ No implementado | sin endpoint (probable front-end) |
+| CU-U-12 | Marcar serie como realizado | ⬜ No implementado | sin endpoint · el "hecho" es por ejercicio (`Routine_Exercise_Finished`, hallazgo 2) · BE-14 |
+| CU-U-13 | Dejar una nota en el ejercicio | ⬜ No implementado | sin endpoint · BE-15 |
+| CU-U-14 | Temporizador | — Sin backend | por su spec es del cliente; el web lo tiene (T29) |
 | CU-U-15 | Consultar wiki de ejercicios | ✅ Implementado | `GET /exercise/all` |
 
 ### Administrar mis RMs
@@ -407,7 +431,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Entrenador (29 CU · 62%)
+## Detalle — Rol Entrenador (32 CU · 81%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -417,8 +441,8 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-03 | Cerrar cuenta de alumno | ✅ Implementado | `POST /users/set-active/:id` · baja lógica `{ active }` + bloqueo de login (403); el coach sólo sobre alumnos y nadie sobre sí mismo (16/10) |
 | CU-E-04 | Obtener RMs del alumno | ✅ Implementado | `GET /user_rm/user/:id` · mismo endpoint que U-19; el `@Owner` no limita a coach ni a admin; con `exercise_id` (17/10) |
 | CU-E-05 | Historial de pagos de alumno | ✅ Implementado | `GET /membership/payment/user/:id` |
-| CU-E-06 | Historial de entrenamientos de alumno | ⬜ No implementado | sin tracking ni endpoint |
-| CU-E-07 | Historial entrenamientos — filtro ejercicio | ⬜ No implementado | sin endpoint |
+| CU-E-06 | Historial de entrenamientos de alumno | ⬜ No implementado | sin endpoint (hallazgo 2) · BE-16 |
+| CU-E-07 | Historial entrenamientos — filtro ejercicio | ⬜ No implementado | sin endpoint · BE-16 |
 
 ### Administrar planificaciones
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -432,8 +456,8 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-12b | Asignar rutinas en lote | ✅ Implementado | `POST /planification/routine/assign-bulk` · transaccional, consecutivas al final |
 | CU-E-12c | Quitar o reincorporar una rutina (lógico) | ✅ Implementado | `POST /planification/routine/set-active/:id` · `order` opcional al reincorporar |
 | CU-E-12d | Quitar o reincorporar rutinas en lote (lógico) | ✅ Implementado | `POST /planification/routine/set-active-bulk` · transaccional |
-| CU-E-13 | Asignar planificación a alumno | 🔵 Andamiaje | `POST /planification/user/assign` · comentado |
-| CU-E-14 | Eliminar planificación a alumno | 🔵 Andamiaje | pasa a baja lógica en cascada (31/8): será `POST /planification/user/set-active/:id`, apaga la `User_Planification` y sus `User_Routine` |
+| CU-E-13 | Asignar planificación a alumno | 🔵 Andamiaje | `POST /planification/user/assign` · `body: any` y llamada comentada: **cuelga** · BE-18 |
+| CU-E-14 | Eliminar planificación a alumno | 🔵 Andamiaje | `DELETE /planification/user/:id` **cuelga** · pasa a baja lógica en cascada (31/8): `POST /planification/user/set-active/:id` apaga la `User_Planification` y sus `User_Routine` · BE-19 |
 
 ### Administrar rutinas
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -442,8 +466,8 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-16 | Crear rutina sistémica | ✅ Implementado | `POST /routine/create` · rutina + `Routine_Circuit` ordenados, en una transacción |
 | CU-E-17 | Editar rutina sistémica | ✅ Implementado | `POST /routine/edit/:id` · reconciliación por `Routine_Circuit.id`, en una transacción |
 | CU-E-18 | Eliminar rutina sistémica (lógico) | ✅ Implementado | `POST /routine/set-active/:id` · baja y reactivación |
-| CU-E-19 | Asignar rutina a alumno | ⬜ No implementado | **post-MVP (27/8)** · andamiaje retirado; irá en `POST /routine/assign-user` |
-| CU-E-20 | Eliminar rutina a alumno | ⬜ No implementado | **post-MVP (27/8)** · irá en `DELETE /routine/assign-user/:id` |
+| CU-E-19 | Asignar rutina a alumno | ⬜ No implementado | **entra al MVP (16/10)** · irá en `POST /routine/assign-user` · BE-10 (modelo) y BE-11 |
+| CU-E-20 | Eliminar rutina a alumno | ⬜ No implementado | **entra al MVP (16/10)** · irá en `DELETE /routine/assign-user/:id` · BE-11 |
 
 ### Administrar circuitos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -460,11 +484,11 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-26 | Obtener estado de membresías | ✅ Implementado | `GET /membership/status/summary` · contadores derivados de `expired_at` |
 | CU-E-27 | Obtener alumnos por estado de membresía | ✅ Implementado | `GET /membership/status/users?status=` · active / expiring_soon / expired / no_payments |
 | CU-E-28 | Obtener alumnos por tipo de membresía | ✅ Implementado | `GET /membership/type/users?membership_id=` · sin el param, agrupa por tipo |
-| CU-E-29 | Registrar pago de alumno | ✅ Implementado | `POST /membership/payment/register` |
+| CU-E-29 | Registrar pago de alumno | ✅ Implementado | `POST /membership/payment/register` · ⚠ acepta un tipo dado de baja y un destinatario que no es alumno · BE-28 |
 
 ---
 
-## Detalle — Rol Admin (23 CU · 100%)
+## Detalle — Rol Admin (23 CU · 78%)
 
 ### Administrar ejercicios
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -472,7 +496,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-A-01 | Obtener ejercicios | ✅ Implementado | `GET /exercise/all` |
 | CU-A-02 | Asignar músculo a ejercicio | ✅ Implementado | se gestiona al crear/editar ejercicios (`POST /exercise/create` y `/exercise/edit/:id`) |
 | CU-A-03 | Desasignar músculo de ejercicio | ✅ Implementado | se gestiona al editar ejercicios (`POST /exercise/edit/:id`) |
-| CU-A-04 | Crear ejercicio | ✅ Implementado | `POST /exercise/create` |
+| CU-A-04 | Crear ejercicio | ✅ Implementado | `POST /exercise/create` · ⚠ `description` es opcional en el DTO y NOT NULL en la base: sin ella responde 500 · BE-31 |
 | CU-A-05 | Editar ejercicio | ✅ Implementado | `POST /exercise/edit/:id` |
 | CU-A-06 | Eliminar ejercicio | ✅ Implementado | `DELETE /exercise/:id` |
 
@@ -482,23 +506,23 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-A-07 | Obtener músculos | ✅ Implementado | `GET /muscles/all` |
 | CU-A-08 | Crear músculo | ✅ Implementado | `POST /muscles/create` |
 | CU-A-09 | Editar músculo | ✅ Implementado | `POST /muscles/edit/:id` |
-| CU-A-10 | Eliminar músculo | ✅ Implementado | `DELETE /muscles/:id` |
+| CU-A-10 | Eliminar músculo | 🟡 Parcial | `DELETE /muscles/:id` · borra en cascada (lo quita de sus ejercicios) en vez de impedir la baja de un músculo en uso · BE-24 |
 | CU-A-11 | Obtener grupos musculares | ✅ Implementado | `GET /muscles/mg/all` |
 
 ### Administrar grupos musculares
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-A-12 | Obtener músculos del grupo muscular | ✅ Implementado | `GET /muscles/mg/get/:id` · incluye músculos |
-| CU-A-13 | Crear grupo muscular | ✅ Implementado | `POST /muscles/mg/create` |
-| CU-A-14 | Editar grupo muscular | ✅ Implementado | `POST /muscles/mg/edit/:id` |
-| CU-A-15 | Eliminar grupo muscular | ✅ Implementado | `DELETE /muscles/mg/:id` |
+| CU-A-13 | Crear grupo muscular | 🟡 Parcial | `POST /muscles/mg/create` · no valida que el nombre sea único · BE-26 |
+| CU-A-14 | Editar grupo muscular | 🟡 Parcial | `POST /muscles/mg/edit/:id` · no valida que el nombre sea único · BE-26 |
+| CU-A-15 | Eliminar grupo muscular | 🟡 Parcial | `DELETE /muscles/mg/:id` · borra el grupo, sus músculos y sus vínculos en cascada en vez de impedirlo · BE-25 |
 
 ### Administrar entrenadores
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-A-16 | Obtener entrenadores | ✅ Implementado | `GET /coach/all` · sólo admin; era público y exponía el CUIL (16/10) |
-| CU-A-17 | Convertir alumno a entrenador | ✅ Implementado | `POST /coach/promote_user` |
-| CU-A-18 | Editar datos de entrenador | ✅ Implementado | `POST /coach/promote_user` · si el user ya es coach, actualiza `coach_email`, `cuil`, `active` |
+| CU-A-17 | Convertir alumno a entrenador | 🟡 Parcial | `POST /coach/promote_user` · falta el camino "ya es entrenador" (hoy pisa email y CUIL) y no es transaccional; por la decisión del 16/10 se reescribe la spec y se arregla · BE-27 |
+| CU-A-18 | Editar datos de entrenador | ✅ Implementado | `POST /coach/promote_user` · si el user ya es coach, actualiza `coach_email`, `cuil`, `active`; se mantiene así (decisión del 16/10) |
 | CU-A-19 | Eliminar entrenador | ✅ Implementado | `POST /coach/delete_coach/:id` · baja lógica (`active: false`) |
 
 ### Administrar membresías (tipos)
@@ -507,23 +531,16 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-A-20 | Obtener membresías | ✅ Implementado | `GET /membership/all` |
 | CU-A-21 | Crear membresía | ✅ Implementado | `POST /membership/create` |
 | CU-A-22 | Editar membresía | ✅ Implementado | `POST /membership/edit/:id` |
-| CU-A-23 | Eliminar membresía | ✅ Implementado | `POST /membership/set-active/:id` · baja lógica con flag `{ active }` · **pendiente:** columna `active` en DB |
-
----
-
-## Orden sugerido para cerrar la brecha
-
-1. **Admin cerrado (23/23):** A-18 cubierto por `promote_user`; A-02/A-03 se resuelven al crear/editar ejercicios; A-23 implementado y con la columna `active` ya agregada a los scripts de DB (falta regenerar la base para aplicarlo).
-2. **Routine + Planification**: implementar los services stubbed → desbloquea 14 CU y hace usable el rol Entrenador y "Mi Entrenamiento" del Usuario.
-3. ~~**Circuitos** (E-21→E-24)~~ **cerrado del todo el 25/8**, con E-23 (editar) incluido. ~~Lo que sigue es **Rutinas** (E-15→E-18)~~ **cerrado el 27/8**; E-19/E-20 quedaron post-MVP. Lo que sigue es **Planificaciones** (E-08→E-14) y, con ellas, los CU de ejecución (U-08, U-09, U-12, U-13, E-06, E-07), que hoy están frenados porque nada escribe `Routine_Exercise_Finished` (hallazgo 2).
-4. ~~**Gestión de cuenta del Usuario** (U-05, U-06) y auth (U-03, U-04).~~ **Cerrado** (U-03/U-04 el 11/8, U-05/U-06 el 18/8).
-5. ~~**Transversal:** Guards de autenticación/roles.~~ **Cerrado el 11/8.** El manejo de schema no es una decisión pendiente: **`Db Creator` es la fuente** y los cambios se aplican a mano desde ahí.
+| CU-A-23 | Eliminar membresía | ✅ Implementado | `POST /membership/set-active/:id` · baja lógica con flag `{ active }` |
 
 ---
 
 ## Cómo leer los estados
 
-- **✅ Implementado** — el endpoint existe y su service ejecuta lógica real y validada.
-- **🟡 Parcial** — funciona a medias: resuelto dentro de otro endpoint, sin filtro por usuario, o con la lógica lista pero sin ruta expuesta.
-- **🔵 Andamiaje** — la ruta está declarada pero el service está vacío y la llamada comentada: responde, no ejecuta nada.
-- **⬜ No implementado** — no existe endpoint, service ni módulo que cubra el caso de uso.
+- **✅ Implementado:** el endpoint existe, su service ejecuta lógica real y **se cumplen todos los caminos de su spec**.
+- **⚠ (sobre un ✅):** además tiene un defecto abierto de seguridad o de contrato; la nota de la fila dice cuál y qué tarea lo cierra.
+- **🟡 Parcial:** un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU.
+- **🔵 Andamiaje:** la ruta está declarada pero sin lógica. Con `@Res()` y la llamada comentada, **no responde**: el request cuelga.
+- **⬜ No implementado:** no hay endpoint que cubra el caso de uso.
+- **— Sin backend:** por su spec el CU es del cliente (hoy, sólo CU-U-14).
+- **BE-xx:** la tarea del roadmap que cierra lo que falta.
