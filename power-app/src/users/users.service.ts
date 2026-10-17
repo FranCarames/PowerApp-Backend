@@ -3,6 +3,7 @@ import { instanceToPlain } from 'class-transformer';
 import { Response } from 'express';
 
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from '../dtos/user/create_user.dto';
 import { LoginUserDto } from '../dtos/user/login_user.dto';
@@ -20,7 +21,8 @@ export class UsersService {
     constructor(
         @InjectRepository(User)
         private usersRepository: Repository<User>,
-        private authService: AuthService
+        private authService: AuthService,
+        private configService: ConfigService
     ) {
     }
 
@@ -226,8 +228,11 @@ export class UsersService {
                 user.updated_at = new Date();
                 await this.usersRepository.save(user);
 
-                // TODO: integrar un servicio de email real (nodemailer/SMTP). Por ahora se loguea la temporal.
-                console.log(`[EMAIL STUB] Contraseña temporal para ${email}: ${tempPassword}`);
+                // Hasta el mail real (BE-29) la temporal sólo se ve en la consola, y sólo con
+                // LOG_TEMP_PASSWORD=true (local, para probar CU-U-04). En Render no se loguea.
+                if (this.configService.get<string>('LOG_TEMP_PASSWORD') === 'true') {
+                    console.log(`[EMAIL STUB] Contraseña temporal para ${email}: ${tempPassword}`);
+                }
             }
 
             // Por seguridad, misma respuesta exista o no el email (no revelar si está registrado).

@@ -26,6 +26,18 @@
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
 
+## Cambios recientes (2026-10-17 · higiene de producción)
+
+- **Sexta tarea del roadmap (BE-06).** Son tres cosas que no son de ningún CU pero estaban expuestas en el deploy público.
+- **Se borró `power-app/config.ts`.** Era código muerto desde el primer commit: exportaba un secreto JWT escrito a mano que sólo nombraban líneas comentadas de `auth.service.ts` (el JWT real sale de `JWT_SECRET`). Además estaba fuera de `src/`, y eso movía la raíz de compilación: el build emitía `dist/config.js` y **`dist/src/main.js`**, así que el `npm run start:prod` del README (`node dist/main`) no arrancaba. Sin el archivo, el build vuelve a emitir **`dist/main.js`** y `dist/src/` desaparece (verificado).
+- **El secreto sigue en el historial, y el repo es público.** Borrar el archivo no lo saca de los commits viejos. Se comparó contra el `JWT_SECRET` del `.env` local, sin mostrar ninguno de los dos, y **no coinciden**. El de Render no se puede ver desde acá. **Pendiente del usuario:** confirmar que el `JWT_SECRET` de Render no es el de `config.ts`. Si lo es, cualquiera puede firmar un token de admin, y hay que rotarlo (cierra todas las sesiones).
+- **Pendiente del usuario (deploy):** confirmar el Start Command de Render. Si es `node dist/src/main.js`, **deja de arrancar con este cambio** y hay que pasarlo a `npm run start:prod` en el mismo deploy. Con `npm start` (`nest start`) sigue andando, porque prueba las dos rutas (se leyó en `@nestjs/cli`).
+- **Logs sensibles detrás de flags explícitos** (decisión del 17/10, entre un `NODE_ENV` y un flag por cosa): **`DB_LOGGING`** prende el `logging` de TypeORM, que logueaba cada query con sus parámetros, hashes de contraseña incluidos. **`LOG_TEMP_PASSWORD`** prende el `[EMAIL STUB]` de CU-U-04, que imprimía la contraseña temporal en texto plano. **Los dos fallan cerrados:** sólo se encienden con `true` exacto, así que en Render, sin las variables, no se loguea nada y no hay que configurar nada. `UsersService` recibe `ConfigService`, igual que `MembershipService`.
+- **Consecuencia asumida:** en Render, recuperar la contraseña **no le llega a nadie** hasta BE-29 (el mail real). En los hechos ya era así, salvo para quien leía los logs del servicio.
+- **Para seguir probando en local** hay que sumar `DB_LOGGING=true` y `LOG_TEMP_PASSWORD=true` al `.env`. Si no, el plan `Tests/Acceso` no encuentra la temporal en la consola (REC-01 y los que la usan). El README documenta las dos variables, y también `MEMBERSHIP_EXPIRING_SOON_DAYS`, que ya se usaba y no figuraba.
+- **Verificación:** build (`dist/main.js` existe y `dist/src/` no) y un script sobre el código compilado. `recoverPassword` sólo loguea la temporal con `LOG_TEMP_PASSWORD=true` (con ausente, `false` o `TRUE`, no), y la factory real de TypeORM da `logging = true` sólo con `DB_LOGGING=true`. Que `start:prod` arranque contra una base **no se verificó en runtime**.
+- **Sin cambio de esquema** ni de ningún CU.
+
 ## Cambios recientes (2026-10-17 · una sola forma para los RMs)
 
 - **Quinta tarea del roadmap (BE-05), hallazgo V10 del web.** Las 5 lecturas de `user_rm` recortaban las FK con su `select`: mandaban el ejercicio y el usuario anidados (`exercise { id, name }`, `user { id, first_name, last_name }`), pero no `user_id` ni `exercise_id`. El Swagger las declaraba como `UserRM`, que es plano, con las FK y sin lo anidado, y con `date` como `date-time` cuando es un día sin hora. El web tipó la forma real a mano (`UserRmWithExercise`, pendiente de contrato).

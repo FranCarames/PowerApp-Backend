@@ -74,7 +74,13 @@ POSTGRES_PASSWORD=tu_password
 POSTGRES_DB=powerapp
 JWT_SECRET=un_secreto_largo_y_aleatorio
 PORT=3000
+
+# Opcionales
+MEMBERSHIP_EXPIRING_SOON_DAYS=7   # días antes del vencimiento en que una membresía cuenta como "por vencer" (default 7)
+DB_LOGGING=true                   # sólo en local: loguea cada query de TypeORM con sus parámetros
+LOG_TEMP_PASSWORD=true            # sólo en local: imprime la contraseña temporal de CU-U-04 (hasta que haya mail real)
 ```
+`DB_LOGGING` y `LOG_TEMP_PASSWORD` se encienden **sólo con `true`**: sin la variable (como en Render) no se loguea nada, porque exponen hashes y contraseñas temporales.
 
 ### 3. Crear la base de datos
 Aplicar los scripts de `Db Creator/` **en orden** sobre la base:

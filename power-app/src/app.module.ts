@@ -27,7 +27,8 @@ import { UserRmModule } from './user_rm/user_rm.module';
         ssl: {
           rejectUnauthorized: false,
         },
-        logging: true,
+        // Sólo con DB_LOGGING=true (local): loguea cada query con sus parámetros, hashes incluidos.
+        logging: configService.get<string>('DB_LOGGING') === 'true',
         autoLoadEntities: true, // Muy útil en NestJS + TypeORM
       }),
       inject: [ConfigService],
