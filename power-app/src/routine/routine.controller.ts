@@ -31,11 +31,14 @@ import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
 import { Owner } from '../authentication/decorators/owner.decorator';
+import { CurrentUser } from '../authentication/decorators/current-user.decorator';
+import { AuthUser } from '../authentication/auth-user.interface';
 import { AssignRoutineToUserDto } from '../dtos/routine/assign_routine_to_user.dto';
 import { RoutineAssignUserResponseDto } from '../dtos/routine/routine_assign_user_response.dto';
 import { AssignedRoutinesParamsDto } from '../dtos/routine/assigned_routines_params.dto';
 import { GetAssignedRoutinesQueryDto } from '../dtos/routine/get_assigned_routines_query.dto';
 import { RoutineAssignedListItemResponseDto } from '../dtos/routine/routine_assigned_list_item_response.dto';
+import { RoutineAssignedDetailResponseDto } from '../dtos/routine/routine_assigned_detail_response.dto';
 
 @ApiTags('Routine')
 @Controller('routine')
@@ -65,8 +68,9 @@ export class RoutineController {
         await this.routineService.getAllRoutinesPlus(query, res);
     }
 
-    // Sin el rol user: CU-U-09 exige que la rutina pertenezca a una asignacion vigente
-    // del alumno, y esa cadena todavia no existe. Habilitarlo sin el check seria un agujero
+    // Sin el rol user, a proposito (D8, 17/10): el alumno lee la rutina POR SU ASIGNACION,
+    // GET /routine/assign-user/:id, que es la unidad de trabajo del dia. Habilitarlo aca
+    // obligaria a chequear "la tiene asignada" y cambiaria el contrato de este endpoint
     @Get('/:id')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 200, type: RoutineDetailResponseDto })
@@ -207,6 +211,23 @@ export class RoutineController {
         @Res() res: Response,
     ) {
         await this.routineService.removeRoutineFromUser(idAssignment.id, res);
+    }
+
+    // El dueño se chequea en el service y no con @Owner: el path trae el id de la asignacion y no
+    // el del alumno. Con el rol user, 403 si la asignacion es de otro; coach y admin abren la de
+    // cualquiera. Cubre U-09 y U-10: el detalle de cada ejercicio (series y notas) viene en el arbol
+    @Get('assign-user/:id')
+    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: RoutineAssignedDetailResponseDto })
+    @ApiResponse({ status: 400, description: 'El id no es un UUID válido' })
+    @ApiResponse({ status: 403, description: 'La asignación es de otro alumno' })
+    @ApiResponse({ status: 404, description: 'Asignación no encontrada' })
+    async getAssignedRoutineById(
+        @Param() idAssignment: ParameterIdDto,
+        @CurrentUser() user: AuthUser,
+        @Res() res: Response,
+    ) {
+        await this.routineService.getAssignedRoutineById(idAssignment.id, user, res);
     }
 
     // Con el rol user, @Owner exige que :userId sea el propio id (403); coach y admin ven el de

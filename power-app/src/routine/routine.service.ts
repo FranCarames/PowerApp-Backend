@@ -23,6 +23,7 @@ import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
 import { AssignRoutineToUserDto } from '../dtos/routine/assign_routine_to_user.dto';
 import { GetAssignedRoutinesQueryDto } from '../dtos/routine/get_assigned_routines_query.dto';
+import { AuthUser } from '../authentication/auth-user.interface';
 
 // Los dos 409 de la rutina individual. El de "ya entreno" sale por dos caminos (el chequeo
 // previo y la FK RESTRICT de la base), y el de duplicado tambien (chequeo previo y unico)
@@ -984,6 +985,70 @@ export class RoutineService {
         }
     }
 
+    // Lo que el alumno abre desde su home (U-09, U-10): la rutina de UNA asignacion, con lo que ya
+    // hizo. Se lee por la asignacion y no por la rutina (D8): la unidad de trabajo del alumno es la
+    // asignacion del dia, y GET /routine/:id queda para coach y admin
+    async getAssignedRoutineById(
+        idAssignment: string,
+        currentUser: AuthUser,
+        res: Response
+    ) {
+        try {
+            const assignment = await this.routineAsignationUserRepository.findOne({
+                where: { id: idAssignment },
+            });
+
+            if (!assignment) {
+                return res.status(404).send({ error: 'Asignación no encontrada' });
+            }
+
+            // "Dueño" = la asignacion es del alumno del token. El path trae el id de la asignacion
+            // y no el del usuario, asi que no alcanza con @Owner: el chequeo va aca, en minuscula
+            // (el iOS manda los UUID en mayuscula). Coach y admin abren la de cualquier alumno
+            // (gimnasio compartido, D6). El texto no puede ser el de la cuenta deshabilitada: es
+            // el unico que hace cerrar la sesion en el web
+            if (currentUser.role === UserRole.user
+                && assignment.user_id.toLowerCase() !== currentUser.id.toLowerCase()) {
+                return res.status(403).send({
+                    error: 'No podés acceder a una rutina asignada a otro alumno.'
+                });
+            }
+
+            const finishedRows = await this.routineAsignExerciseFinishedRepository.find({
+                where: { user_routine_asign_id: assignment.id },
+                order: { created_at: 'ASC', routine_exercise_id: 'ASC' },
+            });
+
+            // La misma consulta y los mismos builders que GET /routine/:id (spec §4.4)
+            const routine = await this.findRoutineDetail(assignment.routine_id);
+
+            if (!routine) {
+                return res.status(404).send({ error: 'Rutina no encontrada' });
+            }
+
+            const { visibleInactiveIds, completedIds } = this.buildAssignmentVisibility(routine, finishedRows);
+
+            return res.status(200).send({
+                id: assignment.id,
+                routine_id: assignment.routine_id,
+                user_id: assignment.user_id,
+                date: assignment.date,
+                created_at: assignment.created_at,
+                updated_at: assignment.updated_at,
+                routine: this.buildRoutineDetailResponse(routine, visibleInactiveIds, completedIds),
+                finished: finishedRows.map(row => ({
+                    routine_exercise_id: row.routine_exercise_id,
+                    user_note: row.user_note ?? null,
+                    created_at: row.created_at,
+                    updated_at: row.updated_at,
+                })),
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener la rutina asignada.' });
+        }
+    }
+
     // ===================== HELPERS DE ASIGNACION INDIVIDUAL =====================
 
     // La misma forma para el alta (la asignacion creada) y la baja (la asignacion borrada).
@@ -1068,6 +1133,43 @@ export class RoutineService {
         return progressByAssignment;
     }
 
+    // Que parte de lo dado de baja se le muestra al alumno en el detalle de una asignacion (spec
+    // §4.4): un Routine_Exercise apagado, si lo completo; un Routine_Circuit apagado, si completo
+    // algo de ese circuito. Se mira el CIRCUITO y no el vinculo porque la base no registra el
+    // hecho por vinculo: con un circuito repetido (A, B, A) el ejercicio completado es el mismo en
+    // los dos. Con esto, los ejercicios del detalle (sin repetir ids) son exactamente los de
+    // BE-12: los activos de los vinculos activos mas los completados
+    private buildAssignmentVisibility(
+        routine: Routine,
+        finishedRows: RoutineAsignExerciseFinished[]
+    ): { visibleInactiveIds: Set<string>; completedIds: Set<string> } {
+        const completedIds = new Set(finishedRows.map(row => row.routine_exercise_id));
+        const circuitsWithCompleted = new Set<string>();
+        const visibleInactiveIds = new Set<string>();
+
+        for (const routineCircuit of routine.routineCircuits) {
+            for (const routineExercise of routineCircuit.circuit.routineExercises) {
+                if (!completedIds.has(routineExercise.id)) {
+                    continue;
+                }
+
+                circuitsWithCompleted.add(routineCircuit.circuit_id);
+
+                if (!routineExercise.active) {
+                    visibleInactiveIds.add(routineExercise.id);
+                }
+            }
+        }
+
+        for (const routineCircuit of routine.routineCircuits) {
+            if (!routineCircuit.active && circuitsWithCompleted.has(routineCircuit.circuit_id)) {
+                visibleInactiveIds.add(routineCircuit.id);
+            }
+        }
+
+        return { visibleInactiveIds, completedIds };
+    }
+
     // Reconoce un error de Postgres por su codigo (23505 = unico, 23503 = clave foranea).
     // constraint es opcional: sirve para no confundir el unico que importa con cualquier otro
     private isDatabaseError(error: unknown, code: string, constraint?: string): boolean {
@@ -1130,14 +1232,21 @@ export class RoutineService {
 
     // Compartido por el detalle y por las respuestas del alta y la edicion, para que el
     // formato no se duplique.
-    // visibleInactiveIds: ids de Routine_Circuit dados de baja que SI hay que mostrar.
-    // Las lecturas del entrenador no pasan nada, asi que ven solo los activos: un circuito
-    // que sacaste de la rutina no reaparece en la pantalla de edicion. Las del alumno
-    // (U-08/U-09 y el historial E-06/E-07) van a pasar los vinculos apagados de los que esa
-    // asignacion (del plan o individual) tenga algun ejercicio hecho — mismo contrato que
-    // buildCircuitDetailResponse un nivel mas abajo: se ve lo dado de baja que uno completo,
-    // y solo eso. Ojo: el vinculo apagado tiene order null, asi que no conserva su posicion
-    private buildRoutineDetailResponse(routine: Routine, visibleInactiveIds?: Set<string>) {
+    // visibleInactiveIds: ids de Routine_Circuit (y de Routine_Exercise, que bajan al builder del
+    // circuito) dados de baja que SI hay que mostrar. Las lecturas del entrenador no pasan nada,
+    // asi que ven solo los activos: un circuito que sacaste de la rutina no reaparece en la
+    // pantalla de edicion. La del alumno (GET /routine/assign-user/:id) pasa lo apagado de lo que
+    // esa asignacion tenga algun ejercicio hecho: se ve lo dado de baja que uno completo.
+    // completedIds: los ejercicios que el alumno completo en esa asignacion. Un vinculo apagado
+    // que se muestra es porque completo algo de ese circuito, pero el circuito ya no integra la
+    // rutina: de el se ve lo completado y nada mas (si no, el detalle mostraria como pendientes
+    // ejercicios que el entrenador saco). Ojo: el vinculo apagado tiene order null, asi que no
+    // conserva su posicion y Postgres lo manda al final
+    private buildRoutineDetailResponse(
+        routine: Routine,
+        visibleInactiveIds?: Set<string>,
+        completedIds?: Set<string>
+    ) {
         return {
             id: routine.id,
             name: routine.name,
@@ -1151,7 +1260,11 @@ export class RoutineService {
                     id: routineCircuit.id,
                     order: routineCircuit.order,
                     // Mismo formato que GET /routine/circuit/:id
-                    circuit: this.buildCircuitDetailResponse(routineCircuit.circuit),
+                    circuit: this.buildCircuitDetailResponse(
+                        routineCircuit.circuit,
+                        visibleInactiveIds,
+                        routineCircuit.active ? undefined : completedIds,
+                    ),
                 })),
         };
     }
@@ -1229,11 +1342,17 @@ export class RoutineService {
     }
 
     // visibleInactiveIds: ids de Routine_Exercise dados de baja que SI hay que mostrar.
-    // Las lecturas del entrenador no pasan nada, asi que ven solo los activos. Las del
-    // alumno (U-08/U-09/U-10 y el historial) van a pasar los que esa asignacion tenga hechos
+    // Las lecturas del entrenador no pasan nada, asi que ven solo los activos. La del
+    // alumno (GET /routine/assign-user/:id) pasa los que esa asignacion tenga hechos
     // (Routine_Exercise_Finished o Routine_Asign_Exercise_Finished): un ejercicio que completo
-    // no tiene que desaparecerle de la pantalla porque el entrenador lo saco del circuito
-    private buildCircuitDetailResponse(circuit: Circuit, visibleInactiveIds?: Set<string>) {
+    // no tiene que desaparecerle de la pantalla porque el entrenador lo saco del circuito.
+    // onlyExerciseIds: si viene, de este circuito se muestran SOLO esos ejercicios. Lo usa el
+    // builder de la rutina para un vinculo apagado: el circuito ya no es parte de la rutina
+    private buildCircuitDetailResponse(
+        circuit: Circuit,
+        visibleInactiveIds?: Set<string>,
+        onlyExerciseIds?: Set<string>
+    ) {
         return {
             id: circuit.id,
             name: circuit.name,
@@ -1243,7 +1362,9 @@ export class RoutineService {
             created_at: circuit.created_at,
             updated_at: circuit.updated_at,
             exercises: circuit.routineExercises
-                .filter(routineExercise => routineExercise.active || visibleInactiveIds?.has(routineExercise.id))
+                .filter(routineExercise => onlyExerciseIds
+                    ? onlyExerciseIds.has(routineExercise.id)
+                    : routineExercise.active || visibleInactiveIds?.has(routineExercise.id))
                 .map(routineExercise => ({
                 id: routineExercise.id,
                 exercise_order: routineExercise.exercise_order,
