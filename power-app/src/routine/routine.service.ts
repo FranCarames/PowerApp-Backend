@@ -22,6 +22,7 @@ import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
 import { AssignRoutineToUserDto } from '../dtos/routine/assign_routine_to_user.dto';
+import { GetAssignedRoutinesQueryDto } from '../dtos/routine/get_assigned_routines_query.dto';
 
 // Los dos 409 de la rutina individual. El de "ya entreno" sale por dos caminos (el chequeo
 // previo y la FK RESTRICT de la base), y el de duplicado tambien (chequeo previo y unico)
@@ -909,6 +910,80 @@ export class RoutineService {
         }
     }
 
+    // El alumno lo usa para el home de la semana (from = lunes, to = domingo) y el entrenador sin
+    // filtro, para ver todo lo que le asigno. Las asignaciones sobreviven a la baja de la rutina y
+    // al cierre de la cuenta (spec §6): por eso no se filtra por ninguno de los dos "active"
+    async getAssignedRoutines(
+        userId: string,
+        query: GetAssignedRoutinesQueryDto,
+        res: Response
+    ) {
+        // Validacion que no depende de la base, antes de consultar. Los dias son 'YYYY-MM-DD' de
+        // ancho fijo (IsCalendarDay), asi que comparar los strings es comparar fechas
+        if (query.from && query.to && query.from > query.to) {
+            return res.status(400).send({
+                error: 'La fecha inicial (from) no puede ser posterior a la final (to).'
+            });
+        }
+
+        try {
+            const user = await this.userRepository.findOne({
+                where: { id: userId },
+                select: { id: true },
+            });
+
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            // De la rutina sale solo lo que muestra el listado. Orden de la spec §4.3: dia y
+            // nombre de rutina; el alta desempata dos rutinas homonimas el mismo dia
+            const assignmentsQuery = this.routineAsignationUserRepository
+                .createQueryBuilder('assignment')
+                .innerJoin('assignment.routine', 'routine')
+                .addSelect(['routine.id', 'routine.name', 'routine.active'])
+                .where('assignment.user_id = :userId', { userId: user.id })
+                .orderBy('assignment.date', 'ASC')
+                .addOrderBy('routine.name', 'ASC')
+                .addOrderBy('assignment.created_at', 'ASC');
+
+            // Los dos extremos son inclusivos y opcionales
+            if (query.from) {
+                assignmentsQuery.andWhere('assignment.date >= :from', { from: query.from });
+            }
+
+            if (query.to) {
+                assignmentsQuery.andWhere('assignment.date <= :to', { to: query.to });
+            }
+
+            const assignments = await assignmentsQuery.getMany();
+
+            if (assignments.length === 0) {
+                return res.status(200).send([]);
+            }
+
+            const progressByAssignment = await this.findAssignedRoutinesProgress(assignments);
+
+            return res.status(200).send(assignments.map(assignment => ({
+                id: assignment.id,
+                routine_id: assignment.routine_id,
+                user_id: assignment.user_id,
+                date: assignment.date,
+                created_at: assignment.created_at,
+                updated_at: assignment.updated_at,
+                routine: {
+                    id: assignment.routine.id,
+                    name: assignment.routine.name,
+                    active: assignment.routine.active,
+                },
+                progress: progressByAssignment.get(assignment.id)!,
+            })));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener las rutinas asignadas.' });
+        }
+    }
+
     // ===================== HELPERS DE ASIGNACION INDIVIDUAL =====================
 
     // La misma forma para el alta (la asignacion creada) y la baja (la asignacion borrada).
@@ -926,6 +1001,71 @@ export class RoutineService {
             updated_at: assignment.updated_at,
             routine: { id: routine.id, name: routine.name },
         };
+    }
+
+    // finished y total de cada asignacion (spec §4.3). total son los ejercicios que el alumno ve
+    // en el detalle: los activos de los circuitos activos de la rutina MAS los dados de baja que
+    // completo en esa asignacion, cada uno una vez. Es una union de conjuntos de ids y no una
+    // suma: un circuito repetido en la rutina (A, B, A) comparte sus Routine_Exercise, y un
+    // ejercicio completado puede ser a la vez activo. Por eso la cuenta se hace en memoria, con
+    // dos consultas chicas, y no con un COUNT en SQL
+    private async findAssignedRoutinesProgress(
+        assignments: RoutineAsignationUser[]
+    ): Promise<Map<string, { finished: number; total: number }>> {
+        const routineIds = [...new Set(assignments.map(assignment => assignment.routine_id))];
+        const assignmentIds = assignments.map(assignment => assignment.id);
+
+        // Los ejercicios vigentes de cada rutina que aparece: activos y en un vinculo activo.
+        // Raw y con alias porque no hay una entidad que los represente
+        const activeRows = await this.dataSource
+            .createQueryBuilder()
+            .select('routineCircuit.routine_id', 'routine_id')
+            .addSelect('routineExercise.id', 'routine_exercise_id')
+            .distinct(true)
+            .from(RoutineCircuit, 'routineCircuit')
+            .innerJoin(RoutineExercise, 'routineExercise', 'routineExercise.circuit_id = routineCircuit.circuit_id')
+            .where('routineCircuit.routine_id IN (:...routineIds)', { routineIds })
+            .andWhere('routineCircuit.active = true')
+            .andWhere('routineExercise.active = true')
+            .getRawMany<{ routine_id: string; routine_exercise_id: string }>();
+
+        // Lo hecho en cada asignacion. getRawMany y no getMany: un select parcial sin la clave
+        // primaria hace que TypeORM agrupe las filas por id y colapse el resultado
+        const finishedRows = await this.routineAsignExerciseFinishedRepository
+            .createQueryBuilder('finished')
+            .select('finished.user_routine_asign_id', 'assignment_id')
+            .addSelect('finished.routine_exercise_id', 'routine_exercise_id')
+            .where('finished.user_routine_asign_id IN (:...assignmentIds)', { assignmentIds })
+            .getRawMany<{ assignment_id: string; routine_exercise_id: string }>();
+
+        const activeByRoutine = new Map<string, Set<string>>();
+
+        for (const row of activeRows) {
+            if (!activeByRoutine.has(row.routine_id)) {
+                activeByRoutine.set(row.routine_id, new Set());
+            }
+            activeByRoutine.get(row.routine_id)!.add(row.routine_exercise_id);
+        }
+
+        const finishedByAssignment = new Map<string, Set<string>>();
+
+        for (const row of finishedRows) {
+            if (!finishedByAssignment.has(row.assignment_id)) {
+                finishedByAssignment.set(row.assignment_id, new Set());
+            }
+            finishedByAssignment.get(row.assignment_id)!.add(row.routine_exercise_id);
+        }
+
+        const progressByAssignment = new Map<string, { finished: number; total: number }>();
+
+        for (const assignment of assignments) {
+            const finished = finishedByAssignment.get(assignment.id) ?? new Set<string>();
+            const visible = new Set([...(activeByRoutine.get(assignment.routine_id) ?? []), ...finished]);
+
+            progressByAssignment.set(assignment.id, { finished: finished.size, total: visible.size });
+        }
+
+        return progressByAssignment;
     }
 
     // Reconoce un error de Postgres por su codigo (23505 = unico, 23503 = clave foranea).

@@ -8,13 +8,13 @@
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
 | ✅ Implementado | 59 | 79% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
-| 🟡 Parcial | 8 | 11% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
-| 🔵 Andamiaje | 3 | 4% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
+| 🟡 Parcial | 9 | 12% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
+| 🔵 Andamiaje | 2 | 3% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
 | ⬜ No implementado | 4 | 5% | Sin endpoint |
 | — Sin backend | 1 | 1% | Por su spec es del cliente (CU-U-14) |
 | **Total** | **75** | | |
 
-**59 de los 74 CU con backend están completos (80%).** Faltan 15: 8 parciales, 3 en andamiaje y 4 sin implementar. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
+**59 de los 74 CU con backend están completos (80%).** Faltan 15: 9 parciales, 2 en andamiaje y 4 sin implementar. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
 > **Nota (17/10):** los ✅ bajan de 63 (corte del 4/9) a 57 porque **cambió el criterio, no porque se rompiera algo**. El de antes daba ✅ a todo endpoint con lógica real; el del roadmap exige además que se cumpla cada camino de la spec. Por eso pasaron a 🟡 CU-U-04 (no envía el mail), CU-A-10 y CU-A-15 (borran en cascada en vez de impedirlo), CU-A-13 y CU-A-14 (no validan el nombre único) y CU-A-17 (falta "ya es entrenador"). Ver los cambios del 17/10.
 > **Base de datos:** la de Render se recreó el 3/10 con el esquema vigente (dato del Status web). Es free tier y **vence alrededor del 2/11** (*sin verificar*), así que hay que regenerarla antes (BE-23). **Desde el 17/10 el esquema del bloque A ya está en `Db Creator`** (BE-10): al regenerar con `01` → `02` → `03` no hace falta el patch `patches/2026-10-17-be-10.sql`, que es para una base viva.
 
@@ -22,12 +22,34 @@
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | Sin backend | % ✅ (sobre los CU con backend) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Usuario | 20 | 13 | 3 | 1 | 2 | 1 | 68% |
+| Usuario | 20 | 13 | 4 | 0 | 2 | 1 | 68% |
 | Entrenador | 32 | 28 | 0 | 2 | 2 | 0 | 88% |
 | Admin | 23 | 18 | 5 | 0 | 0 | 0 | 78% |
-| **Total** | **75** | **59** | **8** | **3** | **4** | **1** | **80%** |
+| **Total** | **75** | **59** | **9** | **2** | **4** | **1** | **80%** |
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+
+## Cambios recientes (2026-10-18 · rutina individual: listado por alumno)
+
+- **Duodécima tarea del roadmap (BE-12): la parte individual de U-08.** `GET /routine/assigned/:userId?from=&to=` (spec del 17/10, §4.3), en `routine.controller.ts` y `routine.service.ts`. Plan: `Doc/plans/2026-10-18-be-12-listado-rutinas-por-alumno-plan.md` (repo PowerApp-Docs). **U-08 pasa de 🔵 a 🟡** (no a ✅): la parte del plan sigue colgando hasta BE-20. Conteos: 🟡 8 → **9** y 🔵 3 → **2**; los ✅ siguen en 59. También es el listado que necesitan E-19 y E-20: el coach lo usa para abrir la asignación que va a quitar.
+- **Va en `routine/` y no reemplaza al andamiaje de `planification/`.** El roadmap hablaba de reemplazar `GET /planification/user/:id/active` por el home; la spec fijó el endpoint en `routine/`, y los dos andamiajes de `planification.controller.ts` (`/user/:id` y `/user/:id/active`) **siguen colgando** porque son de la vía plan (BE-19 y BE-20).
+- **El contrato.** Roles: user (con `@Owner('userId')`: sólo el propio id, `403` si no), coach y admin (cualquier alumno, gimnasio compartido). `from` y `to` son opcionales, inclusivos y en formato día (reusan `@IsCalendarDay()` de BE-11); `from > to` es `400`; usuario inexistente es `404`. `200` con un array ordenado por día y nombre de rutina, vacío si no hay asignaciones. Cada ítem: `{ id, routine_id, user_id, date, created_at, updated_at, routine: { id, name, active }, progress: { finished, total } }`.
+- **Qué es `progress`.** `finished` son las filas de hecho de la asignación. `total` son los ejercicios que el alumno ve en el detalle: **los activos de los vínculos activos de la rutina, más los dados de baja que completó en esa asignación, cada uno una vez**. **Por qué una unión y no una suma:** un circuito repetido en la rutina (A, B, A) comparte sus `Routine_Exercise`, y un ejercicio completado puede ser a la vez activo; se cuentan ids distintos. Una asignación 2 de 3 un lunes no dice nada de otro día de la misma rutina: comparten los ejercicios, no lo hecho.
+- **La cuenta se hace en memoria, con tres consultas.** (1) Las asignaciones del alumno con su rutina (`id`, `name`, `active`), (2) los ejercicios vigentes de las rutinas que aparecen y (3) los hechos de esas asignaciones; las dos últimas con `getRawMany`, porque un `getMany` con select parcial sin la clave primaria hace que TypeORM colapse las filas. **Por qué no un `COUNT` en SQL:** `total` es una unión de conjuntos de ids y pediría subconsultas correlacionadas por fila; en memoria se prueba con los casos borde, y el SQL de las tres consultas se verificó como texto.
+- **Una rutina dada de baja después de asignarla se sigue listando**, con `routine.active: false` (informativo: la asignación existe y se puede ejecutar), y también se lista si la cuenta del alumno está cerrada (spec §6). Un usuario que existe pero no es alumno devuelve `200` con `[]`.
+- **Decisión menor que se puede vetar:** dos rutinas con el mismo nombre el mismo día se desempatan por fecha de alta; la spec ordena sólo por día y nombre. Nota técnica: TypeORM reescribe el orden por nombre de rutina como `ORDER BY ... "routine_name"` (el alias del `SELECT`), que en Postgres es equivalente.
+- **Caso borde que queda para BE-13.** Si el coach saca un circuito de la rutina *después* de que el alumno completó algo de él, el detalle (§4.4) tiene que mostrar ese vínculo apagado. Sus ejercicios activos y sin hacer **no cuentan en `total`** (la spec dice "circuitos activos"). **Recomendación para BE-13:** dentro de un vínculo apagado mostrar sólo lo completado, así el detalle y el `total` coinciden.
+- **Sin cambios de esquema:** `Db Creator/`, las entidades y `routine.module.ts` no se tocaron. Specs de CU reescritas en `Use Cases/` (repo PowerApp-Docs): **U-08** (el home combina las rutinas individuales de la semana con el plan vigente; la parte del plan sigue siendo del bloque B) y una línea en cada una de **E-19 y E-20** para que no contradigan al listado.
+- **Para el web.** B1 (rutinas de la semana) ya puede tipar la parte individual contra el Swagger; la parte del plan llega con BE-20.
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde.
+  - 24 chequeos de los DTOs de query y de parámetros con el `ValidationPipe` real, 58 del service con un `DataSource` real **sin conexión** (las tres consultas se construyen de verdad, se verifica su SQL y sus parámetros y se interceptan al ejecutar con filas armadas: códigos, orden de las validaciones, el filtro de fechas y la cuenta del progreso con sus casos borde) y 27 del controller (ruta, roles, `@Owner` cableado a `userId`, el `OwnerGuard` real, `await` sin `return` y el Swagger generado).
+  - Los tres scripts se corrieron antes **en rojo** (1, 24 y 10 fallas) y después en verde, y los cuatro de BE-11 siguen en verde como regresión (58, 62, 19 y 30; este último pierde el chequeo de que el listado no existía todavía).
+- **Lo que NO se verificó.**
+  - Nada corrió contra un Postgres ni contra el server: las tres consultas se revisaron como texto, no se ejecutaron. Queda para BE-35.
+  - El rendimiento con datos reales (el listado sin filtro de un alumno con meses de historial) no se midió. El índice `idx_rau_user_date` cubre el filtro por alumno y fecha.
+  - **El progreso con ejercicios realmente completados no se puede probar de punta a punta todavía**: nada escribe `Routine_Asign_Exercise_Finished` hasta BE-14 (hallazgo 2). Se probó con filas armadas.
+- **Cambios de estado:** **U-08 pasa de 🔵 a 🟡.** La fase 2 avanza: **BE-10, BE-10b, BE-11 y BE-12 hechas, sigue BE-13** (el detalle para el alumno, con la visibilidad propagada a los ejercicios).
 
 ## Cambios recientes (2026-10-18 · rutina individual: asignar y quitar)
 
@@ -441,7 +463,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | Fase | Foco | Tareas | Ventana | Hito | Estado |
 |---|---|---|---|---|---|
 | **1** | Seguridad y contrato inmediato | BE-01 a BE-08 | 16 al 19/10 | **H1:** sin agujeros de seguridad conocidos, el web avisado de C2 y el Status con conteos reales | ✅ cerrada el 17/10 |
-| **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | en curso: BE-10 y BE-10b hechas el 17/10, BE-11 el 18/10; sigue BE-12 |
+| **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | en curso: BE-10 y BE-10b hechas el 17/10, BE-11 y BE-12 el 18/10; sigue BE-13 |
 | ⏱ | Regenerar la base de Render | BE-23 | ≈ 1/11 | Esquema del bloque A aplicado, antes de que venza la base | fecha fija |
 | **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | |
 | **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | |
@@ -467,7 +489,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Mi entrenamiento
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-U-08 | Obtener mi planificación | 🔵 Andamiaje | `GET /planification/user/:id/active` · llamada comentada: **cuelga** · BE-12 (vía puntual) y BE-20 (vía plan) |
+| CU-U-08 | Obtener mi planificación | 🟡 Parcial | `GET /routine/assigned/:userId?from=&to=` · la parte **individual** del home, con su progreso (18/10) · **falta la parte del plan**: `GET /planification/user/:id/active` sigue colgando · BE-20 |
 | CU-U-09 | Ver detalle de rutina | 🟡 Parcial | `GET /routine/:id` arma el árbol completo, pero es sólo de coach y admin: falta el rol `user` con el check de asignación vigente · BE-13 |
 | CU-U-10 | Ver detalle de un ejercicio | 🟡 Parcial | `GET /exercise/:id` expone la ficha de catálogo · **falta** el detalle en contexto de rutina (series y notas) · BE-13 |
 | CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user` (`@Owner`, ids en minúscula desde el 16/10), orden por fecha DESC |
@@ -522,8 +544,8 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-16 | Crear rutina sistémica | ✅ Implementado | `POST /routine/create` · rutina + `Routine_Circuit` ordenados, en una transacción |
 | CU-E-17 | Editar rutina sistémica | ✅ Implementado | `POST /routine/edit/:id` · reconciliación por `Routine_Circuit.id`, en una transacción |
 | CU-E-18 | Eliminar rutina sistémica (lógico) | ✅ Implementado | `POST /routine/set-active/:id` · baja y reactivación |
-| CU-E-19 | Asignar rutina a alumno | ✅ Implementado | `POST /routine/assign-user` · para un día (`date`), 404 → 400 → 404 → 400 → 409 · sin planificación · el listado es BE-12 (18/10) |
-| CU-E-20 | Eliminar rutina a alumno | ✅ Implementado | `DELETE /routine/assign-user/:id` · borrado físico; 409 si el alumno ya la entrenó (18/10) |
+| CU-E-19 | Asignar rutina a alumno | ✅ Implementado | `POST /routine/assign-user` · para un día (`date`), 404 → 400 → 404 → 400 → 409 · sin planificación · el listado es `GET /routine/assigned/:userId` (BE-12, 18/10) |
+| CU-E-20 | Eliminar rutina a alumno | ✅ Implementado | `DELETE /routine/assign-user/:id` · borrado físico; 409 si el alumno ya la entrenó (18/10) · lo abre desde el listado (BE-12) |
 
 ### Administrar circuitos
 | CU | Caso de uso | Estado | Endpoint / nota |

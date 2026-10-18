@@ -30,8 +30,12 @@ import { CircuitDetailResponseDto } from '../dtos/circuit/circuit_detail_respons
 import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
+import { Owner } from '../authentication/decorators/owner.decorator';
 import { AssignRoutineToUserDto } from '../dtos/routine/assign_routine_to_user.dto';
 import { RoutineAssignUserResponseDto } from '../dtos/routine/routine_assign_user_response.dto';
+import { AssignedRoutinesParamsDto } from '../dtos/routine/assigned_routines_params.dto';
+import { GetAssignedRoutinesQueryDto } from '../dtos/routine/get_assigned_routines_query.dto';
+import { RoutineAssignedListItemResponseDto } from '../dtos/routine/routine_assigned_list_item_response.dto';
 
 @ApiTags('Routine')
 @Controller('routine')
@@ -178,8 +182,7 @@ export class RoutineController {
 
     // ===================== ASIGNACION INDIVIDUAL A UN ALUMNO (CU-E-19, CU-E-20) =====================
 
-    // Rutas de dos segmentos: no compiten con 'GET /:id'. El listado de las asignaciones de un
-    // alumno (GET /routine/assigned/:userId) es la tarea siguiente (BE-12)
+    // Rutas de dos segmentos: no compiten con 'GET /:id'
     @Post('assign-user')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 201, type: RoutineAssignUserResponseDto })
@@ -204,5 +207,22 @@ export class RoutineController {
         @Res() res: Response,
     ) {
         await this.routineService.removeRoutineFromUser(idAssignment.id, res);
+    }
+
+    // Con el rol user, @Owner exige que :userId sea el propio id (403); coach y admin ven el de
+    // cualquier alumno (gimnasio compartido, D6). El home del alumno manda from = lunes y
+    // to = domingo; el entrenador, sin filtro
+    @Get('assigned/:userId')
+    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
+    @Owner('userId')
+    @ApiResponse({ status: 200, type: [RoutineAssignedListItemResponseDto], description: 'Ordenado por día y nombre de rutina. Sin asignaciones, un array vacío' })
+    @ApiResponse({ status: 400, description: 'Id o fecha inválidos, o from posterior a to' })
+    @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
+    async getAssignedRoutines(
+        @Param() params: AssignedRoutinesParamsDto,
+        @Query() query: GetAssignedRoutinesQueryDto,
+        @Res() res: Response,
+    ) {
+        await this.routineService.getAssignedRoutines(params.userId, query, res);
     }
 }
