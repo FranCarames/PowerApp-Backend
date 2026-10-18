@@ -7,14 +7,14 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 61 | 81% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
+| ✅ Implementado | 63 | 84% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
 | 🟡 Parcial | 7 | 9% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
 | 🔵 Andamiaje | 2 | 3% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
-| ⬜ No implementado | 4 | 5% | Sin endpoint |
+| ⬜ No implementado | 2 | 3% | Sin endpoint |
 | — Sin backend | 1 | 1% | Por su spec es del cliente (CU-U-14) |
 | **Total** | **75** | | |
 
-**61 de los 74 CU con backend están completos (82%).** Faltan 13: 7 parciales, 2 en andamiaje y 4 sin implementar. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
+**63 de los 74 CU con backend están completos (85%).** Faltan 11: 7 parciales, 2 en andamiaje y 2 sin implementar. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
 > **Nota (17/10):** los ✅ bajan de 63 (corte del 4/9) a 57 porque **cambió el criterio, no porque se rompiera algo**. El de antes daba ✅ a todo endpoint con lógica real; el del roadmap exige además que se cumpla cada camino de la spec. Por eso pasaron a 🟡 CU-U-04 (no envía el mail), CU-A-10 y CU-A-15 (borran en cascada en vez de impedirlo), CU-A-13 y CU-A-14 (no validan el nombre único) y CU-A-17 (falta "ya es entrenador"). Ver los cambios del 17/10.
 > **Base de datos:** la de Render se recreó el 3/10 con el esquema vigente (dato del Status web). Es free tier y **vence alrededor del 2/11** (*sin verificar*), así que hay que regenerarla antes (BE-23). **Desde el 17/10 el esquema del bloque A ya está en `Db Creator`** (BE-10): al regenerar con `01` → `02` → `03` no hace falta el patch `patches/2026-10-17-be-10.sql`, que es para una base viva.
 
@@ -22,12 +22,40 @@
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | Sin backend | % ✅ (sobre los CU con backend) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Usuario | 20 | 15 | 2 | 0 | 2 | 1 | 79% |
+| Usuario | 20 | 17 | 2 | 0 | 0 | 1 | 89% |
 | Entrenador | 32 | 28 | 0 | 2 | 2 | 0 | 88% |
 | Admin | 23 | 18 | 5 | 0 | 0 | 0 | 78% |
-| **Total** | **75** | **61** | **7** | **2** | **4** | **1** | **82%** |
+| **Total** | **75** | **63** | **7** | **2** | **2** | **1** | **85%** |
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+
+## Cambios recientes (2026-10-18 · rutina individual: marcar, desmarcar y nota)
+
+- **Decimocuarta y decimoquinta tarea del roadmap (BE-14 y BE-15, fusionadas): U-12 y U-13 pasan a ✅.** `POST /routine/assign-user/:id/finished` y `DELETE /routine/assign-user/:id/finished/:routineExerciseId` (spec del 17/10, §4.5 y §4.6), en `routine.controller.ts` y `routine.service.ts`. Plan: `Doc/plans/2026-10-18-be-14-marcar-desmarcar-y-nota-plan.md` (repo PowerApp-Docs). Conteos: ✅ 61 → **63** y ⬜ 4 → **2**; el Usuario sube de 79% a 89%. **Es la primera tarea que escribe el "hecho".** Salvedad: igual que el detalle, marcar dentro de una planificación (la vía `Routine_Exercise_Finished`) es del bloque B; U-12 y U-13 pasan a ✅ porque así lo fija la spec (§11) para el cierre del bloque A.
+- **Se fusionaron BE-14 y BE-15 (D3).** El roadmap los separaba (marcar y desmarcar, por un lado; la nota, por otro). La spec los une: la nota vive en la **misma fila** que el hecho y se escribe por el mismo endpoint, así que **U-13 es un camino incluido de U-12** (sigue contando como CU). La tarea siguiente del roadmap es **BE-16** (el historial).
+- **Marcar: `POST …/finished`** con `{ routine_exercise_id, user_note? }` (sólo el rol `user`). `404` si la asignación no existe, `403` si es de otro alumno (el dueño se chequea en el service, como en el detalle). Después, en este orden: si **ya estaba marcado** → `200`, idempotente (con `user_note` la actualiza, y la cadena vacía la borra; sin `user_note` no toca nada). Si **no estaba marcado**, el ejercicio tiene que ser de la rutina de la asignación (`400` si no) y seguir en ella (`400` si el coach lo sacó) → se crea la fila y responde `201`. Respuesta: `{ routine_exercise_id, user_note, created_at, updated_at }`, la misma forma que `finished` en el detalle. **Sin ventana de fechas** (D5): se puede marcar en cualquier momento.
+- **Qué significa "sacado de la rutina".** Se mira contra los `Routine_Circuit` **de esa rutina** que apuntan al circuito del ejercicio: está sacado si el ejercicio está dado de baja **o** si todos esos vínculos están apagados. Con un circuito repetido (A, B, A) basta con un vínculo activo. Un ejercicio que no existe cuenta como "no pertenece" (`400`, no `404`): un `404` mandaría al cliente a buscar un bug de ids que no está. **Lo ya marcado no vuelve a validarse**: así se puede editar la nota de un ejercicio que el coach sacó después de que el alumno lo hizo.
+- **Desmarcar: `DELETE …/finished/:routineExerciseId`** (sólo `user`). Mismos `404` y `403`. Borra la fila **y su nota**. **Idempotente:** `200` `{ routine_exercise_id, finished: false }` también si no estaba marcado, y se puede desmarcar lo que el coach sacó de la rutina después.
+- **La carrera de dos marcas simultáneas se resuelve con el único** `uk_raef_asign_exercise`: las dos pasan la lectura, la segunda choca en el `INSERT`, y el service **relee la fila y sigue como "ya estaba marcado"** (aplica la nota si vino) → `200`. Se mira el nombre del único para no disfrazar otro error (mismo helper que BE-11). Sin transacción: cada endpoint es una sola escritura.
+- **Se marca por ejercicio, no por serie (aviso al web).** El web espera marcar por serie (B3). La spec ya lo resolvió el 25/8: el hecho es **por ejercicio** y el tildado serie por serie es de la interfaz. B3 tiene que adaptar lo que esperaba.
+- **Cambio en una entidad que no cambia el esquema.** `RoutineAsignExerciseFinished.user_note` pasa de `string` a `string | null` con `type: 'varchar'` explícito (el patrón de `Routine.coach_note`), porque borrar la nota la pone en `null` y TypeScript no lo dejaba. **La columna es la misma:** `VARCHAR(100)` nullable, igual que en `ddl.py` y en el `01`; se comprobó con la metadata y contra el `01`, así que `Db Creator` no se tocó. La gemela de la vía del plan (`RoutineExerciseFinished`) queda como está hasta el bloque B.
+- **`updated_at` se setea a mano al editar la nota** (el `onUpdate` de las entidades es sintaxis de MySQL; hallazgo 4, lo resuelve BE-30), y la nota sólo se escribe si cambia: repetir el mismo pedido no mueve `updated_at`. El `UPDATE` es explícito (`update()`, no `save()`), así que se puede leer como SQL.
+- **BE-13 pasó a usar los mismos helpers** (el chequeo de dueño y el armado de `finished`), sin cambiar lo que devuelve: sus 46 chequeos siguen en verde.
+- **Revisado y sin cambios:** `editCircuit` ya consulta las dos tablas de hecho desde BE-10, y `deleteExercise` (A-06) bloquea con `409` ante **cualquier** fila de `Routine_Exercise`, así que un ejercicio marcado nunca llega al `CASCADE`.
+- **Hallazgo 2 reescrito, no cerrado.** Ya no es cierto que "nada escribe" el registro: desde hoy la **vía individual** se escribe. Siguen abiertos el historial del entrenador (E-06 y E-07, BE-16) y **toda la vía del plan**.
+- **Para el web.** B3 (marcar) y B4 (nota) ya pueden tipar contra el Swagger de estos dos endpoints. Cruzar lo hecho por `routine_exercise_id`, que es el campo `id` de cada ejercicio del árbol.
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde.
+  - 21 chequeos del body y de los parámetros con el `ValidationPipe` real.
+  - 102 chequeos de las reglas con **repositorios falsos con estado** (se comportan como la base: único, orden, `delete`): códigos y orden de las validaciones, los seis caminos de la tabla del §4.5, el dueño con ids en mayúscula, la idempotencia, la carrera por el único (y los casos en que no se disfraza), desmarcar, y un **cruce con el detalle de BE-13 sobre el mismo estado**: marcar aparece en `finished` y deja ver el vínculo apagado de ese circuito, y desmarcar lo saca.
+  - 32 chequeos sin conectarse a la base: `user_note` sigue siendo `varchar(100)` nullable y coincide con el `01`, el `INSERT … RETURNING`, y el SQL de las lecturas, del `UPDATE` y del `DELETE`, armados a partir de lo que el service realmente pasa y **leídos**.
+  - 41 chequeos del controller: rutas, sólo el rol `user`, sin `@Owner`, que le pasa al service el id, el body y el usuario del token, `await` sin `return` y el Swagger generado.
+  - Los cuatro scripts se corrieron antes **en rojo** (1, 34, 8 y 11 fallas) y después en verde; los once de BE-11, BE-12 y BE-13 siguen en verde como regresión.
+- **Lo que NO se verificó.**
+  - **Nada corrió contra un Postgres ni contra el server.** La carrera por el único se simuló en un fake: se probó que el código reacciona si la base devuelve el error, no que la base lo devuelva. Queda para BE-35.
+  - **Dos carreras que no se cubren** (la spec no las pide): que el coach borre la asignación (E-20, mientras no tenía hechos), o que `editCircuit` borre un ejercicio "sin historial", justo cuando el alumno lo marca. En ambos la base devuelve una violación de FK (`RESTRICT`) y la respuesta sería `500`. Son ventanas de milisegundos.
+  - El camino completo con datos reales (asignar → marcar → ver el detalle → quitar la asignación, que ahora responde `409`) queda para BE-35 con el seed de BE-21.
+- **Cambios de estado:** **U-12 y U-13 pasan de ⬜ a ✅.** La fase 2 avanza: **BE-10, BE-10b, BE-11, BE-12, BE-13 y BE-14 (con BE-15) hechas, sigue BE-16** (el historial del entrenador, E-06 y E-07).
 
 ## Cambios recientes (2026-10-18 · rutina individual: detalle para el alumno)
 
@@ -476,7 +504,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 > Lista de **hallazgos abiertos**, con el número que les dan el changelog y el roadmap (por eso faltan el 1 y el 3). Los que se cerraron salieron de acá y quedan registrados en *Cambios recientes*: módulo `/auth` comentado (resuelto 11/8), autorización manual sin Guards (11/8), gestión de cuenta del usuario — U-05, U-06, U-16 (18/8), alumnos y membresías — E-01→E-03, E-26→E-28 (6/8 y 18/8), circuitos incompletos (cerrado 25/8, 4 de 4), **1 · planificaciones sin service** (cerrado el 31/8 y el 4/9, con E-08→E-12d) y **3 · `Routine.routine_plan_id` obsoleta** (la columna se borró el 4/9).
 
-- **2 · Nada escribe el registro de ejecución de entrenamientos** *(25/8; actualizado 17/10)*. Las dos tablas de ejecución existen desde el 17/10 (BE-10): `Routine_Exercise_Finished` para las planificaciones y `Routine_Asign_Exercise_Finished` para las asignaciones individuales. Pero en todo el código **sólo se leen**: la única consulta está en `editCircuit`, para detectar historial y decidir si la baja es lógica. **Ningún endpoint inserta una fila.** De ahí cuelgan 4 CU: marcar un ejercicio como hecho (**U-12**) y dejarle una nota (**U-13**), del lado del alumno, y el historial de entrenamientos (**E-06**) con su filtro por ejercicio (**E-07**), del lado del entrenador. El detalle en contexto de rutina de **U-09/U-10** ya existe desde el 18/10 (BE-13): lee lo hecho, pero no hay nada que lo escriba. **Lo resuelve el bloque A del roadmap** (BE-11 a BE-16, fase 2): el modelo de ejecución ya está (BE-10), faltan los endpoints. **Consecuencia que sigue vigente:** la rama de baja lógica de CU-E-23 nunca se verificó en runtime. Para probarla hace falta un "hecho" que nada escribe y una asignación (individual, o la cadena `User_Planification` → `Planification` → `Routine_Asignation`) que el seed no genera (BE-21 y BE-35).
+- **2 · El registro de ejecución: la vía individual ya se escribe, falta el historial y la vía del plan** *(25/8; actualizado 18/10)*. Las dos tablas de ejecución existen desde el 17/10 (BE-10): `Routine_Exercise_Finished` para las planificaciones y `Routine_Asign_Exercise_Finished` para las asignaciones individuales. **Desde el 18/10 (BE-14) la vía individual se escribe:** el alumno marca y desmarca un ejercicio y deja o edita su nota (**U-12** y **U-13**), y el detalle de la asignación (BE-13) lo lee. **Siguen abiertos dos pedazos:** el historial de entrenamientos del entrenador (**E-06**) con su filtro por ejercicio (**E-07**), que lo resuelve BE-16, y **toda la vía del plan**, donde ningún endpoint inserta en `Routine_Exercise_Finished` (el marcar dentro de una planificación es del bloque B, con la validación de que la `Routine_Asignation` sea del mismo plan). **Consecuencia que sigue vigente:** la rama de baja lógica de CU-E-23 nunca se verificó en runtime; ahora el "hecho" individual existe, pero falta correrlo contra una base con una asignación y datos que el seed no genera (BE-21 y BE-35).
 - **4 · `updated_at` no se actualiza solo, en ninguna tabla** *(25/8; actualizado 17/10)*. Las entidades declaran `@Column({ onUpdate: 'CURRENT_TIMESTAMP' })` en 18 archivos, y eso es **sintaxis de MySQL**: en Postgres no hace nada, el DDL no tiene triggers y ninguna entidad usa `@UpdateDateColumn`. Así que `updated_at` queda **congelado en la fecha de alta**, salvo en los métodos que lo setean a mano (`editCircuit`, `editRoutine` y algunos de `users`). `editPlanification`, por ejemplo, no lo setea. **Lo resuelve BE-30**, con `@UpdateDateColumn` en todas las entidades.
 
 ---
@@ -488,7 +516,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | Fase | Foco | Tareas | Ventana | Hito | Estado |
 |---|---|---|---|---|---|
 | **1** | Seguridad y contrato inmediato | BE-01 a BE-08 | 16 al 19/10 | **H1:** sin agujeros de seguridad conocidos, el web avisado de C2 y el Status con conteos reales | ✅ cerrada el 17/10 |
-| **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | en curso: BE-10 y BE-10b hechas el 17/10, BE-11, BE-12 y BE-13 el 18/10; sigue BE-14 |
+| **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | en curso: BE-10 y BE-10b hechas el 17/10, BE-11, BE-12, BE-13 y BE-14 (con BE-15) el 18/10; sigue BE-16 |
 | ⏱ | Regenerar la base de Render | BE-23 | ≈ 1/11 | Esquema del bloque A aplicado, antes de que venza la base | fecha fija |
 | **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | |
 | **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | |
@@ -518,8 +546,8 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-U-09 | Ver detalle de rutina | ✅ Implementado | `GET /routine/assign-user/:id` · el alumno lee la rutina **por su asignación** (`403` si es de otro; coach y admin, la de cualquiera) · mismo árbol que `GET /routine/:id`, con lo dado de baja que completó y lo hecho en `finished` (18/10) · el detalle de una asignación del plan es del bloque B |
 | CU-U-10 | Ver detalle de un ejercicio | ✅ Implementado | Se resuelve dentro del detalle de la asignación (`GET /routine/assign-user/:id`): ficha del ejercicio, series ordenadas, nota del coach y, en `finished`, la nota del alumno · `GET /exercise/:id` sigue siendo la ficha de catálogo (18/10) |
 | CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user` (`@Owner`, ids en minúscula desde el 16/10), orden por fecha DESC |
-| CU-U-12 | Marcar serie como realizado | ⬜ No implementado | sin endpoint · el "hecho" es por ejercicio (`Routine_Exercise_Finished`, hallazgo 2) · BE-14 |
-| CU-U-13 | Dejar una nota en el ejercicio | ⬜ No implementado | sin endpoint · BE-15 |
+| CU-U-12 | Marcar serie como realizado | ✅ Implementado | `POST /routine/assign-user/:id/finished` y `DELETE …/finished/:routineExerciseId` · el hecho es **por ejercicio** (el tildado por serie es de la interfaz) · idempotentes · sólo el alumno dueño (`403` si es de otro) · marcar un ejercicio que el coach sacó es `400`, pero se puede desmarcar y editar su nota (18/10) · la vía del plan es del bloque B |
+| CU-U-13 | Dejar una nota en el ejercicio | ✅ Implementado | Es un camino incluido de U-12 (D3): `user_note` va en el mismo `POST …/finished`, hasta 100 caracteres, y la cadena vacía la borra · la nota vive en la fila del hecho, así que sólo se anota un ejercicio realizado (o se marca y anota en una sola llamada) (18/10) |
 | CU-U-14 | Temporizador | — Sin backend | por su spec es del cliente; el web lo tiene (T29) |
 | CU-U-15 | Consultar wiki de ejercicios | ✅ Implementado | `GET /exercise/all` |
 

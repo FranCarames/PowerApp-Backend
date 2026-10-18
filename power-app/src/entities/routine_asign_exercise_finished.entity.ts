@@ -21,9 +21,13 @@ export class RoutineAsignExerciseFinished {
     @Column({ type: 'uuid', nullable: false })
     routine_exercise_id!: string;
 
-    @ApiPropertyOptional({ example: 'Me costó la última serie', maxLength: 100 })
-    @Column({ length: 100, nullable: true })
-    user_note?: string;
+    // Acepta null explicito: dejar la nota vacia la borra (U-13), y TypeORM ignora las propiedades
+    // undefined. El type: 'varchar' es OBLIGATORIO con la union: TS emite design:type = Object para
+    // string | null, y sin el tipo declarado TypeORM no sabe que columna crear. La columna no cambia:
+    // sigue siendo VARCHAR(100) nullable, igual que en ddl.py
+    @ApiPropertyOptional({ example: 'Me costó la última serie', maxLength: 100, nullable: true })
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    user_note?: string | null;
 
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })

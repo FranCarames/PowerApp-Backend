@@ -38,7 +38,10 @@ import { RoutineAssignUserResponseDto } from '../dtos/routine/routine_assign_use
 import { AssignedRoutinesParamsDto } from '../dtos/routine/assigned_routines_params.dto';
 import { GetAssignedRoutinesQueryDto } from '../dtos/routine/get_assigned_routines_query.dto';
 import { RoutineAssignedListItemResponseDto } from '../dtos/routine/routine_assigned_list_item_response.dto';
-import { RoutineAssignedDetailResponseDto } from '../dtos/routine/routine_assigned_detail_response.dto';
+import { RoutineAssignedDetailResponseDto, RoutineAssignedFinishedDto } from '../dtos/routine/routine_assigned_detail_response.dto';
+import { MarkExerciseFinishedDto } from '../dtos/routine/mark_exercise_finished.dto';
+import { AssignedFinishedParamsDto } from '../dtos/routine/assigned_finished_params.dto';
+import { RoutineAssignedUnfinishedResponseDto } from '../dtos/routine/routine_assigned_unfinished_response.dto';
 
 @ApiTags('Routine')
 @Controller('routine')
@@ -228,6 +231,41 @@ export class RoutineController {
         @Res() res: Response,
     ) {
         await this.routineService.getAssignedRoutineById(idAssignment.id, user, res);
+    }
+
+    // Marcar, dejar o editar la nota (U-12, con U-13 incluido). Solo el alumno dueño: el dueño se
+    // chequea en el service porque el path trae el id de la asignacion y no el del alumno. El
+    // hecho es POR EJERCICIO, no por serie: el tildado serie por serie es de la interfaz
+    @Post('assign-user/:id/finished')
+    @Auth(UserRole.user)
+    @ApiResponse({ status: 201, type: RoutineAssignedFinishedDto, description: 'El ejercicio no estaba marcado: se creó la marca (con la nota, si vino)' })
+    @ApiResponse({ status: 200, type: RoutineAssignedFinishedDto, description: 'Ya estaba marcado (también si dos marcas chocaron): idempotente. Si vino user_note se actualizó; la cadena vacía la borra' })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, el ejercicio no pertenece a la rutina de la asignación, o el coach lo sacó de la rutina y todavía no estaba marcado' })
+    @ApiResponse({ status: 403, description: 'La asignación es de otro alumno' })
+    @ApiResponse({ status: 404, description: 'Asignación no encontrada' })
+    async markExerciseFinished(
+        @Param() idAssignment: ParameterIdDto,
+        @Body() markExerciseFinishedDto: MarkExerciseFinishedDto,
+        @CurrentUser() user: AuthUser,
+        @Res() res: Response,
+    ) {
+        await this.routineService.markExerciseFinished(idAssignment.id, markExerciseFinishedDto, user, res);
+    }
+
+    // Borra la marca y su nota. Idempotente: 200 también si el ejercicio no estaba marcado. Se
+    // puede desmarcar un ejercicio que el coach sacó de la rutina después
+    @Delete('assign-user/:id/finished/:routineExerciseId')
+    @Auth(UserRole.user)
+    @ApiResponse({ status: 200, type: RoutineAssignedUnfinishedResponseDto })
+    @ApiResponse({ status: 400, description: 'Alguno de los ids no es un UUID válido' })
+    @ApiResponse({ status: 403, description: 'La asignación es de otro alumno' })
+    @ApiResponse({ status: 404, description: 'Asignación no encontrada' })
+    async unmarkExerciseFinished(
+        @Param() params: AssignedFinishedParamsDto,
+        @CurrentUser() user: AuthUser,
+        @Res() res: Response,
+    ) {
+        await this.routineService.unmarkExerciseFinished(params.id, params.routineExerciseId, user, res);
     }
 
     // Con el rol user, @Owner exige que :userId sea el propio id (403); coach y admin ven el de

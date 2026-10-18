@@ -22,6 +22,7 @@ import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
 import { AssignRoutineToUserDto } from '../dtos/routine/assign_routine_to_user.dto';
+import { MarkExerciseFinishedDto } from '../dtos/routine/mark_exercise_finished.dto';
 import { GetAssignedRoutinesQueryDto } from '../dtos/routine/get_assigned_routines_query.dto';
 import { AuthUser } from '../authentication/auth-user.interface';
 
@@ -29,6 +30,10 @@ import { AuthUser } from '../authentication/auth-user.interface';
 // previo y la FK RESTRICT de la base), y el de duplicado tambien (chequeo previo y unico)
 const ASSIGN_DUPLICATE_ERROR = 'El alumno ya tiene esa rutina asignada ese día.';
 const REMOVE_TRAINED_ERROR = 'El alumno ya entrenó esta rutina: no se puede quitar.';
+
+// El 403 de las operaciones sobre una asignacion de otro alumno (detalle, marcar, desmarcar).
+// No puede ser el texto de la cuenta deshabilitada: es el unico que hace cerrar la sesion en el web
+const OTHER_STUDENT_ASSIGNMENT_ERROR = 'No podés acceder a una rutina asignada a otro alumno.';
 
 @Injectable()
 export class RoutineService {
@@ -45,6 +50,10 @@ export class RoutineService {
         private routineAsignationUserRepository: Repository<RoutineAsignationUser>,
         @InjectRepository(RoutineAsignExerciseFinished)
         private routineAsignExerciseFinishedRepository: Repository<RoutineAsignExerciseFinished>,
+        @InjectRepository(RoutineExercise)
+        private routineExerciseRepository: Repository<RoutineExercise>,
+        @InjectRepository(RoutineCircuit)
+        private routineCircuitRepository: Repository<RoutineCircuit>,
     ) {
     }
 
@@ -1007,11 +1016,8 @@ export class RoutineService {
             // (el iOS manda los UUID en mayuscula). Coach y admin abren la de cualquier alumno
             // (gimnasio compartido, D6). El texto no puede ser el de la cuenta deshabilitada: es
             // el unico que hace cerrar la sesion en el web
-            if (currentUser.role === UserRole.user
-                && assignment.user_id.toLowerCase() !== currentUser.id.toLowerCase()) {
-                return res.status(403).send({
-                    error: 'No podés acceder a una rutina asignada a otro alumno.'
-                });
+            if (currentUser.role === UserRole.user && !this.isAssignmentOwner(assignment, currentUser)) {
+                return res.status(403).send({ error: OTHER_STUDENT_ASSIGNMENT_ERROR });
             }
 
             const finishedRows = await this.routineAsignExerciseFinishedRepository.find({
@@ -1036,16 +1042,139 @@ export class RoutineService {
                 created_at: assignment.created_at,
                 updated_at: assignment.updated_at,
                 routine: this.buildRoutineDetailResponse(routine, visibleInactiveIds, completedIds),
-                finished: finishedRows.map(row => ({
-                    routine_exercise_id: row.routine_exercise_id,
-                    user_note: row.user_note ?? null,
-                    created_at: row.created_at,
-                    updated_at: row.updated_at,
-                })),
+                finished: finishedRows.map(row => this.buildFinishedResponse(row)),
             });
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener la rutina asignada.' });
+        }
+    }
+
+    // CU-U-12, con U-13 incluido (D3): marcar un ejercicio como hecho y, en la misma fila, dejar o
+    // editar la nota. El hecho es por ejercicio, no por serie: el tildado serie por serie es de la
+    // interfaz. Es una sola escritura (INSERT o UPDATE), asi que no hay transaccion: la carrera de
+    // dos marcas simultaneas la cierra el unico de la base. Sin ventana de fechas (D5)
+    async markExerciseFinished(
+        idAssignment: string,
+        markExerciseFinishedDto: MarkExerciseFinishedDto,
+        currentUser: AuthUser,
+        res: Response
+    ) {
+        try {
+            const assignment = await this.routineAsignationUserRepository.findOne({
+                where: { id: idAssignment },
+            });
+
+            if (!assignment) {
+                return res.status(404).send({ error: 'Asignación no encontrada' });
+            }
+
+            if (!this.isAssignmentOwner(assignment, currentUser)) {
+                return res.status(403).send({ error: OTHER_STUDENT_ASSIGNMENT_ERROR });
+            }
+
+            // Solo un string cuenta como "viene la nota": '' la borra (spec §4.5) y null o ausente
+            // significa no tocarla
+            const sentNote = typeof markExerciseFinishedDto.user_note === 'string'
+                ? (markExerciseFinishedDto.user_note === '' ? null : markExerciseFinishedDto.user_note)
+                : undefined;
+
+            let finished = await this.findFinishedRow(assignment.id, markExerciseFinishedDto.routine_exercise_id);
+
+            if (!finished) {
+                // No estaba marcado: el ejercicio tiene que ser de la rutina y seguir en ella
+                const markable = await this.checkExerciseIsMarkable(
+                    assignment.routine_id,
+                    markExerciseFinishedDto.routine_exercise_id,
+                );
+
+                if ('error' in markable) {
+                    return res.status(400).send({ error: markable.error });
+                }
+
+                try {
+                    const created = await this.routineAsignExerciseFinishedRepository.save(
+                        this.routineAsignExerciseFinishedRepository.create({
+                            user_routine_asign_id: assignment.id,
+                            routine_exercise_id: markable.exerciseId,
+                            user_note: sentNote ?? null,
+                        })
+                    );
+
+                    return res.status(201).send(this.buildFinishedResponse(created));
+                } catch (error) {
+                    // Dos marcas simultaneas pasan las dos la lectura y la segunda choca con el
+                    // unico: se trata como "ya estaba marcado" (spec §4.5). Se mira el nombre del
+                    // unico para no disfrazar otro error, y si la fila no aparece se relanza
+                    if (!this.isDatabaseError(error, '23505', 'uk_raef_asign_exercise')) {
+                        throw error;
+                    }
+
+                    finished = await this.findFinishedRow(assignment.id, markExerciseFinishedDto.routine_exercise_id);
+
+                    if (!finished) {
+                        throw error;
+                    }
+                }
+            }
+
+            // Ya estaba marcado: idempotente. Sin nota no se toca nada, y con nota solo se escribe
+            // si cambia. updated_at se setea a mano: el onUpdate de las entidades es sintaxis de
+            // MySQL y en Postgres no hace nada
+            if (sentNote !== undefined && sentNote !== (finished.user_note ?? null)) {
+                const updatedAt = new Date();
+
+                await this.routineAsignExerciseFinishedRepository.update(
+                    { id: finished.id },
+                    { user_note: sentNote, updated_at: updatedAt },
+                );
+
+                finished.user_note = sentNote;
+                finished.updated_at = updatedAt;
+            }
+
+            return res.status(200).send(this.buildFinishedResponse(finished));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al marcar el ejercicio.' });
+        }
+    }
+
+    // Borra la fila y, con ella, la nota. Idempotente: si no estaba marcado tambien responde 200.
+    // No mira si el ejercicio sigue en la rutina: se puede desmarcar lo que el coach saco despues
+    async unmarkExerciseFinished(
+        idAssignment: string,
+        routineExerciseId: string,
+        currentUser: AuthUser,
+        res: Response
+    ) {
+        try {
+            const assignment = await this.routineAsignationUserRepository.findOne({
+                where: { id: idAssignment },
+            });
+
+            if (!assignment) {
+                return res.status(404).send({ error: 'Asignación no encontrada' });
+            }
+
+            if (!this.isAssignmentOwner(assignment, currentUser)) {
+                return res.status(403).send({ error: OTHER_STUDENT_ASSIGNMENT_ERROR });
+            }
+
+            await this.routineAsignExerciseFinishedRepository.delete({
+                user_routine_asign_id: assignment.id,
+                routine_exercise_id: routineExerciseId,
+            });
+
+            // Si no habia nada que borrar no hay fila de donde sacar el id: se devuelve el del path
+            // normalizado, en minuscula como el resto
+            return res.status(200).send({
+                routine_exercise_id: routineExerciseId.toLowerCase(),
+                finished: false,
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al desmarcar el ejercicio.' });
         }
     }
 
@@ -1168,6 +1297,66 @@ export class RoutineService {
         }
 
         return { visibleInactiveIds, completedIds };
+    }
+
+    // "Dueño" = la asignacion es del alumno del token, comparado en minuscula (el iOS manda los
+    // UUID en mayuscula). Lo usan el detalle, marcar y desmarcar: el path trae el id de la
+    // asignacion y no el del alumno, asi que no alcanza con @Owner
+    private isAssignmentOwner(assignment: RoutineAsignationUser, currentUser: AuthUser): boolean {
+        return assignment.user_id.toLowerCase() === currentUser.id.toLowerCase();
+    }
+
+    private async findFinishedRow(
+        assignmentId: string,
+        routineExerciseId: string
+    ): Promise<RoutineAsignExerciseFinished | null> {
+        return this.routineAsignExerciseFinishedRepository.findOne({
+            where: { user_routine_asign_id: assignmentId, routine_exercise_id: routineExerciseId },
+        });
+    }
+
+    // Si un ejercicio que todavia no estaba marcado se puede marcar (spec §4.5). Tiene que ser de
+    // la rutina: algun Routine_Circuit de ESA rutina contiene su circuito, activo o no. Y tiene que
+    // seguir en ella: el ejercicio activo y al menos un vinculo activo (con un circuito repetido,
+    // A, B, A, basta con uno). Un id que no existe cuenta como "no pertenece": un 404 mandaria al
+    // cliente a buscar un bug de ids que no esta
+    private async checkExerciseIsMarkable(
+        routineId: string,
+        routineExerciseId: string
+    ): Promise<{ exerciseId: string } | { error: string }> {
+        const exercise = await this.routineExerciseRepository.findOne({
+            where: { id: routineExerciseId },
+            select: { id: true, circuit_id: true, active: true },
+        });
+
+        const links = exercise
+            ? await this.routineCircuitRepository.find({
+                where: { routine_id: routineId, circuit_id: exercise.circuit_id },
+                select: { id: true, active: true },
+            })
+            : [];
+
+        if (!exercise || links.length === 0) {
+            return { error: 'El ejercicio no pertenece a la rutina de esta asignación.' };
+        }
+
+        if (!exercise.active || !links.some(link => link.active)) {
+            return { error: 'El ejercicio fue sacado de la rutina: ya no se puede marcar.' };
+        }
+
+        // El id de la fila y no el del body: puede venir en mayuscula
+        return { exerciseId: exercise.id };
+    }
+
+    // Lo que el cliente cruza con el arbol de la rutina por routine_exercise_id. La misma forma en
+    // el detalle (finished) y en la respuesta de marcar
+    private buildFinishedResponse(row: RoutineAsignExerciseFinished) {
+        return {
+            routine_exercise_id: row.routine_exercise_id,
+            user_note: row.user_note ?? null,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        };
     }
 
     // Reconoce un error de Postgres por su codigo (23505 = unico, 23503 = clave foranea).
