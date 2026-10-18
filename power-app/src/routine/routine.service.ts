@@ -10,6 +10,7 @@ import { RoutineCircuit } from '../entities/routine_circuit.entity';
 import { RoutineExercise } from '../entities/routine_exercise.entity';
 import { ExerciseSet } from '../entities/exercise_set.entity';
 import { RoutineExerciseFinished } from '../entities/routine_exercise_finished.entity';
+import { RoutineAsignExerciseFinished } from '../entities/routine_asign_exercise_finished.entity';
 import { GetCircuitsQueryDto } from '../dtos/circuit/get_circuits_query.dto';
 import { SetCircuitActiveDto } from '../dtos/circuit/set_circuit_active.dto';
 import { CreateCircuitDto } from '../dtos/circuit/create_circuit.dto';
@@ -562,14 +563,22 @@ export class RoutineService {
                 routineExercise => routineExercise.active && !exerciseIds.includes(routineExercise.exercise_id)
             );
 
-            // Una sola query para saber cuales tienen historial, no una por ejercicio
+            // Dos queries, una por tabla de "hecho" (la de las planificaciones y la de las
+            // asignaciones individuales), y no una por ejercicio. Si CUALQUIERA tiene una fila,
+            // el ejercicio no se borra fisicamente: A-06 se apoya en que un Routine_Exercise
+            // inactivo solo existe si alguien lo completo, y las FK RESTRICT lo frenarian igual
             let conHistorial: string[] = [];
             if (salen.length > 0) {
-                const finished = await queryRunner.manager.find(RoutineExerciseFinished, {
-                    where: { routine_exercise_id: In(salen.map(routineExercise => routineExercise.id)) },
+                const salenIds = salen.map(routineExercise => routineExercise.id);
+                const finishedEnPlan = await queryRunner.manager.find(RoutineExerciseFinished, {
+                    where: { routine_exercise_id: In(salenIds) },
                     select: { routine_exercise_id: true },
                 });
-                conHistorial = finished.map(row => row.routine_exercise_id);
+                const finishedIndividual = await queryRunner.manager.find(RoutineAsignExerciseFinished, {
+                    where: { routine_exercise_id: In(salenIds) },
+                    select: { routine_exercise_id: true },
+                });
+                conHistorial = [...finishedEnPlan, ...finishedIndividual].map(row => row.routine_exercise_id);
             }
 
             for (const routineExercise of salen) {
@@ -821,8 +830,8 @@ export class RoutineService {
     // visibleInactiveIds: ids de Routine_Circuit dados de baja que SI hay que mostrar.
     // Las lecturas del entrenador no pasan nada, asi que ven solo los activos: un circuito
     // que sacaste de la rutina no reaparece en la pantalla de edicion. Las del alumno
-    // (U-08/U-09 y el historial E-06/E-07) van a pasar los vinculos apagados de los que ese
-    // User_Routine tenga algun ejercicio en Routine_Exercise_Finished — mismo contrato que
+    // (U-08/U-09 y el historial E-06/E-07) van a pasar los vinculos apagados de los que esa
+    // asignacion (del plan o individual) tenga algun ejercicio hecho — mismo contrato que
     // buildCircuitDetailResponse un nivel mas abajo: se ve lo dado de baja que uno completo,
     // y solo eso. Ojo: el vinculo apagado tiene order null, asi que no conserva su posicion
     private buildRoutineDetailResponse(routine: Routine, visibleInactiveIds?: Set<string>) {
@@ -918,9 +927,9 @@ export class RoutineService {
 
     // visibleInactiveIds: ids de Routine_Exercise dados de baja que SI hay que mostrar.
     // Las lecturas del entrenador no pasan nada, asi que ven solo los activos. Las del
-    // alumno (U-08/U-09/U-10 y el historial) van a pasar los que ese User_Routine tenga
-    // en Routine_Exercise_Finished: un ejercicio que completo no tiene que desaparecerle
-    // de la pantalla porque el entrenador lo saco del circuito
+    // alumno (U-08/U-09/U-10 y el historial) van a pasar los que esa asignacion tenga hechos
+    // (Routine_Exercise_Finished o Routine_Asign_Exercise_Finished): un ejercicio que completo
+    // no tiene que desaparecerle de la pantalla porque el entrenador lo saco del circuito
     private buildCircuitDetailResponse(circuit: Circuit, visibleInactiveIds?: Set<string>) {
         return {
             id: circuit.id,

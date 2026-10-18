@@ -64,6 +64,7 @@ export class PlanificationService {
             const planifications = await this.buildPlanificationsQuery(query)
                 .leftJoinAndSelect('planification.routineAsignations', 'routineAsignation', 'routineAsignation.active = true')
                 .leftJoinAndSelect('routineAsignation.routine', 'routine')
+                .addOrderBy('routineAsignation.week', 'ASC')
                 .addOrderBy('routineAsignation.order', 'ASC')
                 // Desempate: el order puede estar duplicado, asi que sin esto el
                 // orden no es deterministico y la pantalla se reordena sola
@@ -114,7 +115,7 @@ export class PlanificationService {
                     number_of_routines: createPlanificationDto.number_of_routines,
                     description: createPlanificationDto.description ?? null,
                     type: createPlanificationDto.type ?? null,
-                    duration: createPlanificationDto.duration ?? null,
+                    duration: createPlanificationDto.duration,
                 })
             );
 
@@ -149,14 +150,26 @@ export class PlanificationService {
                 });
             }
 
+            // Achicar la duracion por debajo de una semana en uso dejaria rutinas fuera del plan.
+            // Solo cuentan las VIGENTES: una dada de baja puede quedar en una semana que ya no
+            // existe, y reincorporarla se rechaza ahi (set-active). Con 0 no hay tope
+            if (editPlanificationDto.duration > 0) {
+                const maxWeek = await this.maxActiveWeek(planification.id);
+                if (maxWeek > editPlanificationDto.duration) {
+                    return res.status(400).send({
+                        error: `La planificación tiene rutinas en la semana ${maxWeek}: la duración no puede ser menor.`
+                    });
+                }
+            }
+
             // El body es el estado completo de la cabecera: lo que no viene se BORRA.
-            // Por eso los tres opcionales van a null explicito y no a undefined, que
-            // TypeORM ignoraria dejando el valor viejo
+            // Por eso los dos opcionales van a null explicito y no a undefined, que
+            // TypeORM ignoraria dejando el valor viejo. La duracion es obligatoria
             planification.name = editPlanificationDto.name;
             planification.number_of_routines = editPlanificationDto.number_of_routines;
             planification.description = editPlanificationDto.description ?? null;
             planification.type = editPlanificationDto.type ?? null;
-            planification.duration = editPlanificationDto.duration ?? null;
+            planification.duration = editPlanificationDto.duration;
 
             await this.planificationRepository.save(planification);
 
@@ -217,6 +230,11 @@ export class PlanificationService {
                 });
             }
 
+            const weekError = this.weekOutOfDuration(assignRoutineDto.week, planification.duration);
+            if (weekError) {
+                return res.status(400).send({ error: weekError });
+            }
+
             const routine = await this.routineRepository.findOne({
                 where: { id: assignRoutineDto.routine_id },
             });
@@ -233,16 +251,17 @@ export class PlanificationService {
                 });
             }
 
-            // Sin order explicito va al final. Con order se persiste TAL CUAL, aunque la
-            // posicion ya este ocupada: no se desplaza ni se renumera nada, y el order
+            // Sin order explicito va al final DE ESA SEMANA. Con order se persiste TAL CUAL,
+            // aunque la posicion ya este ocupada: no se desplaza ni se renumera nada, y el order
             // puede quedar duplicado. Es la decision del 4/9
             const order = assignRoutineDto.order
-                ?? await this.nextOrder(assignRoutineDto.planification_id);
+                ?? await this.nextOrder(assignRoutineDto.planification_id, assignRoutineDto.week);
 
             await this.routineAsignationRepository.save(
                 this.routineAsignationRepository.create({
                     routine_id: assignRoutineDto.routine_id,
                     planification_id: assignRoutineDto.planification_id,
+                    week: assignRoutineDto.week,
                     order,
                 })
             );
@@ -283,6 +302,12 @@ export class PlanificationService {
                 });
             }
 
+            const weekError = this.weekOutOfDuration(assignRoutinesDto.week, planification.duration);
+            if (weekError) {
+                await queryRunner.rollbackTransaction();
+                return res.status(400).send({ error: weekError });
+            }
+
             // Se validan los ids UNICOS: el array puede traer repetidos a proposito,
             // y cada repeticion crea su propia asignacion
             const idsUnicos = [...new Set(assignRoutinesDto.routine_ids)];
@@ -304,14 +329,19 @@ export class PlanificationService {
                 });
             }
 
-            // Consecutivas desde el final, en el orden del array
-            let order = await this.nextOrder(assignRoutinesDto.planification_id, queryRunner.manager);
+            // Consecutivas desde el final de la semana, en el orden del array
+            let order = await this.nextOrder(
+                assignRoutinesDto.planification_id,
+                assignRoutinesDto.week,
+                queryRunner.manager,
+            );
 
             for (const routineId of assignRoutinesDto.routine_ids) {
                 await queryRunner.manager.save(
                     queryRunner.manager.create(RoutineAsignation, {
                         routine_id: routineId,
                         planification_id: assignRoutinesDto.planification_id,
+                        week: assignRoutinesDto.week,
                         order: order++,
                     })
                 );
@@ -337,11 +367,11 @@ export class PlanificationService {
         setActiveDto: SetRoutineAsignationActiveDto,
         res: Response
     ) {
-        // El order solo tiene sentido al reactivar. Aceptarlo en silencio con
+        // week y order solo tienen sentido al reactivar. Aceptarlos en silencio con
         // active = false esconderia un bug del cliente
-        if (!setActiveDto.active && setActiveDto.order !== undefined) {
+        if (!setActiveDto.active && (setActiveDto.week !== undefined || setActiveDto.order !== undefined)) {
             return res.status(400).send({
-                error: 'El campo order sólo aplica al reactivar una asignación.'
+                error: 'Los campos week y order sólo aplican al reactivar una asignación.'
             });
         }
 
@@ -355,15 +385,29 @@ export class PlanificationService {
             }
 
             if (setActiveDto.active) {
-                // La baja le borro la posicion, asi que reactivar tiene que darle una:
-                // la del body si vino, y si no al final
-                asignacion.order = setActiveDto.order
-                    ?? await this.nextOrder(asignacion.planification_id);
-            } else {
-                // Pierde la posicion y el resto NO se renumera: la secuencia queda con
-                // un hueco, a proposito. Es la decision del 4/9
-                asignacion.order = null;
+                // Sin week ni order vuelve a su lugar: la baja se los conservo (D10). Con week
+                // y sin order va al final de esa semana; con order se guarda tal cual
+                const week = setActiveDto.week ?? asignacion.week;
+
+                // La duracion pudo achicarse mientras estaba de baja: editPlanification solo
+                // mira las vigentes. El plan siempre existe (FK NOT NULL con CASCADE)
+                const planification = await this.planificationRepository.findOne({
+                    where: { id: asignacion.planification_id },
+                });
+                const weekError = this.weekOutOfDuration(week, planification!.duration);
+                if (weekError) {
+                    return res.status(400).send({ error: `${weekError} Indicá una semana válida.` });
+                }
+
+                if (setActiveDto.order !== undefined) {
+                    asignacion.order = setActiveDto.order;
+                } else if (setActiveDto.week !== undefined) {
+                    asignacion.order = await this.nextOrder(asignacion.planification_id, week);
+                }
+                asignacion.week = week;
             }
+            // La baja (active = false) solo apaga el flag: el resto del plan no se renumera y la
+            // rutina conserva su semana y su orden
 
             asignacion.active = setActiveDto.active;
             await this.routineAsignationRepository.save(asignacion);
@@ -404,15 +448,32 @@ export class PlanificationService {
                 return res.status(404).send({ error: 'Algunas asignaciones no fueron encontradas' });
             }
 
-            // Los ids pueden ser de planificaciones distintas, asi que el order de la
-            // reactivacion se calcula por plan, dentro del loop
-            for (const asignacion of asignaciones) {
-                if (setActiveDto.active) {
-                    asignacion.order = await this.nextOrder(asignacion.planification_id, queryRunner.manager);
-                } else {
-                    asignacion.order = null;
-                }
+            // Reincorporar: cada una vuelve a su lugar, pero la duracion pudo achicarse mientras
+            // estaba de baja. Se valida TODO antes de guardar nada (es todo o nada). Los ids
+            // pueden ser de planificaciones distintas, asi que se mira la de cada una
+            if (setActiveDto.active) {
+                const planificationIds = [...new Set(asignaciones.map(asignacion => asignacion.planification_id))];
+                const planifications = await queryRunner.manager.find(Planification, {
+                    where: { id: In(planificationIds) },
+                });
+                const durationByPlanification = new Map(planifications.map(p => [p.id, p.duration]));
 
+                for (const asignacion of asignaciones) {
+                    const weekError = this.weekOutOfDuration(
+                        asignacion.week,
+                        durationByPlanification.get(asignacion.planification_id)!,
+                    );
+                    if (weekError) {
+                        await queryRunner.rollbackTransaction();
+                        return res.status(400).send({
+                            error: `La asignación ${asignacion.id} no se puede reincorporar: ${weekError}`
+                        });
+                    }
+                }
+            }
+
+            // Quitar y reincorporar solo cambian el flag: la rutina conserva su semana y su orden
+            for (const asignacion of asignaciones) {
                 asignacion.active = setActiveDto.active;
                 await queryRunner.manager.save(asignacion);
             }
@@ -433,11 +494,21 @@ export class PlanificationService {
 
     // ===================== HELPERS =====================
 
-    // max(order) + 1 sobre las asignaciones ACTIVAS del plan, o 1 si no hay ninguna.
-    // Las inactivas tienen order null, asi que no participan del maximo.
-    // Recibe el manager para poder correr dentro de la transaccion de los lotes
+    // La semana cabe si el plan no tiene duracion fija (0) o si no la supera. El minimo
+    // (week >= 1) lo valida el DTO. Devuelve el mensaje de error, o null si la semana es valida
+    private weekOutOfDuration(week: number, duration: number): string | null {
+        if (duration === 0 || week <= duration) {
+            return null;
+        }
+        return `La semana ${week} supera la duración de la planificación (${duration} semanas).`;
+    }
+
+    // max(order) + 1 sobre las asignaciones ACTIVAS de esa semana del plan, o 1 si no hay
+    // ninguna. Las inactivas conservan su order (D10) pero no cuentan: la rutina de baja no
+    // ocupa lugar. Recibe el manager para poder correr dentro de la transaccion de los lotes
     private async nextOrder(
         idPlanification: string,
+        week: number,
         manager?: EntityManager
     ): Promise<number> {
         const repository = manager
@@ -448,10 +519,23 @@ export class PlanificationService {
             .createQueryBuilder('routineAsignation')
             .select('MAX(routineAsignation.order)', 'max')
             .where('routineAsignation.planification_id = :idPlanification', { idPlanification })
+            .andWhere('routineAsignation.week = :week', { week })
             .andWhere('routineAsignation.active = true')
             .getRawOne<{ max: number | null }>();
 
         return (resultado?.max ?? 0) + 1;
+    }
+
+    // Semana mas alta usada por una asignacion ACTIVA del plan, o 0 si no tiene ninguna
+    private async maxActiveWeek(idPlanification: string): Promise<number> {
+        const resultado = await this.routineAsignationRepository
+            .createQueryBuilder('routineAsignation')
+            .select('MAX(routineAsignation.week)', 'max')
+            .where('routineAsignation.planification_id = :idPlanification', { idPlanification })
+            .andWhere('routineAsignation.active = true')
+            .getRawOne<{ max: number | null }>();
+
+        return resultado?.max ?? 0;
     }
 
     // Filtros compartidos por /all y /all-plus
@@ -488,6 +572,7 @@ export class PlanificationService {
             ],
             order: {
                 routineAsignations: {
+                    week: 'ASC',
                     order: 'ASC',
                     // Mismo desempate que /all-plus: el order admite duplicados
                     created_at: 'ASC',
@@ -521,6 +606,7 @@ export class PlanificationService {
             updated_at: planification.updated_at,
             routines: asignaciones.map(routineAsignation => ({
                 id: routineAsignation.id,
+                week: routineAsignation.week,
                 order: routineAsignation.order,
                 routine: {
                     id: routineAsignation.routine.id,

@@ -30,9 +30,11 @@ export class Planification {
     @Column({ type: 'varchar', length: 30, nullable: true })
     type?: string | null;
 
-    @ApiPropertyOptional({ example: '12 semanas', maxLength: 50 })
-    @Column({ type: 'varchar', length: 50, nullable: true })
-    duration?: string | null;
+    // Semanas. 0 = sin duracion fija; si es mayor que 0 limita la semana (week) de las rutinas
+    // del plan a 1..duration. Obligatoria desde el 17/10 (D9): era texto libre ('12 semanas')
+    @ApiProperty({ example: 12, minimum: 0, description: 'Duración en semanas. 0 = sin duración fija' })
+    @Column({ type: 'integer', nullable: false })
+    duration!: number;
 
     @ApiProperty({ example: true })
     @Column({ nullable: false, default: true })

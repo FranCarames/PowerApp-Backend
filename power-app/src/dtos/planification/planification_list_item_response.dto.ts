@@ -17,8 +17,8 @@ export class PlanificationListItemResponseDto {
     @ApiPropertyOptional({ example: 'fuerza' })
     type?: string;
 
-    @ApiPropertyOptional({ example: '12 semanas' })
-    duration?: string;
+    @ApiProperty({ example: 12, description: 'Duración en semanas. 0 = sin duración fija' })
+    duration!: number;
 
     @ApiProperty({ example: true })
     active!: boolean;

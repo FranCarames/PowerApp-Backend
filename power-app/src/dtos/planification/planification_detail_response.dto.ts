@@ -21,7 +21,10 @@ export class PlanificationAsignationResponseDto {
     @ApiProperty({ example: 'uuid-1234', description: 'Id del Routine_Asignation (el vínculo), NO el de la rutina: es el que va a necesitar CU-E-12 para desasignar' })
     id!: string;
 
-    @ApiProperty({ example: 1 })
+    @ApiProperty({ example: 1, minimum: 1, description: 'Semana del plan en la que va la rutina' })
+    week!: number;
+
+    @ApiProperty({ example: 1, description: 'Posición dentro de la semana. Etiqueta de orden: puede repetirse' })
     order!: number;
 
     @ApiProperty({ type: PlanificationRoutineResponseDto })
@@ -34,6 +37,6 @@ export class PlanificationAsignationResponseDto {
 // hace falta un DTO aparte. Si el detalle algun dia baja a los circuitos, ahi se separan
 export class PlanificationDetailResponseDto extends PlanificationListItemResponseDto {
 
-    @ApiProperty({ type: [PlanificationAsignationResponseDto], description: 'Rutinas del plan, ordenadas por order. Vacío hasta que exista CU-E-12' })
+    @ApiProperty({ type: [PlanificationAsignationResponseDto], description: 'Rutinas vigentes del plan, ordenadas por week, order y fecha de asignación. La lista es plana: el cliente agrupa por semana. Vacía si no tiene ninguna' })
     routines!: PlanificationAsignationResponseDto[];
 }

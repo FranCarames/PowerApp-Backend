@@ -1,13 +1,19 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Unique } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserRoutine } from './user_routine.entity';
+import { UserPlanification } from './user_planification.entity';
+import { RoutineAsignation } from './routine_asignation.entity';
 import { RoutineExercise } from './routine_exercise.entity';
 
-// La existencia de la fila = ese ejercicio esta hecho en esa instancia de rutina.
-// El registro se crea al completar el ejercicio ENTERO: el tildado serie por serie
-// es maquillaje del front y no toca la base
+// Via de la planificacion. La existencia de la fila = ese ejercicio esta hecho en esa rutina
+// (routine_asignation_id) de esa asignacion del plan al alumno (user_planification_id). Cuelga
+// directo de las dos: no hay instancia intermedia (D11, 17/10).
+// El registro se crea al completar el ejercicio ENTERO: el tildado serie por serie es
+// maquillaje del front y no toca la base.
+// Consistencia que la base NO garantiza: la Routine_Asignation tiene que ser de la misma
+// planificacion que la User_Planification. Con dos FK simples no se puede expresar; la valida
+// el service al marcar (bloque B)
 @Entity('Routine_Exercise_Finished')
-@Unique('uk_ref_user_routine_exercise', ['user_routine_id', 'routine_exercise_id'])
+@Unique('uk_ref_plan_asignation_exercise', ['user_planification_id', 'routine_asignation_id', 'routine_exercise_id'])
 export class RoutineExerciseFinished {
     @ApiProperty({ example: 'uuid-1234' })
     @PrimaryGeneratedColumn('uuid')
@@ -15,7 +21,11 @@ export class RoutineExerciseFinished {
 
     @ApiProperty({ example: 'uuid-1234' })
     @Column({ type: 'uuid', nullable: false })
-    user_routine_id!: string;
+    user_planification_id!: string;
+
+    @ApiProperty({ example: 'uuid-1234' })
+    @Column({ type: 'uuid', nullable: false })
+    routine_asignation_id!: string;
 
     @ApiProperty({ example: 'uuid-1234' })
     @Column({ type: 'uuid', nullable: false })
@@ -34,13 +44,18 @@ export class RoutineExerciseFinished {
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS
-    @ManyToOne(() => UserRoutine, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'user_routine_id' })
-    userRoutine!: UserRoutine;
+    // RESTRICT en las tres, a proposito: el historial no se pierde por una cascada. La baja
+    // fisica de un Routine_Exercise solo pasa cuando nadie lo completo, asi que si una de estas
+    // FK llega a frenar un delete es porque hay un bug en la reconciliacion. Preferimos el error
+    // de la base antes que perder historial
+    @ManyToOne(() => UserPlanification, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'user_planification_id' })
+    userPlanification!: UserPlanification;
 
-    // RESTRICT y no CASCADE, a proposito: la baja fisica de un Routine_Exercise solo pasa
-    // cuando nadie lo completo, asi que si esta FK llega a frenar un delete es porque hay
-    // un bug en la reconciliacion. Preferimos el error de la base antes que perder historial
+    @ManyToOne(() => RoutineAsignation, { onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'routine_asignation_id' })
+    routineAsignation!: RoutineAsignation;
+
     @ManyToOne(() => RoutineExercise, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'routine_exercise_id' })
     routineExercise!: RoutineExercise;

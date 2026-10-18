@@ -10,7 +10,7 @@ export class SetRoutineAsignationsActiveDto {
     @IsUUID('all', { each: true, message: 'Cada ID de asignación debe ser un UUID válido' })
     routine_asignation_ids!: string[];
 
-    @ApiProperty({ example: false, description: 'Al reactivar en lote, cada asignación vuelve al final de su planificación' })
+    @ApiProperty({ example: false, description: 'Al reactivar en lote, cada asignación vuelve a su lugar (su semana y su orden). Si alguna queda fuera de la duración actual de su plan, es un 400 y no se aplica ninguna' })
     @IsNotEmpty()
     @IsBoolean()
     active!: boolean;

@@ -1,9 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
 import { Routine } from './routine.entity';
 import { Planification } from './planification.entity';
-import { RoutineAsignationUser } from './routine_asignation_user.entity';
-import { UserRoutine } from './user_routine.entity';
 
 @Entity('Routine_Asignation')
 export class RoutineAsignation {
@@ -19,13 +17,20 @@ export class RoutineAsignation {
     @Column({ type: 'uuid', nullable: false })
     planification_id!: string;
 
-    // Nullable a proposito: la baja logica le borra la posicion (order = null) y NO se
-    // renumera el resto, asi que la secuencia puede tener huecos. Y como el alta persiste
-    // el order recibido tal cual, tambien puede tener duplicados: order es una etiqueta
-    // de orden, no una secuencia canonica. El desempate lo pone la lectura, por created_at
-    @ApiPropertyOptional({ example: 1 })
-    @Column({ type: 'integer', nullable: true })
-    order?: number | null;
+    // NOT NULL desde el 17/10 (D10): la baja logica solo apaga active y la rutina CONSERVA su
+    // lugar, asi que ya no hay un order nulo que representar. Sigue siendo una etiqueta de
+    // orden dentro de la semana, no una secuencia canonica: el alta persiste el order recibido
+    // tal cual, asi que puede tener duplicados y huecos. El desempate lo pone la lectura, por
+    // created_at
+    @ApiProperty({ example: 1, description: 'Posición dentro de la semana. Etiqueta de orden: puede repetirse' })
+    @Column({ type: 'integer', nullable: false })
+    order!: number;
+
+    // Semana del plan en la que va la rutina: 1..Planification.duration, o sin tope si la
+    // duracion es 0. El rango lo valida el service
+    @ApiProperty({ example: 1, minimum: 1, description: 'Semana del plan en la que va la rutina' })
+    @Column({ type: 'integer', nullable: false })
+    week!: number;
 
     @ApiProperty({ example: true })
     @Column({ nullable: false, default: true })
@@ -47,10 +52,4 @@ export class RoutineAsignation {
     @ManyToOne(() => Planification, planification => planification.routineAsignations, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'planification_id' })
     planification!: Planification;
-
-    @OneToMany(() => RoutineAsignationUser, routineAsignationUser => routineAsignationUser.routineAsignation)
-    routineAsignationUsers!: RoutineAsignationUser[];
-
-    @OneToMany(() => UserRoutine, userRoutine => userRoutine.routineAsignation)
-    userRoutines!: UserRoutine[];
 }

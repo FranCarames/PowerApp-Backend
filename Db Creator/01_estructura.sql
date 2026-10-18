@@ -85,7 +85,7 @@ CREATE TABLE public."Planification" (
     description        TEXT,
     number_of_routines INTEGER     NOT NULL,
     type               VARCHAR(30),
-    duration           VARCHAR(50),
+    duration           INTEGER     NOT NULL,
     active             BOOLEAN     NOT NULL DEFAULT true,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -195,7 +195,8 @@ CREATE TABLE public."Routine_Asignation" (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     routine_id      UUID        NOT NULL,
     planification_id UUID       NOT NULL,
-    "order" 		INTEGER,
+    "order"         INTEGER     NOT NULL,
+    week            INTEGER     NOT NULL,
     active          BOOLEAN     NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -211,12 +212,12 @@ CREATE TABLE public."User_Planification" (
     coach_id           UUID,
     planification_id   UUID,
     description        TEXT,
-    number_of_routines INTEGER,
+    number_of_routines INTEGER      NOT NULL,
     type               VARCHAR(30),
     coach_note         VARCHAR(100),
-    duration           VARCHAR(50),
+    -- Sin end_date ni duration (D12): el fin se calcula como start_date + las semanas de
+    -- Planification.duration
     start_date         DATE         NOT NULL,
-    end_date           DATE         NOT NULL,
     active             BOOLEAN      NOT NULL DEFAULT true,
     created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -275,35 +276,22 @@ CREATE INDEX idx_routine_exercise_circuit_id  ON public."Routine_Exercise"(circu
 CREATE INDEX idx_routine_exercise_exercise_id ON public."Routine_Exercise"(exercise_id);
 CREATE INDEX idx_routine_exercise_order       ON public."Routine_Exercise"(circuit_id, exercise_order);
 
+-- Asignacion individual: una rutina suelta para un alumno, un dia. Cada fila es una sesion
 CREATE TABLE public."Routine_Asignation_User" (
-    id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    routine_id            UUID        NOT NULL,
-    user_id               UUID        NOT NULL,
-    routine_asignation_id UUID        NOT NULL,
-    "order" 			  INTEGER     NOT NULL,
-    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    routine_id  UUID        NOT NULL,
+    user_id     UUID        NOT NULL,
+    date        DATE        NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_routine_asignation_user_routine
-        FOREIGN KEY (routine_id)            REFERENCES public."Routine"(id)           ON DELETE CASCADE,
+        FOREIGN KEY (routine_id) REFERENCES public."Routine"(id) ON DELETE CASCADE,
     CONSTRAINT fk_routine_asignation_user_user
-        FOREIGN KEY (user_id)               REFERENCES public."User"(id)              ON DELETE CASCADE,
-    CONSTRAINT fk_routine_asignation_user_asignation
-        FOREIGN KEY (routine_asignation_id) REFERENCES public."Routine_Asignation"(id) ON DELETE CASCADE
+        FOREIGN KEY (user_id)    REFERENCES public."User"(id)    ON DELETE CASCADE,
+    CONSTRAINT uk_rau_routine_user_date UNIQUE (routine_id, user_id, date)
 );
 
-CREATE TABLE public."User_Routine" (
-    id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    routine_asignation_id UUID        NOT NULL,
-    user_id               UUID        NOT NULL,
-    date                  DATE        NOT NULL,
-    active                BOOLEAN     NOT NULL DEFAULT true,
-    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_user_routine_routine_asignation
-        FOREIGN KEY (routine_asignation_id) REFERENCES public."Routine_Asignation"(id) ON DELETE CASCADE,
-    CONSTRAINT fk_user_routine_user
-        FOREIGN KEY (user_id) REFERENCES public."User"(id) ON DELETE CASCADE
-);
+CREATE INDEX idx_rau_user_date ON public."Routine_Asignation_User"(user_id, date);
 
 
 -- =============================================================
@@ -337,22 +325,48 @@ CREATE INDEX idx_exercise_set_order               ON public."Exercise_Set"(routi
 --  TABLAS CON DEPENDENCIAS DE CUARTO NIVEL
 -- =============================================================
 
--- La existencia de la fila = ese ejercicio esta hecho en esa instancia de rutina
+-- Via de la planificacion. La existencia de la fila = ese ejercicio esta hecho en esa rutina
+-- de esa asignacion del plan al alumno. Cuelga directo de User_Planification y de
+-- Routine_Asignation (no hay instancia intermedia). Todas las FK en RESTRICT: el historial
+-- no se pierde por una cascada. La Routine_Asignation tiene que ser de la misma planificacion
+-- que la User_Planification: con dos FK simples la base no lo puede expresar, lo valida el service
 CREATE TABLE public."Routine_Exercise_Finished" (
-    id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_routine_id     UUID        NOT NULL,
-    routine_exercise_id UUID        NOT NULL,
-    user_note           VARCHAR(100),
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_ref_user_routine
-        FOREIGN KEY (user_routine_id)     REFERENCES public."User_Routine"(id)     ON DELETE CASCADE,
+    id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_planification_id UUID        NOT NULL,
+    routine_asignation_id UUID        NOT NULL,
+    routine_exercise_id   UUID        NOT NULL,
+    user_note             VARCHAR(100),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_ref_user_planification
+        FOREIGN KEY (user_planification_id) REFERENCES public."User_Planification"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ref_routine_asignation
+        FOREIGN KEY (routine_asignation_id) REFERENCES public."Routine_Asignation"(id) ON DELETE RESTRICT,
     -- RESTRICT a proposito: la baja fisica de un Routine_Exercise solo ocurre cuando no
     -- tiene historial, asi que si esta FK frena un delete es un bug de la reconciliacion
     CONSTRAINT fk_ref_routine_exercise
-        FOREIGN KEY (routine_exercise_id) REFERENCES public."Routine_Exercise"(id) ON DELETE RESTRICT,
-    CONSTRAINT uk_ref_user_routine_exercise UNIQUE (user_routine_id, routine_exercise_id)
+        FOREIGN KEY (routine_exercise_id)   REFERENCES public."Routine_Exercise"(id)   ON DELETE RESTRICT,
+    CONSTRAINT uk_ref_plan_asignation_exercise
+        UNIQUE (user_planification_id, routine_asignation_id, routine_exercise_id)
 );
 
-CREATE INDEX idx_ref_user_routine_id     ON public."Routine_Exercise_Finished"(user_routine_id);
-CREATE INDEX idx_ref_routine_exercise_id ON public."Routine_Exercise_Finished"(routine_exercise_id);
+CREATE INDEX idx_ref_routine_asignation_id ON public."Routine_Exercise_Finished"(routine_asignation_id);
+CREATE INDEX idx_ref_routine_exercise_id   ON public."Routine_Exercise_Finished"(routine_exercise_id);
+
+-- Via individual (D1): misma logica que Routine_Exercise_Finished, colgando de la asignacion
+-- individual. FK en RESTRICT: una asignacion ya entrenada no se borra (D4)
+CREATE TABLE public."Routine_Asign_Exercise_Finished" (
+    id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_routine_asign_id UUID        NOT NULL,
+    routine_exercise_id   UUID        NOT NULL,
+    user_note             VARCHAR(100),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_raef_routine_asignation_user
+        FOREIGN KEY (user_routine_asign_id) REFERENCES public."Routine_Asignation_User"(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_raef_routine_exercise
+        FOREIGN KEY (routine_exercise_id)   REFERENCES public."Routine_Exercise"(id)        ON DELETE RESTRICT,
+    CONSTRAINT uk_raef_asign_exercise UNIQUE (user_routine_asign_id, routine_exercise_id)
+);
+
+CREATE INDEX idx_raef_routine_exercise_id ON public."Routine_Asign_Exercise_Finished"(routine_exercise_id);

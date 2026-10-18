@@ -7,7 +7,6 @@ import { Routine } from '../entities/routine.entity';
 import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { UserPlanification } from '../entities/user_planification.entity';
 import { RoutineAsignationUser } from '../entities/routine_asignation_user.entity';
-import { UserRoutine } from '../entities/user_routine.entity';
 import { AuthModule } from '../authentication/auth.module';
 
 @Module({
@@ -17,7 +16,6 @@ import { AuthModule } from '../authentication/auth.module';
     RoutineAsignation,
     UserPlanification,
     RoutineAsignationUser,
-    UserRoutine,
   ]), AuthModule],
   controllers: [PlanificationController],
   providers: [PlanificationService]

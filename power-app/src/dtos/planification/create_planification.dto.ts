@@ -1,5 +1,6 @@
-import { IsNotEmpty, IsString, IsOptional, MaxLength, IsInt, Min } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, MaxLength, IsInt, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { INTEGER_MAX } from './planification_limits';
 
 export class CreatePlanificationDto {
 
@@ -29,10 +30,10 @@ export class CreatePlanificationDto {
     @MaxLength(30)
     type?: string;
 
-    @ApiPropertyOptional({ example: '12 semanas', maxLength: 50 })
-    @IsOptional()
+    @ApiProperty({ example: 12, minimum: 0, maximum: INTEGER_MAX, description: 'Duración del plan en semanas. 0 = sin duración fija. Si es mayor que 0, limita la semana (week) de las rutinas del plan a 1..duration. Obligatoria, también al editar. Al editar, si es mayor que 0 no puede ser menor que la semana más alta usada por una rutina vigente del plan (400)' })
     @IsNotEmpty()
-    @IsString()
-    @MaxLength(50)
-    duration?: string;
+    @IsInt()
+    @Min(0)
+    @Max(INTEGER_MAX)
+    duration!: number;
 }

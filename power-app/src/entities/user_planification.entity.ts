@@ -26,9 +26,10 @@ export class UserPlanification {
     @Column({ type: 'text', nullable: true })
     description?: string;
 
-    @ApiPropertyOptional({ example: 3 })
-    @Column({ type: 'integer', nullable: true })
-    number_of_routines?: number;
+    // Se copia de la plantilla al asignar (DB3-a). NOT NULL como en el diagrama
+    @ApiProperty({ example: 3 })
+    @Column({ type: 'integer', nullable: false })
+    number_of_routines!: number;
 
     @ApiPropertyOptional({ example: 'fuerza', maxLength: 30 })
     @Column({ length: 30, nullable: true })
@@ -38,17 +39,12 @@ export class UserPlanification {
     @Column({ length: 100, nullable: true })
     coach_note?: string;
 
-    @ApiPropertyOptional({ example: '8 semanas', maxLength: 50 })
-    @Column({ length: 50, nullable: true })
-    duration?: string;
-
+    // No hay end_date ni duration (D12, 17/10): el fin se calcula como start_date + las semanas
+    // de la plantilla (Planification.duration). Editar la duracion de la plantilla mueve el fin
+    // de todos los que la tienen asignada; con duracion 0 la asignacion no tiene fin
     @ApiProperty({ example: '2024-01-01' })
     @Column({ type: 'date', nullable: false })
     start_date!: Date;
-
-    @ApiProperty({ example: '2024-03-01' })
-    @Column({ type: 'date', nullable: false })
-    end_date!: Date;
 
     @ApiProperty({ example: true })
     @Column({ nullable: false, default: true })

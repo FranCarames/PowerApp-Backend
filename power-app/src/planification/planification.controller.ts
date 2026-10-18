@@ -78,6 +78,7 @@ export class PlanificationController {
     @Post('/create')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 201, type: PlanificationDetailResponseDto })
+    @ApiResponse({ status: 400, description: 'Datos inválidos (duration obligatoria, entero ≥ 0)' })
     async createPlanification(
         @Body() createPlanificationDto: CreatePlanificationDto,
         @Res() res: Response,
@@ -88,6 +89,8 @@ export class PlanificationController {
     @Post('/edit/:id')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 200, type: PlanificationDetailResponseDto })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, planificación de baja, o duración menor que la semana más alta usada por una rutina vigente' })
+    @ApiResponse({ status: 404, description: 'Planificación no encontrada' })
     async editPlanification(
         @Param() idPlanification: ParameterIdDto,
         @Body() editPlanificationDto: EditPlanificationDto,
@@ -115,6 +118,8 @@ export class PlanificationController {
     @Post('/routine/assign')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 201, type: PlanificationDetailResponseDto })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, planificación o rutina de baja, o semana mayor que la duración del plan' })
+    @ApiResponse({ status: 404, description: 'Planificación o rutina no encontrada' })
     async assignRoutineToPlanification(
         @Body() assignRoutineDto: AssignRoutineToPlanificationDto,
         @Res() res: Response,
@@ -125,6 +130,8 @@ export class PlanificationController {
     @Post('/routine/assign-bulk')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 201, type: PlanificationDetailResponseDto })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, planificación o alguna rutina de baja, o semana mayor que la duración del plan (no se crea ninguna asignación)' })
+    @ApiResponse({ status: 404, description: 'Planificación o alguna rutina no encontrada' })
     async assignRoutinesToPlanification(
         @Body() assignRoutinesDto: AssignRoutinesToPlanificationDto,
         @Res() res: Response,
@@ -137,6 +144,8 @@ export class PlanificationController {
     @Post('/routine/set-active/:id')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 200, type: RoutineAsignation })
+    @ApiResponse({ status: 400, description: 'week u order junto con active = false, o semana fuera de la duración actual del plan' })
+    @ApiResponse({ status: 404, description: 'Asignación no encontrada' })
     async setRoutineAsignationActive(
         @Param() idRoutineAsignation: ParameterIdDto,
         @Body() setActiveDto: SetRoutineAsignationActiveDto,
@@ -148,6 +157,8 @@ export class PlanificationController {
     @Post('/routine/set-active-bulk')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 200, type: [RoutineAsignation] })
+    @ApiResponse({ status: 400, description: 'Ids repetidos, o alguna asignación quedaría fuera de la duración actual de su plan (no se aplica ninguna)' })
+    @ApiResponse({ status: 404, description: 'Alguna asignación no fue encontrada' })
     async setRoutineAsignationsActive(
         @Body() setActiveDto: SetRoutineAsignationsActiveDto,
         @Res() res: Response,
