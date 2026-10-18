@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, DataSource, In, SelectQueryBuilder } from 'typeorm';
+import { Repository, DataSource, In, SelectQueryBuilder, QueryFailedError } from 'typeorm';
 import { Circuit } from '../entities/circuit.entity';
 import { Exercise } from '../entities/exercise.entity';
 import { Routine } from '../entities/routine.entity';
@@ -11,6 +11,8 @@ import { RoutineExercise } from '../entities/routine_exercise.entity';
 import { ExerciseSet } from '../entities/exercise_set.entity';
 import { RoutineExerciseFinished } from '../entities/routine_exercise_finished.entity';
 import { RoutineAsignExerciseFinished } from '../entities/routine_asign_exercise_finished.entity';
+import { RoutineAsignationUser } from '../entities/routine_asignation_user.entity';
+import { User, UserRole } from '../entities/user.entity';
 import { GetCircuitsQueryDto } from '../dtos/circuit/get_circuits_query.dto';
 import { SetCircuitActiveDto } from '../dtos/circuit/set_circuit_active.dto';
 import { CreateCircuitDto } from '../dtos/circuit/create_circuit.dto';
@@ -19,6 +21,12 @@ import { GetRoutinesQueryDto } from '../dtos/routine/get_routines_query.dto';
 import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
+import { AssignRoutineToUserDto } from '../dtos/routine/assign_routine_to_user.dto';
+
+// Los dos 409 de la rutina individual. El de "ya entreno" sale por dos caminos (el chequeo
+// previo y la FK RESTRICT de la base), y el de duplicado tambien (chequeo previo y unico)
+const ASSIGN_DUPLICATE_ERROR = 'El alumno ya tiene esa rutina asignada ese día.';
+const REMOVE_TRAINED_ERROR = 'El alumno ya entrenó esta rutina: no se puede quitar.';
 
 @Injectable()
 export class RoutineService {
@@ -29,6 +37,12 @@ export class RoutineService {
         private routineRepository: Repository<Routine>,
         @InjectDataSource()
         private dataSource: DataSource,
+        @InjectRepository(User)
+        private userRepository: Repository<User>,
+        @InjectRepository(RoutineAsignationUser)
+        private routineAsignationUserRepository: Repository<RoutineAsignationUser>,
+        @InjectRepository(RoutineAsignExerciseFinished)
+        private routineAsignExerciseFinishedRepository: Repository<RoutineAsignExerciseFinished>,
     ) {
     }
 
@@ -775,6 +789,155 @@ export class RoutineService {
             console.error(error);
             res.status(500).send({ error: 'Error al actualizar el estado del circuito.' });
         }
+    }
+
+    // ===================== ASIGNACION INDIVIDUAL A UN ALUMNO (CU-E-19, CU-E-20) =====================
+
+    async assignRoutineToUser(
+        assignRoutineToUserDto: AssignRoutineToUserDto,
+        res: Response
+    ) {
+        try {
+            // El orden de las validaciones es parte del contrato (spec §4.1): primero la
+            // rutina, despues el destinatario, al final el duplicado. Es una sola escritura,
+            // asi que no hace falta transaccion: las carreras las cierra el unico de la base
+            const routine = await this.routineRepository.findOne({
+                where: { id: assignRoutineToUserDto.routine_id },
+                select: { id: true, name: true, active: true },
+            });
+
+            if (!routine) {
+                return res.status(404).send({ error: 'Rutina no encontrada' });
+            }
+
+            // Una rutina de baja no puede asignarse de nuevo (mismo criterio que armar una
+            // rutina con un circuito de baja). Lo ya asignado antes sigue vigente
+            if (!routine.active) {
+                return res.status(400).send({
+                    error: `La rutina '${routine.name}' está dada de baja y no puede asignarse.`
+                });
+            }
+
+            const user = await this.userRepository.findOne({
+                where: { id: assignRoutineToUserDto.user_id },
+                select: { id: true, role: true, active: true },
+            });
+
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            if (user.role !== UserRole.user) {
+                return res.status(400).send({ error: 'La rutina sólo puede asignarse a un alumno.' });
+            }
+
+            if (!user.active) {
+                return res.status(400).send({
+                    error: 'La cuenta del alumno está cerrada: no se le puede asignar una rutina.'
+                });
+            }
+
+            // Los ids de la consulta salen de las filas leidas y no del body: el iOS manda
+            // los UUID en mayuscula, y la respuesta tiene que devolverlos como estan en la base
+            const alreadyAssigned = await this.routineAsignationUserRepository.exists({
+                where: { routine_id: routine.id, user_id: user.id, date: assignRoutineToUserDto.date },
+            });
+
+            if (alreadyAssigned) {
+                return res.status(409).send({ error: ASSIGN_DUPLICATE_ERROR });
+            }
+
+            const assignment = await this.routineAsignationUserRepository.save(
+                this.routineAsignationUserRepository.create({
+                    routine_id: routine.id,
+                    user_id: user.id,
+                    date: assignRoutineToUserDto.date,
+                })
+            );
+
+            return res.status(201).send(this.buildRoutineAssignUserResponse(assignment, routine));
+        } catch (error) {
+            // Dos altas simultaneas pasan las dos el chequeo previo y la segunda choca con el
+            // unico. Se mira el nombre del unico para no disfrazar de duplicado otro error
+            if (this.isDatabaseError(error, '23505', 'uk_rau_routine_user_date')) {
+                return res.status(409).send({ error: ASSIGN_DUPLICATE_ERROR });
+            }
+
+            console.error(error);
+            res.status(500).send({ error: 'Error al asignar la rutina.' });
+        }
+    }
+
+    async removeRoutineFromUser(
+        idAssignment: string,
+        res: Response
+    ) {
+        try {
+            const assignment = await this.routineAsignationUserRepository.findOne({
+                where: { id: idAssignment },
+                relations: { routine: true },
+            });
+
+            if (!assignment) {
+                return res.status(404).send({ error: 'Asignación no encontrada' });
+            }
+
+            // D4: una asignacion ya entrenada no se borra, para no destruir el historial del
+            // alumno. Entrenada = tiene al menos un ejercicio marcado como hecho
+            const trained = await this.routineAsignExerciseFinishedRepository.exists({
+                where: { user_routine_asign_id: assignment.id },
+            });
+
+            if (trained) {
+                return res.status(409).send({ error: REMOVE_TRAINED_ERROR });
+            }
+
+            // Borrado fisico (spec de E-20). delete() no toca la entidad, asi que la respuesta
+            // se arma con lo leido
+            await this.routineAsignationUserRepository.delete({ id: assignment.id });
+
+            return res.status(200).send(this.buildRoutineAssignUserResponse(assignment, assignment.routine));
+        } catch (error) {
+            // Si el alumno marco un ejercicio entre el chequeo y el borrado, el RESTRICT de la
+            // base frena el DELETE (23503): es el mismo caso de "ya entreno"
+            if (this.isDatabaseError(error, '23503')) {
+                return res.status(409).send({ error: REMOVE_TRAINED_ERROR });
+            }
+
+            console.error(error);
+            res.status(500).send({ error: 'Error al quitar la rutina del alumno.' });
+        }
+    }
+
+    // ===================== HELPERS DE ASIGNACION INDIVIDUAL =====================
+
+    // La misma forma para el alta (la asignacion creada) y la baja (la asignacion borrada).
+    // De la rutina sale solo id y name: el listado (BE-12) es el que suma active
+    private buildRoutineAssignUserResponse(
+        assignment: RoutineAsignationUser,
+        routine: Pick<Routine, 'id' | 'name'>
+    ) {
+        return {
+            id: assignment.id,
+            routine_id: assignment.routine_id,
+            user_id: assignment.user_id,
+            date: assignment.date,
+            created_at: assignment.created_at,
+            updated_at: assignment.updated_at,
+            routine: { id: routine.id, name: routine.name },
+        };
+    }
+
+    // Reconoce un error de Postgres por su codigo (23505 = unico, 23503 = clave foranea).
+    // constraint es opcional: sirve para no confundir el unico que importa con cualquier otro
+    private isDatabaseError(error: unknown, code: string, constraint?: string): boolean {
+        if (!(error instanceof QueryFailedError)) {
+            return false;
+        }
+
+        const driverError: { code?: string; constraint?: string } | undefined = error.driverError;
+
+        return driverError?.code === code && (!constraint || driverError.constraint === constraint);
     }
 
     // ===================== HELPERS DE RUTINA =====================

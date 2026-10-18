@@ -9,6 +9,8 @@ import { RoutineExercise } from '../entities/routine_exercise.entity';
 import { ExerciseSet } from '../entities/exercise_set.entity';
 import { RoutineExerciseFinished } from '../entities/routine_exercise_finished.entity';
 import { RoutineAsignExerciseFinished } from '../entities/routine_asign_exercise_finished.entity';
+import { RoutineAsignationUser } from '../entities/routine_asignation_user.entity';
+import { User } from '../entities/user.entity';
 import { AuthModule } from '../authentication/auth.module';
 
 @Module({
@@ -20,6 +22,8 @@ import { AuthModule } from '../authentication/auth.module';
     ExerciseSet,
     RoutineExerciseFinished,
     RoutineAsignExerciseFinished,
+    RoutineAsignationUser,
+    User,
   ]), AuthModule],
   controllers: [RoutineController],
   providers: [RoutineService]

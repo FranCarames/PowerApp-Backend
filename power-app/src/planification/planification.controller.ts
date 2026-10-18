@@ -30,10 +30,10 @@ import { SetRoutineAsignationsActiveDto } from '../dtos/planification/set_routin
 // TODO: crear los siguientes DTOs en src/dtos/planification/ (CU-E-13 y E-14)
 // import { AssignPlanificationToUserDto } from '../dtos/planification/assign_planification_to_user.dto';
 // import { EditUserPlanificationDto } from '../dtos/planification/edit_user_planification.dto';
-// CU-E-19 y CU-E-20 (asignar/quitar rutina puntual a un alumno) salieron de aca el 27/8:
-// son del paquete "Administrar Rutinas", dependen de Routine_Asignation_User —declarada
-// post-MVP— y cuando se retomen van a vivir en routine/ (POST /routine/assign-user,
-// DELETE /routine/assign-user/:id, GET /routine/assigned/:userId)
+// CU-E-19 y CU-E-20 (asignar/quitar rutina individual a un alumno) salieron de aca el 27/8:
+// son del paquete "Administrar Rutinas" y viven en routine/ (POST /routine/assign-user y
+// DELETE /routine/assign-user/:id, desde BE-11). El listado GET /routine/assigned/:userId
+// es BE-12
 
 @ApiTags('Planification')
 @Controller('planification')

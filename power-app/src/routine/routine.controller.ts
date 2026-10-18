@@ -2,6 +2,7 @@ import {
     Controller,
     Get,
     Post,
+    Delete,
     Body,
     Param,
     Query,
@@ -29,6 +30,8 @@ import { CircuitDetailResponseDto } from '../dtos/circuit/circuit_detail_respons
 import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
+import { AssignRoutineToUserDto } from '../dtos/routine/assign_routine_to_user.dto';
+import { RoutineAssignUserResponseDto } from '../dtos/routine/routine_assign_user_response.dto';
 
 @ApiTags('Routine')
 @Controller('routine')
@@ -171,5 +174,35 @@ export class RoutineController {
         @Res() res: Response,
     ) {
         await this.routineService.setCircuitActive(idCircuit.id, setCircuitActiveDto, res);
+    }
+
+    // ===================== ASIGNACION INDIVIDUAL A UN ALUMNO (CU-E-19, CU-E-20) =====================
+
+    // Rutas de dos segmentos: no compiten con 'GET /:id'. El listado de las asignaciones de un
+    // alumno (GET /routine/assigned/:userId) es la tarea siguiente (BE-12)
+    @Post('assign-user')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 201, type: RoutineAssignUserResponseDto })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, rutina dada de baja, o el destinatario no es un alumno o tiene la cuenta cerrada' })
+    @ApiResponse({ status: 404, description: 'Rutina o usuario no encontrado' })
+    @ApiResponse({ status: 409, description: 'El alumno ya tiene esa rutina asignada ese día' })
+    async assignRoutineToUser(
+        @Body() assignRoutineToUserDto: AssignRoutineToUserDto,
+        @Res() res: Response,
+    ) {
+        await this.routineService.assignRoutineToUser(assignRoutineToUserDto, res);
+    }
+
+    @Delete('assign-user/:id')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: RoutineAssignUserResponseDto, description: 'La asignación que se borró (borrado físico)' })
+    @ApiResponse({ status: 400, description: 'El id no es un UUID válido' })
+    @ApiResponse({ status: 404, description: 'Asignación no encontrada' })
+    @ApiResponse({ status: 409, description: 'El alumno ya entrenó esta rutina: no se puede quitar' })
+    async removeRoutineFromUser(
+        @Param() idAssignment: ParameterIdDto,
+        @Res() res: Response,
+    ) {
+        await this.routineService.removeRoutineFromUser(idAssignment.id, res);
     }
 }

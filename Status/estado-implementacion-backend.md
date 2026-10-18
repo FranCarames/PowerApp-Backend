@@ -1,20 +1,20 @@
 # PowerApp Backend — Estado de implementación vs. Casos de Uso
 
-> **Corte:** 2026-10-17 · **Fuente:** `Use Cases/` del repo PowerApp-Docs (fuente de verdad de los CU) comparado contra `power-app/src`
+> **Corte:** 2026-10-18 · **Fuente:** `Use Cases/` del repo PowerApp-Docs (fuente de verdad de los CU) comparado contra `power-app/src`
 > **Método:** mapeo 1:1 de los 75 CU contra los `controller` y `service` del código, con el criterio del inventario del [roadmap del 16/10](https://github.com/FranCarames/PowerApp-Docs/blob/main/Doc/plans/2026-10-16-roadmap-backend.md) (§9): un CU es ✅ sólo si **todos los caminos de su spec** se cumplen.
 
 ## Resumen
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 57 | 76% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
+| ✅ Implementado | 59 | 79% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
 | 🟡 Parcial | 8 | 11% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
 | 🔵 Andamiaje | 3 | 4% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
-| ⬜ No implementado | 6 | 8% | Sin endpoint |
+| ⬜ No implementado | 4 | 5% | Sin endpoint |
 | — Sin backend | 1 | 1% | Por su spec es del cliente (CU-U-14) |
 | **Total** | **75** | | |
 
-**57 de los 74 CU con backend están completos (77%).** Faltan 17: 8 parciales, 3 en andamiaje y 6 sin implementar. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
+**59 de los 74 CU con backend están completos (80%).** Faltan 15: 8 parciales, 3 en andamiaje y 4 sin implementar. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
 > **Nota (17/10):** los ✅ bajan de 63 (corte del 4/9) a 57 porque **cambió el criterio, no porque se rompiera algo**. El de antes daba ✅ a todo endpoint con lógica real; el del roadmap exige además que se cumpla cada camino de la spec. Por eso pasaron a 🟡 CU-U-04 (no envía el mail), CU-A-10 y CU-A-15 (borran en cascada en vez de impedirlo), CU-A-13 y CU-A-14 (no validan el nombre único) y CU-A-17 (falta "ya es entrenador"). Ver los cambios del 17/10.
 > **Base de datos:** la de Render se recreó el 3/10 con el esquema vigente (dato del Status web). Es free tier y **vence alrededor del 2/11** (*sin verificar*), así que hay que regenerarla antes (BE-23). **Desde el 17/10 el esquema del bloque A ya está en `Db Creator`** (BE-10): al regenerar con `01` → `02` → `03` no hace falta el patch `patches/2026-10-17-be-10.sql`, que es para una base viva.
 
@@ -23,11 +23,35 @@
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | Sin backend | % ✅ (sobre los CU con backend) |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 13 | 3 | 1 | 2 | 1 | 68% |
-| Entrenador | 32 | 26 | 0 | 2 | 4 | 0 | 81% |
+| Entrenador | 32 | 28 | 0 | 2 | 2 | 0 | 88% |
 | Admin | 23 | 18 | 5 | 0 | 0 | 0 | 78% |
-| **Total** | **75** | **57** | **8** | **3** | **6** | **1** | **77%** |
+| **Total** | **75** | **59** | **8** | **3** | **4** | **1** | **80%** |
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+
+## Cambios recientes (2026-10-18 · rutina individual: asignar y quitar)
+
+- **Undécima tarea del roadmap (BE-11): E-19 y E-20 pasan a ✅.** Son los primeros endpoints de la vía individual (spec del 17/10, §4.1 y §4.2), en `routine.controller.ts` y `routine.service.ts` como se acordó el 27/8. Plan: `Doc/plans/2026-10-18-be-11-asignar-rutina-individual-plan.md` (repo PowerApp-Docs). Conteos: 57 → **59** ✅ de 75 (80% de los 74 con backend); el Entrenador sube de 81% a 88%.
+- **Son dos endpoints y no tres.** El roadmap metía `GET /routine/assigned/:userId` en esta tarea; la spec del 17/10 lo movió a **BE-12** (§4.3 y §9) porque trae el progreso de cada asignación. Manda la spec. **Consecuencia:** hasta BE-12 el entrenador puede asignar y quitar, pero **no tiene cómo listar las asignaciones de un alumno**, y E-20 arranca justamente de abrir una asignación. Queda diferido, no olvidado.
+- **`POST /routine/assign-user`** (coach, admin). Body `{ routine_id, user_id, date }`; `201` con `{ id, routine_id, user_id, date, created_at, updated_at, routine: { id, name } }`. Las validaciones van en un orden que es parte del contrato: `404` rutina inexistente → `400` rutina de baja → `404` usuario inexistente → `400` destinatario que no es alumno o con la cuenta cerrada → `409` si ya tiene esa rutina ese día. **Por qué ese orden:** el cliente corrige de a un error por vez, y la rutina es lo primero que eligió el coach. El `400` del destinatario tiene dos mensajes (no es alumno / cuenta cerrada) para que el coach no tenga que adivinar cuál fue.
+- **`DELETE /routine/assign-user/:id`** (coach, admin). `404` si no existe; `409` `El alumno ya entrenó esta rutina: no se puede quitar.` si tiene filas en `Routine_Asign_Exercise_Finished`; si no, **borrado físico** y `200` con la asignación borrada, con la misma forma que el alta. **Por qué físico y con 409:** es lo que dice la spec de E-20, y no se destruye el historial del alumno (D4, criterio del 22/8). El `RESTRICT` de la base es el respaldo.
+- **El `409` sale por dos caminos en cada endpoint.** El alta chequea el duplicado antes de insertar *y* traduce el `23505` del único `uk_rau_routine_user_date` (dos altas simultáneas pasan las dos el chequeo). La baja chequea la ejecución antes de borrar *y* traduce el `23503` de la FK `RESTRICT` (el alumno marca un ejercicio entre el chequeo y el borrado). Es la **primera vez que el proyecto traduce un error de Postgres a un código HTTP**: se mira `QueryFailedError` y `driverError.code`, y en el alta también el nombre del único, para no disfrazar de duplicado cualquier otro `23505`.
+- **Sin transacción, a propósito.** Cada endpoint es una sola escritura precedida de lecturas; las carreras las cierra la base. Por eso no aplica la regla de `connect()` y `startTransaction()` dentro del `try`.
+- **`date` es un día sin hora, validado a mano.** `@IsDateString()` (el que usa `user_rm`) acepta fecha con hora y zona y la dejaría pasar a un `date` de Postgres; el año `0000` pasaría la forma y daría un 500. El body usa un validador propio (`@IsCalendarDay()`: forma `YYYY-MM-DD`, día que exista en el calendario, año ≥ 1) que BE-12 reutiliza para `from` y `to`. El servidor sigue sin calcular "hoy": la fecha es siempre del cliente, pasada o futura.
+- **Dos rutinas distintas el mismo día se permiten.** El único es `(rutina, alumno, día)`; lo que se rechaza es repetir la **misma** rutina el mismo día. Es consecuencia de D2 y queda escrito en la spec de E-19.
+- **Los ids de la respuesta son los de la base.** El iOS manda los UUID en mayúscula; el alta guarda y devuelve los ids de las filas leídas y no los del body.
+- **Registros del módulo.** `routine.module.ts` suma `RoutineAsignationUser` (sólo estaba en `planification.module.ts`) y `User`, con `forFeature` y no importando `UsersModule` (el usuario ya rechazó acoplar módulos). Se actualizó el comentario de `planification.controller.ts` que decía que E-19 y E-20 "se retomarán".
+- **Sin cambios de esquema:** `Db Creator/` y las entidades no se tocaron. Specs de CU reescritas en `Use Cases/` (repo PowerApp-Docs): **E-19 y E-20**. Las precondiciones de E-03 a E-07 ("gimnasio compartido", D6) siguen para BE-38.
+- **Para el web.** B5 (rutina puntual) ya puede tipar el alta y la baja contra el Swagger de estos dos endpoints. Falta el listado (BE-12) para completar la pantalla.
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde.
+  - 58 chequeos del body con el `ValidationPipe` real y el validador del día, 62 de las reglas de los dos métodos con repositorios falsos (códigos, mensajes, **orden de las validaciones**, los dos 409 de cada endpoint, ids en mayúscula, qué se guardó y qué no, la forma exacta de las respuestas), 31 del controller (rutas, verbos, roles, `await` sin `return`, y el Swagger generado con `@nestjs/testing` sin abrir ningún puerto) y 19 sin conectarse a la base (nombre del único, `INSERT ... RETURNING "id", "created_at", "updated_at"`, `date` hidratado como `'YYYY-MM-DD'`, FK `RESTRICT`).
+  - Los scripts de DTO, reglas y controller se corrieron antes **en rojo** (1, 21 y 11 fallas contra HEAD: el módulo o el método no existían) y después en verde. El de TypeORM mide el esquema de BE-10, así que ya pasaba; su único ajuste fue de método: `getQuery()` suelto no muestra el `RETURNING` porque TypeORM lo arma recién en `execute()`, así que el script reproduce ese paso.
+- **Lo que NO se verificó.**
+  - Nada corrió contra un Postgres ni contra el server. El `INSERT ... RETURNING` y la hidratación de `date` se revisaron contra la metadata de TypeORM y el parser de `pg`, no en vivo: queda para BE-35.
+  - La carrera real (dos altas simultáneas, o una marca en medio de un borrado) no se reprodujo: se probó que el código traduce el error si la base lo devuelve, no que la base lo devuelva.
+  - **La baja de una asignación entrenada no se puede probar de punta a punta todavía**: nada escribe `Routine_Asign_Exercise_Finished` hasta BE-14 (hallazgo 2). Se probó con un repositorio falso.
+- **Cambios de estado:** **E-19 y E-20 pasan de ⬜ a ✅.** La fase 2 avanza: **BE-10, BE-10b y BE-11 hechas, sigue BE-12** (el listado por alumno, que es la parte individual de U-08).
 
 ## Cambios recientes (2026-10-17 · modelo de ejecución y planificaciones por semanas)
 
@@ -417,7 +441,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | Fase | Foco | Tareas | Ventana | Hito | Estado |
 |---|---|---|---|---|---|
 | **1** | Seguridad y contrato inmediato | BE-01 a BE-08 | 16 al 19/10 | **H1:** sin agujeros de seguridad conocidos, el web avisado de C2 y el Status con conteos reales | ✅ cerrada el 17/10 |
-| **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | en curso: BE-10 y BE-10b hechas el 17/10, sigue BE-11 |
+| **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | en curso: BE-10 y BE-10b hechas el 17/10, BE-11 el 18/10; sigue BE-12 |
 | ⏱ | Regenerar la base de Render | BE-23 | ≈ 1/11 | Esquema del bloque A aplicado, antes de que venza la base | fecha fija |
 | **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | |
 | **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | |
@@ -463,7 +487,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Entrenador (32 CU · 81%)
+## Detalle — Rol Entrenador (32 CU · 88%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -498,8 +522,8 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-16 | Crear rutina sistémica | ✅ Implementado | `POST /routine/create` · rutina + `Routine_Circuit` ordenados, en una transacción |
 | CU-E-17 | Editar rutina sistémica | ✅ Implementado | `POST /routine/edit/:id` · reconciliación por `Routine_Circuit.id`, en una transacción |
 | CU-E-18 | Eliminar rutina sistémica (lógico) | ✅ Implementado | `POST /routine/set-active/:id` · baja y reactivación |
-| CU-E-19 | Asignar rutina a alumno | ⬜ No implementado | **entra al MVP (16/10)** · irá en `POST /routine/assign-user` · BE-10 (modelo) y BE-11 |
-| CU-E-20 | Eliminar rutina a alumno | ⬜ No implementado | **entra al MVP (16/10)** · irá en `DELETE /routine/assign-user/:id` · BE-11 |
+| CU-E-19 | Asignar rutina a alumno | ✅ Implementado | `POST /routine/assign-user` · para un día (`date`), 404 → 400 → 404 → 400 → 409 · sin planificación · el listado es BE-12 (18/10) |
+| CU-E-20 | Eliminar rutina a alumno | ✅ Implementado | `DELETE /routine/assign-user/:id` · borrado físico; 409 si el alumno ya la entrenó (18/10) |
 
 ### Administrar circuitos
 | CU | Caso de uso | Estado | Endpoint / nota |
