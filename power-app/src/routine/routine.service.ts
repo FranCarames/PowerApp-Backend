@@ -23,6 +23,7 @@ import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
 import { AssignRoutineToUserDto } from '../dtos/routine/assign_routine_to_user.dto';
 import { MarkExerciseFinishedDto } from '../dtos/routine/mark_exercise_finished.dto';
+import { GetTrainingHistoryQueryDto } from '../dtos/routine/get_training_history_query.dto';
 import { GetAssignedRoutinesQueryDto } from '../dtos/routine/get_assigned_routines_query.dto';
 import { AuthUser } from '../authentication/auth-user.interface';
 
@@ -1175,6 +1176,115 @@ export class RoutineService {
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al desmarcar el ejercicio.' });
+        }
+    }
+
+    // CU-E-06 y E-07: lo que un alumno entreno. Una "sesion" es una asignacion individual con al
+    // menos un ejercicio hecho (la via del plan se suma en el bloque B, con source 'plan'). Gimnasio
+    // compartido (D6): cualquier coach o admin ve el historial de cualquier alumno
+    async getTrainingHistory(
+        userId: string,
+        query: GetTrainingHistoryQueryDto,
+        res: Response
+    ) {
+        try {
+            const user = await this.userRepository.findOne({
+                where: { id: userId },
+                select: { id: true },
+            });
+
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            // Una sola consulta que parte del "hecho" y baja hasta las series. Todo INNER salvo
+            // las series (un ejercicio puede no tenerlas). Sin ningun "active": lo dado de baja
+            // aparece igual si el alumno lo hizo (spec §4.7 y §6) — por eso tampoco une Circuit ni
+            // Routine_Circuit. Orden de la spec: dia descendente y nombre de rutina; el resto desempata
+            const historyQuery = this.routineAsignExerciseFinishedRepository
+                .createQueryBuilder('finished')
+                .select(['finished.id', 'finished.routine_exercise_id', 'finished.user_note', 'finished.created_at'])
+                .innerJoin('finished.routineAsignationUser', 'assignment')
+                .addSelect(['assignment.id', 'assignment.date', 'assignment.created_at'])
+                .innerJoin('assignment.routine', 'routine')
+                .addSelect(['routine.id', 'routine.name'])
+                .innerJoin('finished.routineExercise', 'routineExercise')
+                .addSelect(['routineExercise.id'])
+                .innerJoin('routineExercise.exercise', 'exercise')
+                .addSelect(['exercise.id', 'exercise.name'])
+                .leftJoin('routineExercise.exerciseSets', 'exerciseSet')
+                .addSelect([
+                    'exerciseSet.id', 'exerciseSet.set_order', 'exerciseSet.set_count', 'exerciseSet.rep_count',
+                    'exerciseSet.weight', 'exerciseSet.rm_perc', 'exerciseSet.rpe', 'exerciseSet.rir',
+                    'exerciseSet.amrap', 'exerciseSet.amrap_time', 'exerciseSet.rm',
+                ])
+                .where('assignment.user_id = :userId', { userId: user.id })
+                .orderBy('assignment.date', 'DESC')
+                .addOrderBy('routine.name', 'ASC')
+                .addOrderBy('assignment.created_at', 'ASC')
+                .addOrderBy('finished.created_at', 'ASC')
+                .addOrderBy('finished.id', 'ASC')
+                .addOrderBy('exerciseSet.set_order', 'ASC');
+
+            // E-07: el ejercicio del CATALOGO (Exercise.id). Si no hay coincidencias, el array
+            // viene vacio: solo el usuario inexistente es 404
+            if (query.exercise_id) {
+                historyQuery.andWhere('exercise.id = :exerciseId', { exerciseId: query.exercise_id });
+            }
+
+            const finishedRows = await historyQuery.getMany();
+
+            // Las filas ya vienen en el orden final: se agrupa por asignacion respetandolo. Los
+            // ejercicios de cada sesion quedan en el orden en que el alumno los marco
+            const sessions = new Map<string, {
+                source: 'individual';
+                assignment_id: string;
+                date: string;
+                routine: { id: string; name: string };
+                exercises: unknown[];
+            }>();
+
+            for (const finished of finishedRows) {
+                const assignment = finished.routineAsignationUser;
+
+                if (!sessions.has(assignment.id)) {
+                    sessions.set(assignment.id, {
+                        source: 'individual',
+                        assignment_id: assignment.id,
+                        date: assignment.date,
+                        routine: { id: assignment.routine.id, name: assignment.routine.name },
+                        exercises: [],
+                    });
+                }
+
+                // sets es la PRESCRIPCION del coach (D7): el modelo no registra la carga real
+                sessions.get(assignment.id)!.exercises.push({
+                    routine_exercise_id: finished.routine_exercise_id,
+                    exercise: {
+                        id: finished.routineExercise.exercise.id,
+                        name: finished.routineExercise.exercise.name,
+                    },
+                    user_note: finished.user_note ?? null,
+                    finished_at: finished.created_at,
+                    sets: finished.routineExercise.exerciseSets.map(exerciseSet => ({
+                        set_order: exerciseSet.set_order,
+                        set_count: exerciseSet.set_count,
+                        rep_count: exerciseSet.rep_count,
+                        weight: exerciseSet.weight ?? null,
+                        rm_perc: exerciseSet.rm_perc ?? null,
+                        rpe: exerciseSet.rpe ?? null,
+                        rir: exerciseSet.rir ?? null,
+                        amrap: exerciseSet.amrap,
+                        amrap_time: exerciseSet.amrap_time ?? null,
+                        rm: exerciseSet.rm,
+                    })),
+                });
+            }
+
+            return res.status(200).send([...sessions.values()]);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener el historial de entrenamientos.' });
         }
     }
 

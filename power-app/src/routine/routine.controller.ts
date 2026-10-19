@@ -42,6 +42,8 @@ import { RoutineAssignedDetailResponseDto, RoutineAssignedFinishedDto } from '..
 import { MarkExerciseFinishedDto } from '../dtos/routine/mark_exercise_finished.dto';
 import { AssignedFinishedParamsDto } from '../dtos/routine/assigned_finished_params.dto';
 import { RoutineAssignedUnfinishedResponseDto } from '../dtos/routine/routine_assigned_unfinished_response.dto';
+import { GetTrainingHistoryQueryDto } from '../dtos/routine/get_training_history_query.dto';
+import { RoutineHistorySessionDto } from '../dtos/routine/routine_history_response.dto';
 
 @ApiTags('Routine')
 @Controller('routine')
@@ -283,5 +285,21 @@ export class RoutineController {
         @Res() res: Response,
     ) {
         await this.routineService.getAssignedRoutines(params.userId, query, res);
+    }
+
+    // Historial de entrenamientos del alumno (E-06) y su filtro por ejercicio (E-07). Solo coach y
+    // admin: gimnasio compartido (D6), cualquiera ve el de cualquier alumno. Las dos rutas de dos
+    // segmentos no compiten con 'GET /:id'
+    @Get('history/:userId')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: [RoutineHistorySessionDto], description: 'Las sesiones con al menos un ejercicio hecho, de la más nueva a la más vieja (día descendente y nombre de rutina). Sin historial, un array vacío' })
+    @ApiResponse({ status: 400, description: 'El id del alumno o el exercise_id no son UUID válidos' })
+    @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
+    async getTrainingHistory(
+        @Param() params: AssignedRoutinesParamsDto,
+        @Query() query: GetTrainingHistoryQueryDto,
+        @Res() res: Response,
+    ) {
+        await this.routineService.getTrainingHistory(params.userId, query, res);
     }
 }
