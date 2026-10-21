@@ -7,14 +7,14 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 67 | 89% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
-| 🟡 Parcial | 7 | 9% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
+| ✅ Implementado | 68 | 91% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
+| 🟡 Parcial | 6 | 8% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
 | 🔵 Andamiaje | 0 | 0% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
 | ⬜ No implementado | 0 | 0% | Sin endpoint |
 | — Sin backend | 1 | 1% | Por su spec es del cliente (CU-U-14) |
 | **Total** | **75** | | |
 
-**67 de los 74 CU con backend están completos (91%).** Faltan 7, todos parciales: ya no queda ninguno sin endpoint ni en andamiaje. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
+**68 de los 74 CU con backend están completos (92%).** Faltan 6, todos parciales: ya no queda ninguno sin endpoint ni en andamiaje. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
 > **Nota (17/10):** los ✅ bajan de 63 (corte del 4/9) a 57 porque **cambió el criterio, no porque se rompiera algo**. El de antes daba ✅ a todo endpoint con lógica real; el del roadmap exige además que se cumpla cada camino de la spec. Por eso pasaron a 🟡 CU-U-04 (no envía el mail), CU-A-10 y CU-A-15 (borran en cascada en vez de impedirlo), CU-A-13 y CU-A-14 (no validan el nombre único) y CU-A-17 (falta "ya es entrenador"). Ver los cambios del 17/10.
 > **Base de datos:** la de Render se recreó el 3/10 con el esquema vigente (dato del Status web). Es free tier y **vence alrededor del 2/11** (*sin verificar*), así que hay que regenerarla antes (BE-23). **Desde el 17/10 el esquema del bloque A ya está en `Db Creator`** (BE-10): al regenerar con `01` → `02` → `03` no hace falta el patch `patches/2026-10-17-be-10.sql`, que es para una base viva.
 
@@ -22,12 +22,42 @@
 
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | Sin backend | % ✅ (sobre los CU con backend) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Usuario | 20 | 17 | 2 | 0 | 0 | 1 | 89% |
+| Usuario | 20 | 18 | 1 | 0 | 0 | 1 | 95% |
 | Entrenador | 32 | 32 | 0 | 0 | 0 | 0 | 100% |
 | Admin | 23 | 18 | 5 | 0 | 0 | 0 | 78% |
-| **Total** | **75** | **67** | **7** | **0** | **0** | **1** | **91%** |
+| **Total** | **75** | **68** | **6** | **0** | **0** | **1** | **92%** |
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+
+## Cambios recientes (2026-10-21 · bloque B: el plan en el home del alumno)
+
+- **Vigésima primera tarea del roadmap (BE-20): la parte del plan de U-08.** Plan: `Doc/plans/2026-10-21-be-20-el-plan-en-el-home-plan.md` (repo PowerApp-Docs). Junto con `GET /routine/assigned/:userId` (BE-12), el home del alumno queda completo.
+- **El contrato** (spec del bloque B, §5.5): `GET /routine/assigned-plan/:userId?from=&to=`, user con `@Owner('userId')`, coach y admin. Va en `routine/` (D27: ahí están los builders y los helpers de lo que el alumno ve y ejecuta) y es **un endpoint aparte** del de la vía individual (D28), que no cambia de forma: el cliente hace los dos pedidos con el mismo `from`/`to` y muestra las dos fuentes juntas. Validaciones, en este orden: `400` si `from > to` (el mismo texto de la vía individual) → `404` `Usuario no encontrado` → `400` si hay más de 520 semanas para devolver → `200`.
+- **Qué devuelve:** un grupo por cada semana de cada asignación **activa** del alumno que se pisa con `[from, to]`, de la 1 a la que contiene `end_date`: `{ user_planification: { id, start_date, end_date, coach_note, planification: { id, name, duration, active } }, week, week_start, week_end, routines: [ { routine_asignation_id, order, active, routine: { id, name, active }, progress: { finished, total } } ] }`. Sin filtro, todas las semanas (el alumno vuelve a una semana pasada; el coach ve el plan entero). Los grupos van por `week_start`, nombre de la planificación y alta de la asignación; las rutinas, por `order` y alta, **sin día** (D28: el "ordenadas por día" de U-08 queda para las individuales). Una semana sin rutinas viene con `routines: []`. Las asignaciones quitadas (E-14) salen del home.
+- **Las semanas** (D15, D16): lineales, sin repetición cíclica; la 1 es la de lunes a domingo que contiene `start_date`, y `week_start`/`week_end` son siempre el lunes y el domingo, aunque el plan arranque o termine a mitad de semana. Las cuentas son dos funciones nuevas de `planification/plan_weeks.ts` (`planWeekOf` y `planWeekBounds`), sobre `YYYY-MM-DD` en UTC como las de BE-18b, para que la zona del servidor no corra un día.
+- **La visibilidad** (D29, la regla del 27/8 un nivel más arriba): una rutina quitada del plan (E-12c) se ve sólo si el alumno hizo algo en ella **en esa asignación**, y sólo lo que hizo: su `progress` es `finished = total`. Si no hizo nada, para el alumno no existe. Una plantilla (E-11) o una rutina (E-18) dadas de baja se siguen viendo, con su `active: false` como dato informativo.
+- **Decisión del 21/10, con el usuario: un tope de 520 semanas (10 años) por pedido**, que da `400` (`Hay más de 520 semanas de plan para mostrar: pedí un rango más corto con from y to.`). Por qué: E-13 acepta cualquier fin hasta el 9999-12-31, así que un tipeo (9999 por 2026) haría que el pedido del coach sin filtro armara unas 416.000 semanas (~150 MB de JSON) y tirara el proceso en el free tier de Render (512 MB) para todos. El home pide una sola semana, así que nunca lo toca. Es el criterio del tope técnico de BE-18b. Se descartaron no poner tope (riesgo anotado) y acotar el fin en E-13 (reabría BE-18b y no cubría lo ya cargado).
+- **Decisiones del plan** (el usuario las aprobó con él):
+  - **El query y el param son los de BE-12** (`GetAssignedRoutinesQueryDto` y `AssignedRoutinesParamsDto`), porque la spec pide el mismo filtro que la vía individual.
+  - **Coach y admin ven lo mismo que el alumno:** la spec habla de las rutinas "visibles para el alumno", como el detalle de BE-13. La plantilla entera se ve en `GET /planification/:id`.
+  - **Una semana se pisa con `[from, to]` entera, de lunes a domingo** (§4), aunque el plan arranque o termine a mitad. Sólo importa con un rango que no sea una semana completa; el home siempre manda lunes y domingo.
+  - **Las asignaciones activas se traen sin filtro de fechas y el recorte por semanas se hace en memoria.** Por qué: son pocas por alumno, las cuentas de semanas quedan en un solo lugar y no hay que traducir semanas a fechas en SQL (que con `to = 9999-12-31` pediría el domingo del año 10000).
+  - **Las rutinas del plan se piden en una sola consulta**, por las plantillas y por un rango de semanas que cubre a todas las asignaciones; cada semana toma después las suyas.
+  - **El orden se arma en dos partes:** el SQL ordena las asignaciones por nombre de la planificación y alta, y en memoria un sort estable las ordena por `week_start`. Así el orden por nombre es el de Postgres, como el nombre de rutina en BE-12.
+  - **El domingo de la última semana se recorta al 9999-12-31** en un plan que termina en esa semana (un viernes), porque el domingo cae en el año 10000 y no entra en `YYYY-MM-DD`.
+- **El progreso se generalizó para las dos vías** (§12 de la spec): la consulta de ejercicios vigentes de BE-12 salió a `findActiveExercisesByRoutine` **sin cambiar su SQL**, y la unión de conjuntos a `buildProgress`. `findAssignedRoutinesProgress` los usa y el home individual quedó igual (lo confirmó su regresión). En una rutina quitada del plan no se piden vigentes.
+- **Hallazgo técnico:** el build no detecta un repositorio que falta en el `forFeature` de un módulo; compila y el server no arranca. `RoutineService` inyecta tres repositorios nuevos (al final del constructor) y `RoutineModule` registra los dos que le faltaban (`UserPlanification` y `RoutineAsignation`); el script del controller los cruza.
+- **Lo que queda abierto:** una marca inconsistente (la rutina no es de la plantilla de su asignación, la regla que la base no garantiza) no cae en ninguna sesión y no cuenta; validarla al marcar es de BE-20c. Una rutina del plan en una semana posterior al fin no aparece nunca en el home (spec §12).
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde.
+  - **El código se probó antes de aprobar el plan** en una copia del proyecto en el scratchpad, compilada con `tsc` y con `node_modules` enlazado, y se aplicó tal cual: repo y copia quedaron idénticos.
+  - Tres scripts nuevos sobre el código compilado, escritos antes del código y corridos **en rojo** (2, 13 y 44 fallas) y después en verde, en la primera corrida:
+    - **las cuentas de semanas** (92 chequeos), en tres zonas horarias: el ejemplo de la spec, inicios en domingo y en lunes, cruces de año y de un 29 de febrero, la semana 520 y el recorte del 9999-12-31;
+    - **el controller y su Swagger** (91): ruta, roles, `@Owner('userId')` con el `OwnerGuard` real, tipos, `await` sin devolver el `Response`, que **ningún handler de `routine/` cuelgue** y que **el módulo registre cada repositorio que inyecta el service**;
+    - **las reglas** (113), con repositorios falsos que filtran como la base y **las consultas reales**: el SQL de las cuatro consultas generado sin base, las filas hidratadas por el transformador de TypeORM, los códigos, las semanas (antes del inicio, después del fin, fin manual corto y largo, rangos parciales), la visibilidad de D29 con dos asignaciones de la misma plantilla, el progreso, el orden de los grupos y el tope.
+  - **Regresión en verde, con los mismos números:** BE-12 (24, 27 y 58, que exige el mismo SQL del progreso), las semanas de BE-18b (86) y BE-18 (47, 130, 48 y 43).
+  - **Qué NO se verificó:** el SQL contra un Postgres, que el server arranque con la inyección nueva (se probó el registro, no la inyección), el progreso del plan con marcas reales (nada escribe `Routine_Exercise_Finished` hasta BE-20c) y el runtime (BE-35, con el seed de BE-21).
+- **U-08 pasa de 🟡 a ✅ (68 ✅ · 6 🟡 · 0 🔵).** Spec de CU reescrita en `Use Cases/` (repo PowerApp-Docs): **U-08** (la parte del plan por semana del plan, sin día y con su progreso; dos planes en la misma semana; el plan que arranca o termina a mitad de semana; la semana vacía; la rutina quitada del plan; el plan quitado; moverse a otra semana; lo individual sigue por día). **Para el web:** B1 tipa la parte del plan contra §5.5 y abre cada rutina con `user_planification.id` y `routine_asignation_id`. **Sigue BE-20b** (el detalle de una sesión del plan).
 
 ## Cambios recientes (2026-10-21 · bloque B: quitar o reincorporar la planificación de un alumno, y sus planes)
 
@@ -632,7 +662,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | **1** | Seguridad y contrato inmediato | BE-01 a BE-08 | 16 al 19/10 | **H1:** sin agujeros de seguridad conocidos, el web avisado de C2 y el Status con conteos reales | ✅ cerrada el 17/10 |
 | **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | ✅ cerrada el 18/10 (BE-10 y BE-10b el 17/10; BE-11 a BE-16 el 18/10) |
 | ⏱ | Regenerar la base de Render | BE-23 | ≈ 1/11 | Esquema del bloque A aplicado, antes de que venza la base | fecha fija |
-| **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | en curso: BE-17, BE-18, BE-18b y BE-19 hechas (20 y 21/10) |
+| **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | en curso: BE-17, BE-18, BE-18b, BE-19 y BE-20 hechas (20 y 21/10) |
 | **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | |
 | **5** | Verificación y cierre | BE-35 a BE-39 | 12 al 17/11 | **H5:** criterios de "backend terminado" cumplidos y código congelado | |
 
@@ -640,7 +670,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Usuario (20 CU · 89%)
+## Detalle — Rol Usuario (20 CU · 95%)
 
 ### Administrar mi cuenta
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -656,7 +686,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Mi entrenamiento
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-U-08 | Obtener mi planificación | 🟡 Parcial | `GET /routine/assigned/:userId?from=&to=` · la parte **individual** del home, con su progreso (18/10) · **falta la parte del plan**: `GET /routine/assigned-plan/:userId` (spec del bloque B, §5.5) · BE-20 |
+| CU-U-08 | Obtener mi planificación | ✅ Implementado | `GET /routine/assigned/:userId?from=&to=` · la parte **individual** del home, por día y con su progreso (18/10) · `GET /routine/assigned-plan/:userId?from=&to=` · la parte **del plan**: las semanas de cada asignación activa que caen en el rango, sus rutinas sin día y con su progreso; una rutina quitada del plan sólo si el alumno hizo algo · tope de 520 semanas (BE-20, 21/10) |
 | CU-U-09 | Ver detalle de rutina | ✅ Implementado | `GET /routine/assign-user/:id` · el alumno lee la rutina **por su asignación** (`403` si es de otro; coach y admin, la de cualquiera) · mismo árbol que `GET /routine/:id`, con lo dado de baja que completó y lo hecho en `finished` (18/10) · el detalle de una asignación del plan es del bloque B |
 | CU-U-10 | Ver detalle de un ejercicio | ✅ Implementado | Se resuelve dentro del detalle de la asignación (`GET /routine/assign-user/:id`): ficha del ejercicio, series ordenadas, nota del coach y, en `finished`, la nota del alumno · `GET /exercise/:id` sigue siendo la ficha de catálogo (18/10) |
 | CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user` (`@Owner`, ids en minúscula desde el 16/10), orden por fecha DESC |

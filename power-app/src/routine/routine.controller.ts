@@ -44,6 +44,7 @@ import { AssignedFinishedParamsDto } from '../dtos/routine/assigned_finished_par
 import { RoutineAssignedUnfinishedResponseDto } from '../dtos/routine/routine_assigned_unfinished_response.dto';
 import { GetTrainingHistoryQueryDto } from '../dtos/routine/get_training_history_query.dto';
 import { RoutineHistorySessionDto } from '../dtos/routine/routine_history_response.dto';
+import { RoutineAssignedPlanWeekResponseDto } from '../dtos/routine/routine_assigned_plan_response.dto';
 
 @ApiTags('Routine')
 @Controller('routine')
@@ -285,6 +286,24 @@ export class RoutineController {
         @Res() res: Response,
     ) {
         await this.routineService.getAssignedRoutines(params.userId, query, res);
+    }
+
+    // La parte del plan del home (U-08). Un endpoint aparte de assigned/:userId (D28): el cliente
+    // hace los dos pedidos, con el mismo from/to, y muestra las dos fuentes juntas. Mismos roles y
+    // mismo @Owner que la via individual. No compite con 'assigned/:userId' ni con 'GET /:id': el
+    // primer segmento es otro
+    @Get('assigned-plan/:userId')
+    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
+    @Owner('userId')
+    @ApiResponse({ status: 200, type: [RoutineAssignedPlanWeekResponseDto], description: 'Una entrada por semana de cada plan activo del alumno que se pisa con [from, to], por week_start, nombre de la planificación y alta de la asignación. Sin filtro, todas las semanas. Sin planes, un array vacío' })
+    @ApiResponse({ status: 400, description: 'Id o fecha inválidos, from posterior a to, o más de 520 semanas de plan para devolver (pedí un rango más corto con from y to)' })
+    @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
+    async getAssignedPlan(
+        @Param() params: AssignedRoutinesParamsDto,
+        @Query() query: GetAssignedRoutinesQueryDto,
+        @Res() res: Response,
+    ) {
+        await this.routineService.getAssignedPlan(params.userId, query, res);
     }
 
     // Historial de entrenamientos del alumno (E-06) y su filtro por ejercicio (E-07). Solo coach y

@@ -10,6 +10,8 @@ import { ExerciseSet } from '../entities/exercise_set.entity';
 import { RoutineExerciseFinished } from '../entities/routine_exercise_finished.entity';
 import { RoutineAsignExerciseFinished } from '../entities/routine_asign_exercise_finished.entity';
 import { RoutineAsignationUser } from '../entities/routine_asignation_user.entity';
+import { UserPlanification } from '../entities/user_planification.entity';
+import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { User } from '../entities/user.entity';
 import { AuthModule } from '../authentication/auth.module';
 
@@ -23,6 +25,8 @@ import { AuthModule } from '../authentication/auth.module';
     RoutineExerciseFinished,
     RoutineAsignExerciseFinished,
     RoutineAsignationUser,
+    UserPlanification,
+    RoutineAsignation,
     User,
   ]), AuthModule],
   controllers: [RoutineController],

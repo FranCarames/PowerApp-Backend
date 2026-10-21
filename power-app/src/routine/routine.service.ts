@@ -12,6 +12,8 @@ import { ExerciseSet } from '../entities/exercise_set.entity';
 import { RoutineExerciseFinished } from '../entities/routine_exercise_finished.entity';
 import { RoutineAsignExerciseFinished } from '../entities/routine_asign_exercise_finished.entity';
 import { RoutineAsignationUser } from '../entities/routine_asignation_user.entity';
+import { UserPlanification } from '../entities/user_planification.entity';
+import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { User, UserRole } from '../entities/user.entity';
 import { GetCircuitsQueryDto } from '../dtos/circuit/get_circuits_query.dto';
 import { SetCircuitActiveDto } from '../dtos/circuit/set_circuit_active.dto';
@@ -26,6 +28,7 @@ import { MarkExerciseFinishedDto } from '../dtos/routine/mark_exercise_finished.
 import { GetTrainingHistoryQueryDto } from '../dtos/routine/get_training_history_query.dto';
 import { GetAssignedRoutinesQueryDto } from '../dtos/routine/get_assigned_routines_query.dto';
 import { AuthUser } from '../authentication/auth-user.interface';
+import { planWeekOf, planWeekBounds } from '../planification/plan_weeks';
 
 // Los dos 409 de la rutina individual. El de "ya entreno" sale por dos caminos (el chequeo
 // previo y la FK RESTRICT de la base), y el de duplicado tambien (chequeo previo y unico)
@@ -39,6 +42,12 @@ const OTHER_STUDENT_ASSIGNMENT_ERROR = 'No podés acceder a una rutina asignada 
 // El 400 de marcar un ejercicio que no estaba marcado sin decir que dia se hizo (D25). Lo van a
 // compartir las dos vias: la del plan llega en BE-20c
 const FINISHED_DAY_REQUIRED_ERROR = 'Indicá el día en que hiciste el ejercicio (finished_at).';
+
+// El tope de semanas del plan en el home (decision del 21/10). Un fin absurdo (un 9999 tipeado por
+// 2026) pedido sin filtro armaria cientos de miles de semanas y tiraria el proceso; el home pide una
+// sola semana, asi que nunca lo toca. 520 semanas son 10 años
+const PLAN_WEEKS_LIMIT = 520;
+const PLAN_WEEKS_LIMIT_ERROR = `Hay más de ${PLAN_WEEKS_LIMIT} semanas de plan para mostrar: pedí un rango más corto con from y to.`;
 
 @Injectable()
 export class RoutineService {
@@ -59,6 +68,12 @@ export class RoutineService {
         private routineExerciseRepository: Repository<RoutineExercise>,
         @InjectRepository(RoutineCircuit)
         private routineCircuitRepository: Repository<RoutineCircuit>,
+        @InjectRepository(UserPlanification)
+        private userPlanificationRepository: Repository<UserPlanification>,
+        @InjectRepository(RoutineAsignation)
+        private routineAsignationRepository: Repository<RoutineAsignation>,
+        @InjectRepository(RoutineExerciseFinished)
+        private routineExerciseFinishedRepository: Repository<RoutineExerciseFinished>,
     ) {
     }
 
@@ -1317,6 +1332,213 @@ export class RoutineService {
         }
     }
 
+    // ===================== EL PLAN DEL ALUMNO (bloque B) =====================
+
+    // La parte del plan del home (CU-U-08, spec del bloque B §5.5). Un endpoint aparte del de la via
+    // individual (D28): el cliente hace los dos pedidos y muestra las dos fuentes juntas. De cada
+    // asignacion ACTIVA del alumno, las semanas del plan que se pisan con [from, to], cada una con las
+    // rutinas que el alumno ve y su progreso. Las rutinas del plan no tienen dia, solo semana y orden.
+    // Coach y admin ven lo mismo que el alumno (gimnasio compartido, D6)
+    async getAssignedPlan(
+        userId: string,
+        query: GetAssignedRoutinesQueryDto,
+        res: Response
+    ) {
+        // La misma validacion que la via individual, antes de consultar
+        if (query.from && query.to && query.from > query.to) {
+            return res.status(400).send({
+                error: 'La fecha inicial (from) no puede ser posterior a la final (to).'
+            });
+        }
+
+        try {
+            const user = await this.userRepository.findOne({
+                where: { id: userId },
+                select: { id: true },
+            });
+
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            // Las asignaciones activas del alumno: las quitadas (E-14) salen del home, y una plantilla
+            // dada de baja (E-11) no saca lo ya asignado. Sin filtro de fechas: son pocas por alumno y
+            // el recorte por semanas se hace abajo, con las cuentas de plan_weeks. El orden (nombre de
+            // la planificacion y alta) desempata los grupos de una misma semana
+            const userPlanifications = await this.userPlanificationRepository
+                .createQueryBuilder('userPlanification')
+                .innerJoin('userPlanification.planification', 'planification')
+                .addSelect(['planification.id', 'planification.name', 'planification.duration', 'planification.active'])
+                .where('userPlanification.user_id = :userId', { userId: user.id })
+                .andWhere('userPlanification.active = true')
+                .orderBy('planification.name', 'ASC')
+                .addOrderBy('userPlanification.created_at', 'ASC')
+                .getMany();
+
+            // De cada asignacion, las semanas que se pisan con [from, to]: de la 1 a la que contiene
+            // end_date (spec §4), recortadas por las que contienen from y to. La semana va de lunes a
+            // domingo, asi que se pisa aunque el plan arranque o termine a mitad de ella
+            const weekRanges = userPlanifications
+                .map(userPlanification => {
+                    const lastWeek = planWeekOf(userPlanification.start_date, userPlanification.end_date);
+
+                    return {
+                        userPlanification,
+                        first: query.from ? Math.max(1, planWeekOf(userPlanification.start_date, query.from)) : 1,
+                        last: query.to ? Math.min(lastWeek, planWeekOf(userPlanification.start_date, query.to)) : lastWeek,
+                    };
+                })
+                .filter(range => range.first <= range.last);
+
+            // El tope se cuenta antes de consultar nada mas
+            const weekCount = weekRanges.reduce((count, range) => count + range.last - range.first + 1, 0);
+
+            if (weekCount > PLAN_WEEKS_LIMIT) {
+                return res.status(400).send({ error: PLAN_WEEKS_LIMIT_ERROR });
+            }
+
+            if (weekRanges.length === 0) {
+                return res.status(200).send([]);
+            }
+
+            // Las rutinas de las plantillas, activas o no (una quitada del plan se ve si el alumno hizo
+            // algo, D29), de las semanas pedidas: el rango cubre las de todas las asignaciones y cada
+            // semana toma despues las suyas. Orden de la spec: semana, order y alta
+            const routineAsignations = await this.routineAsignationRepository
+                .createQueryBuilder('routineAsignation')
+                .innerJoin('routineAsignation.routine', 'routine')
+                .addSelect(['routine.id', 'routine.name', 'routine.active'])
+                .where('routineAsignation.planification_id IN (:...planificationIds)', {
+                    planificationIds: [...new Set(weekRanges.map(range => range.userPlanification.planification_id))],
+                })
+                .andWhere('routineAsignation.week >= :firstWeek', { firstWeek: Math.min(...weekRanges.map(range => range.first)) })
+                .andWhere('routineAsignation.week <= :lastWeek', { lastWeek: Math.max(...weekRanges.map(range => range.last)) })
+                .orderBy('routineAsignation.week', 'ASC')
+                .addOrderBy('routineAsignation.order', 'ASC')
+                .addOrderBy('routineAsignation.created_at', 'ASC')
+                .getMany();
+
+            const routineAsignationsByWeek = new Map<string, RoutineAsignation[]>();
+
+            for (const routineAsignation of routineAsignations) {
+                const key = `${routineAsignation.planification_id}|${routineAsignation.week}`;
+
+                if (!routineAsignationsByWeek.has(key)) {
+                    routineAsignationsByWeek.set(key, []);
+                }
+                routineAsignationsByWeek.get(key)!.push(routineAsignation);
+            }
+
+            // Cada semana pedida de cada asignacion, con las rutinas de su plantilla para esa semana
+            const weeks = weekRanges.flatMap(({ userPlanification, first, last }) =>
+                Array.from({ length: last - first + 1 }, (_, index) => ({
+                    userPlanification,
+                    week: first + index,
+                    routineAsignations: routineAsignationsByWeek.get(`${userPlanification.planification_id}|${first + index}`) ?? [],
+                }))
+            );
+
+            // Las sesiones del plan: el par (asignacion, rutina del plan)
+            const sessions = weeks.flatMap(({ userPlanification, routineAsignations }) =>
+                routineAsignations.map(routineAsignation => ({ userPlanification, routineAsignation }))
+            );
+            const sessionKey = (userPlanificationId: string, routineAsignationId: string) =>
+                `${userPlanificationId}|${routineAsignationId}`;
+
+            // Lo hecho en cada sesion. Una marca cuya rutina no es de la plantilla de su asignacion (la
+            // regla que la base no garantiza) no cae en ninguna sesion, asi que no cuenta
+            const finishedBySession = new Map<string, Set<string>>();
+
+            if (sessions.length > 0) {
+                const finishedRows = await this.routineExerciseFinishedRepository
+                    .createQueryBuilder('finished')
+                    .select('finished.user_planification_id', 'user_planification_id')
+                    .addSelect('finished.routine_asignation_id', 'routine_asignation_id')
+                    .addSelect('finished.routine_exercise_id', 'routine_exercise_id')
+                    .where('finished.user_planification_id IN (:...userPlanificationIds)', {
+                        userPlanificationIds: [...new Set(sessions.map(session => session.userPlanification.id))],
+                    })
+                    .andWhere('finished.routine_asignation_id IN (:...routineAsignationIds)', {
+                        routineAsignationIds: [...new Set(sessions.map(session => session.routineAsignation.id))],
+                    })
+                    .getRawMany<{ user_planification_id: string; routine_asignation_id: string; routine_exercise_id: string }>();
+
+                for (const row of finishedRows) {
+                    const key = sessionKey(row.user_planification_id, row.routine_asignation_id);
+
+                    if (!finishedBySession.has(key)) {
+                        finishedBySession.set(key, new Set());
+                    }
+                    finishedBySession.get(key)!.add(row.routine_exercise_id);
+                }
+            }
+
+            // D29: una rutina quitada del plan se ve solo si el alumno hizo algo en ella en esta
+            // asignacion (como un circuito sacado de la rutina, un nivel mas arriba)
+            const isVisible = (userPlanification: UserPlanification, routineAsignation: RoutineAsignation) =>
+                routineAsignation.active || finishedBySession.has(sessionKey(userPlanification.id, routineAsignation.id));
+
+            // Los ejercicios vigentes solo hacen falta para las rutinas activas del plan: de una quitada
+            // se ve solo lo completado
+            const routineIds = [...new Set(sessions
+                .filter(session => session.routineAsignation.active)
+                .map(session => session.routineAsignation.routine_id))];
+            const activeByRoutine = routineIds.length > 0
+                ? await this.findActiveExercisesByRoutine(routineIds)
+                : new Map<string, Set<string>>();
+
+            const groups = weeks.map(({ userPlanification, week, routineAsignations }) => {
+                const { week_start, week_end } = planWeekBounds(userPlanification.start_date, week);
+
+                return {
+                    user_planification: {
+                        id: userPlanification.id,
+                        start_date: userPlanification.start_date,
+                        end_date: userPlanification.end_date,
+                        coach_note: userPlanification.coach_note ?? null,
+                        planification: {
+                            id: userPlanification.planification.id,
+                            name: userPlanification.planification.name ?? null,
+                            duration: userPlanification.planification.duration,
+                            active: userPlanification.planification.active,
+                        },
+                    },
+                    week,
+                    week_start,
+                    week_end,
+                    routines: routineAsignations
+                        .filter(routineAsignation => isVisible(userPlanification, routineAsignation))
+                        .map(routineAsignation => ({
+                            routine_asignation_id: routineAsignation.id,
+                            order: routineAsignation.order,
+                            active: routineAsignation.active,
+                            routine: {
+                                id: routineAsignation.routine.id,
+                                name: routineAsignation.routine.name,
+                                active: routineAsignation.routine.active,
+                            },
+                            // En una rutina quitada del plan se ve solo lo completado, como si todos sus
+                            // vinculos estuvieran dados de baja: finished = total
+                            progress: this.buildProgress(
+                                routineAsignation.active ? activeByRoutine.get(routineAsignation.routine_id) : undefined,
+                                finishedBySession.get(sessionKey(userPlanification.id, routineAsignation.id)) ?? new Set<string>(),
+                            ),
+                        })),
+                };
+            });
+
+            // Orden de la spec: week_start y, en la misma semana, el de la consulta (nombre de la
+            // planificacion y alta). El sort de JS es estable, y los dias 'YYYY-MM-DD' se comparan como
+            // texto
+            groups.sort((a, b) => (a.week_start < b.week_start ? -1 : a.week_start > b.week_start ? 1 : 0));
+
+            return res.status(200).send(groups);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener el plan del alumno.' });
+        }
+    }
+
     // ===================== HELPERS DE ASIGNACION INDIVIDUAL =====================
 
     // La misma forma para el alta (la asignacion creada) y la baja (la asignacion borrada).
@@ -1336,31 +1558,15 @@ export class RoutineService {
         };
     }
 
-    // finished y total de cada asignacion (spec §4.3). total son los ejercicios que el alumno ve
-    // en el detalle: los activos de los circuitos activos de la rutina MAS los dados de baja que
-    // completo en esa asignacion, cada uno una vez. Es una union de conjuntos de ids y no una
-    // suma: un circuito repetido en la rutina (A, B, A) comparte sus Routine_Exercise, y un
-    // ejercicio completado puede ser a la vez activo. Por eso la cuenta se hace en memoria, con
-    // dos consultas chicas, y no con un COUNT en SQL
+    // finished y total de cada asignacion individual (spec §4.3), con los dos helpers de progreso
+    // que comparte con la via del plan
     private async findAssignedRoutinesProgress(
         assignments: RoutineAsignationUser[]
     ): Promise<Map<string, { finished: number; total: number }>> {
         const routineIds = [...new Set(assignments.map(assignment => assignment.routine_id))];
         const assignmentIds = assignments.map(assignment => assignment.id);
 
-        // Los ejercicios vigentes de cada rutina que aparece: activos y en un vinculo activo.
-        // Raw y con alias porque no hay una entidad que los represente
-        const activeRows = await this.dataSource
-            .createQueryBuilder()
-            .select('routineCircuit.routine_id', 'routine_id')
-            .addSelect('routineExercise.id', 'routine_exercise_id')
-            .distinct(true)
-            .from(RoutineCircuit, 'routineCircuit')
-            .innerJoin(RoutineExercise, 'routineExercise', 'routineExercise.circuit_id = routineCircuit.circuit_id')
-            .where('routineCircuit.routine_id IN (:...routineIds)', { routineIds })
-            .andWhere('routineCircuit.active = true')
-            .andWhere('routineExercise.active = true')
-            .getRawMany<{ routine_id: string; routine_exercise_id: string }>();
+        const activeByRoutine = await this.findActiveExercisesByRoutine(routineIds);
 
         // Lo hecho en cada asignacion. getRawMany y no getMany: un select parcial sin la clave
         // primaria hace que TypeORM agrupe las filas por id y colapse el resultado
@@ -1370,15 +1576,6 @@ export class RoutineService {
             .addSelect('finished.routine_exercise_id', 'routine_exercise_id')
             .where('finished.user_routine_asign_id IN (:...assignmentIds)', { assignmentIds })
             .getRawMany<{ assignment_id: string; routine_exercise_id: string }>();
-
-        const activeByRoutine = new Map<string, Set<string>>();
-
-        for (const row of activeRows) {
-            if (!activeByRoutine.has(row.routine_id)) {
-                activeByRoutine.set(row.routine_id, new Set());
-            }
-            activeByRoutine.get(row.routine_id)!.add(row.routine_exercise_id);
-        }
 
         const finishedByAssignment = new Map<string, Set<string>>();
 
@@ -1392,13 +1589,55 @@ export class RoutineService {
         const progressByAssignment = new Map<string, { finished: number; total: number }>();
 
         for (const assignment of assignments) {
-            const finished = finishedByAssignment.get(assignment.id) ?? new Set<string>();
-            const visible = new Set([...(activeByRoutine.get(assignment.routine_id) ?? []), ...finished]);
-
-            progressByAssignment.set(assignment.id, { finished: finished.size, total: visible.size });
+            progressByAssignment.set(assignment.id, this.buildProgress(
+                activeByRoutine.get(assignment.routine_id),
+                finishedByAssignment.get(assignment.id) ?? new Set<string>(),
+            ));
         }
 
         return progressByAssignment;
+    }
+
+    // Los ejercicios vigentes de cada rutina: activos y en un vinculo activo. Raw y con alias porque
+    // no hay una entidad que los represente. Lo usan las dos vias (el home individual y el del plan)
+    private async findActiveExercisesByRoutine(routineIds: string[]): Promise<Map<string, Set<string>>> {
+        const activeRows = await this.dataSource
+            .createQueryBuilder()
+            .select('routineCircuit.routine_id', 'routine_id')
+            .addSelect('routineExercise.id', 'routine_exercise_id')
+            .distinct(true)
+            .from(RoutineCircuit, 'routineCircuit')
+            .innerJoin(RoutineExercise, 'routineExercise', 'routineExercise.circuit_id = routineCircuit.circuit_id')
+            .where('routineCircuit.routine_id IN (:...routineIds)', { routineIds })
+            .andWhere('routineCircuit.active = true')
+            .andWhere('routineExercise.active = true')
+            .getRawMany<{ routine_id: string; routine_exercise_id: string }>();
+
+        const activeByRoutine = new Map<string, Set<string>>();
+
+        for (const row of activeRows) {
+            if (!activeByRoutine.has(row.routine_id)) {
+                activeByRoutine.set(row.routine_id, new Set());
+            }
+            activeByRoutine.get(row.routine_id)!.add(row.routine_exercise_id);
+        }
+
+        return activeByRoutine;
+    }
+
+    // finished y total de una sesion (spec del bloque A, §4.3; las dos vias). total son los ejercicios
+    // que el alumno ve en el detalle: los activos de los circuitos activos de la rutina MAS los dados
+    // de baja que completo, cada uno una vez. Es una union de conjuntos de ids y no una suma: un
+    // circuito repetido en la rutina (A, B, A) comparte sus Routine_Exercise, y un ejercicio completado
+    // puede ser a la vez activo. Por eso la cuenta se hace en memoria y no con un COUNT en SQL. Sin
+    // activos (una rutina quitada del plan), total = finished: se ve solo lo completado
+    private buildProgress(
+        activeIds: Set<string> | undefined,
+        finishedIds: Set<string>
+    ): { finished: number; total: number } {
+        const visible = new Set([...(activeIds ?? []), ...finishedIds]);
+
+        return { finished: finishedIds.size, total: visible.size };
     }
 
     // Que parte de lo dado de baja se le muestra al alumno en el detalle de una asignacion (spec
