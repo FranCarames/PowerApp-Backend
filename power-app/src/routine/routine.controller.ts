@@ -241,8 +241,8 @@ export class RoutineController {
     @Post('assign-user/:id/finished')
     @Auth(UserRole.user)
     @ApiResponse({ status: 201, type: RoutineAssignedFinishedDto, description: 'El ejercicio no estaba marcado: se creó la marca (con la nota, si vino)' })
-    @ApiResponse({ status: 200, type: RoutineAssignedFinishedDto, description: 'Ya estaba marcado (también si dos marcas chocaron): idempotente. Si vino user_note se actualizó; la cadena vacía la borra' })
-    @ApiResponse({ status: 400, description: 'Datos inválidos, el ejercicio no pertenece a la rutina de la asignación, o el coach lo sacó de la rutina y todavía no estaba marcado' })
+    @ApiResponse({ status: 200, type: RoutineAssignedFinishedDto, description: 'Ya estaba marcado (también si dos marcas chocaron): idempotente. Si vinieron user_note o finished_at y cambiaron, se actualizaron; la cadena vacía borra la nota' })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, falta finished_at al marcar un ejercicio que no estaba marcado, el ejercicio no pertenece a la rutina de la asignación, o el coach lo sacó de la rutina y todavía no estaba marcado' })
     @ApiResponse({ status: 403, description: 'La asignación es de otro alumno' })
     @ApiResponse({ status: 404, description: 'Asignación no encontrada' })
     async markExerciseFinished(

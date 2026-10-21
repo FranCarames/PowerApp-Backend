@@ -209,24 +209,23 @@ CREATE TABLE public."Routine_Asignation" (
 CREATE TABLE public."User_Planification" (
     id                 UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id            UUID         NOT NULL,
-    coach_id           UUID,
-    planification_id   UUID,
-    description        TEXT,
-    number_of_routines INTEGER      NOT NULL,
-    type               VARCHAR(30),
+    coach_id           UUID         NOT NULL,
+    planification_id   UUID         NOT NULL,
+    -- Sin description, type ni number_of_routines (D18): la cabecera se lee de la plantilla
     coach_note         VARCHAR(100),
-    -- Sin end_date ni duration (D12): el fin se calcula como start_date + las semanas de
-    -- Planification.duration
     start_date         DATE         NOT NULL,
+    -- Guardado (D17): por defecto, el domingo de la semana Planification.duration
+    end_date           DATE         NOT NULL,
     active             BOOLEAN      NOT NULL DEFAULT true,
     created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_user_planification_user
         FOREIGN KEY (user_id)          REFERENCES public."User"(id)          ON DELETE CASCADE,
+    -- RESTRICT (D19): las bajas de coach y de plantilla son logicas, nunca se dispara
     CONSTRAINT fk_user_planification_coach
-        FOREIGN KEY (coach_id)         REFERENCES public."Coach"(id)         ON DELETE SET NULL,
+        FOREIGN KEY (coach_id)         REFERENCES public."Coach"(id)         ON DELETE RESTRICT,
     CONSTRAINT fk_user_planification_planification
-        FOREIGN KEY (planification_id) REFERENCES public."Planification"(id) ON DELETE SET NULL
+        FOREIGN KEY (planification_id) REFERENCES public."Planification"(id) ON DELETE RESTRICT
 );
 
 -- Vinculo M:N Routine <-> Circuit. Sin unique: un circuito puede repetirse en la rutina
@@ -336,6 +335,8 @@ CREATE TABLE public."Routine_Exercise_Finished" (
     routine_asignation_id UUID        NOT NULL,
     routine_exercise_id   UUID        NOT NULL,
     user_note             VARCHAR(100),
+    -- El dia en que el alumno hizo el ejercicio (D25): lo manda el cliente, permite marcar en diferido
+    finished_at           DATE        NOT NULL,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_ref_user_planification
@@ -360,6 +361,8 @@ CREATE TABLE public."Routine_Asign_Exercise_Finished" (
     user_routine_asign_id UUID        NOT NULL,
     routine_exercise_id   UUID        NOT NULL,
     user_note             VARCHAR(100),
+    -- El dia en que el alumno hizo el ejercicio (D25): lo manda el cliente, permite marcar en diferido
+    finished_at           DATE        NOT NULL,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_raef_routine_asignation_user

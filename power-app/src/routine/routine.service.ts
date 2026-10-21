@@ -36,6 +36,10 @@ const REMOVE_TRAINED_ERROR = 'El alumno ya entrenó esta rutina: no se puede qui
 // No puede ser el texto de la cuenta deshabilitada: es el unico que hace cerrar la sesion en el web
 const OTHER_STUDENT_ASSIGNMENT_ERROR = 'No podés acceder a una rutina asignada a otro alumno.';
 
+// El 400 de marcar un ejercicio que no estaba marcado sin decir que dia se hizo (D25). Lo van a
+// compartir las dos vias: la del plan llega en BE-20c
+const FINISHED_DAY_REQUIRED_ERROR = 'Indicá el día en que hiciste el ejercicio (finished_at).';
+
 @Injectable()
 export class RoutineService {
     constructor(
@@ -1052,9 +1056,10 @@ export class RoutineService {
     }
 
     // CU-U-12, con U-13 incluido (D3): marcar un ejercicio como hecho y, en la misma fila, dejar o
-    // editar la nota. El hecho es por ejercicio, no por serie: el tildado serie por serie es de la
-    // interfaz. Es una sola escritura (INSERT o UPDATE), asi que no hay transaccion: la carrera de
-    // dos marcas simultaneas la cierra el unico de la base. Sin ventana de fechas (D5)
+    // editar la nota y el dia en que se hizo (finished_at, D25). El hecho es por ejercicio, no por
+    // serie: el tildado serie por serie es de la interfaz. Es una sola escritura (INSERT o UPDATE),
+    // asi que no hay transaccion: la carrera de dos marcas simultaneas la cierra el unico de la
+    // base. Sin ventana de fechas (D5): finished_at no se valida contra ningun dia
     async markExerciseFinished(
         idAssignment: string,
         markExerciseFinishedDto: MarkExerciseFinishedDto,
@@ -1080,9 +1085,20 @@ export class RoutineService {
                 ? (markExerciseFinishedDto.user_note === '' ? null : markExerciseFinishedDto.user_note)
                 : undefined;
 
+            // Lo mismo con el dia: obligatorio para crear la marca, y opcional para corregirla
+            // (null o ausente = no tocarlo). El DTO ya garantizo que es un dia valido
+            const sentDay = typeof markExerciseFinishedDto.finished_at === 'string'
+                ? markExerciseFinishedDto.finished_at
+                : undefined;
+
             let finished = await this.findFinishedRow(assignment.id, markExerciseFinishedDto.routine_exercise_id);
 
             if (!finished) {
+                // Antes que la pertenencia: sin el dia no hay nada que crear (spec del bloque B, §5.7)
+                if (sentDay === undefined) {
+                    return res.status(400).send({ error: FINISHED_DAY_REQUIRED_ERROR });
+                }
+
                 // No estaba marcado: el ejercicio tiene que ser de la rutina y seguir en ella
                 const markable = await this.checkExerciseIsMarkable(
                     assignment.routine_id,
@@ -1098,6 +1114,7 @@ export class RoutineService {
                         this.routineAsignExerciseFinishedRepository.create({
                             user_routine_asign_id: assignment.id,
                             routine_exercise_id: markable.exerciseId,
+                            finished_at: sentDay,
                             user_note: sentNote ?? null,
                         })
                     );
@@ -1119,19 +1136,28 @@ export class RoutineService {
                 }
             }
 
-            // Ya estaba marcado: idempotente. Sin nota no se toca nada, y con nota solo se escribe
-            // si cambia. updated_at se setea a mano: el onUpdate de las entidades es sintaxis de
-            // MySQL y en Postgres no hace nada
+            // Ya estaba marcado: idempotente. Se escribe solo lo que vino y cambio (la nota y el
+            // dia), en un solo UPDATE. updated_at se setea a mano: el onUpdate de las entidades es
+            // sintaxis de MySQL y en Postgres no hace nada
+            const changes: { user_note?: string | null; finished_at?: string } = {};
+
             if (sentNote !== undefined && sentNote !== (finished.user_note ?? null)) {
+                changes.user_note = sentNote;
+            }
+
+            if (sentDay !== undefined && sentDay !== finished.finished_at) {
+                changes.finished_at = sentDay;
+            }
+
+            if (Object.keys(changes).length > 0) {
                 const updatedAt = new Date();
 
                 await this.routineAsignExerciseFinishedRepository.update(
                     { id: finished.id },
-                    { user_note: sentNote, updated_at: updatedAt },
+                    { ...changes, updated_at: updatedAt },
                 );
 
-                finished.user_note = sentNote;
-                finished.updated_at = updatedAt;
+                Object.assign(finished, changes, { updated_at: updatedAt });
             }
 
             return res.status(200).send(this.buildFinishedResponse(finished));
@@ -1203,7 +1229,7 @@ export class RoutineService {
             // Routine_Circuit. Orden de la spec: dia descendente y nombre de rutina; el resto desempata
             const historyQuery = this.routineAsignExerciseFinishedRepository
                 .createQueryBuilder('finished')
-                .select(['finished.id', 'finished.routine_exercise_id', 'finished.user_note', 'finished.created_at'])
+                .select(['finished.id', 'finished.routine_exercise_id', 'finished.user_note', 'finished.finished_at', 'finished.created_at'])
                 .innerJoin('finished.routineAsignationUser', 'assignment')
                 .addSelect(['assignment.id', 'assignment.date', 'assignment.created_at'])
                 .innerJoin('assignment.routine', 'routine')
@@ -1222,6 +1248,7 @@ export class RoutineService {
                 .orderBy('assignment.date', 'DESC')
                 .addOrderBy('routine.name', 'ASC')
                 .addOrderBy('assignment.created_at', 'ASC')
+                .addOrderBy('finished.finished_at', 'ASC')
                 .addOrderBy('finished.created_at', 'ASC')
                 .addOrderBy('finished.id', 'ASC')
                 .addOrderBy('exerciseSet.set_order', 'ASC');
@@ -1235,7 +1262,8 @@ export class RoutineService {
             const finishedRows = await historyQuery.getMany();
 
             // Las filas ya vienen en el orden final: se agrupa por asignacion respetandolo. Los
-            // ejercicios de cada sesion quedan en el orden en que el alumno los marco
+            // ejercicios de cada sesion quedan por el dia en que el alumno los hizo y, dentro del
+            // mismo dia, en el orden en que los marco
             const sessions = new Map<string, {
                 source: 'individual';
                 assignment_id: string;
@@ -1265,7 +1293,8 @@ export class RoutineService {
                         name: finished.routineExercise.exercise.name,
                     },
                     user_note: finished.user_note ?? null,
-                    finished_at: finished.created_at,
+                    // El dia en que lo hizo (D25), no el momento en que lo marco
+                    finished_at: finished.finished_at,
                     sets: finished.routineExercise.exerciseSets.map(exerciseSet => ({
                         set_order: exerciseSet.set_order,
                         set_count: exerciseSet.set_count,
@@ -1459,11 +1488,13 @@ export class RoutineService {
     }
 
     // Lo que el cliente cruza con el arbol de la rutina por routine_exercise_id. La misma forma en
-    // el detalle (finished) y en la respuesta de marcar
+    // el detalle (finished) y en la respuesta de marcar. finished_at es el dia en que lo hizo y
+    // created_at, cuando se registro la marca
     private buildFinishedResponse(row: RoutineAsignExerciseFinished) {
         return {
             routine_exercise_id: row.routine_exercise_id,
             user_note: row.user_note ?? null,
+            finished_at: row.finished_at,
             created_at: row.created_at,
             updated_at: row.updated_at,
         };

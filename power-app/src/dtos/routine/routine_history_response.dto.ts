@@ -65,8 +65,8 @@ export class RoutineHistoryExerciseDto {
     @ApiProperty({ example: 'Me costó la última serie', nullable: true, type: String, description: 'Nota del alumno; null si no dejó ninguna' })
     user_note!: string | null;
 
-    @ApiProperty({ description: 'Cuándo lo marcó el alumno' })
-    finished_at!: Date;
+    @ApiProperty({ example: '2026-10-20', description: 'Día en que el alumno hizo el ejercicio (YYYY-MM-DD, sin hora): el que indicó al marcar, no el momento en que marcó. Desde el 21/10 (BE-18); antes era el instante de la marca' })
+    finished_at!: string;
 
     @ApiProperty({ type: [RoutineHistorySetDto], description: 'La prescripción del coach, ordenada por set_order. Vacía si el ejercicio no tiene series' })
     sets!: RoutineHistorySetDto[];
@@ -86,6 +86,6 @@ export class RoutineHistorySessionDto {
     @ApiProperty({ type: RoutineHistoryRoutineDto })
     routine!: RoutineHistoryRoutineDto;
 
-    @ApiProperty({ type: [RoutineHistoryExerciseDto], description: 'Los ejercicios que el alumno hizo en la sesión, en el orden en que los marcó. Incluye los que el coach dio de baja después' })
+    @ApiProperty({ type: [RoutineHistoryExerciseDto], description: 'Los ejercicios que el alumno hizo en la sesión, por el día en que los hizo y, dentro del mismo día, en el orden en que los marcó. Incluye los que el coach dio de baja después' })
     exercises!: RoutineHistoryExerciseDto[];
 }

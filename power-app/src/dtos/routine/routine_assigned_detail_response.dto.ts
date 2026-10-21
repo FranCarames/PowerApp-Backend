@@ -9,7 +9,10 @@ export class RoutineAssignedFinishedDto {
     @ApiProperty({ example: 'Me costó la última serie', nullable: true, type: String, description: 'Nota del alumno sobre ese ejercicio (hasta 100 caracteres); null si no dejó ninguna' })
     user_note!: string | null;
 
-    @ApiProperty({ description: 'Cuándo lo marcó' })
+    @ApiProperty({ example: '2026-10-20', description: 'Día en que el alumno hizo el ejercicio (YYYY-MM-DD, sin hora). Lo indica al marcar y lo puede corregir' })
+    finished_at!: string;
+
+    @ApiProperty({ description: 'Cuándo se registró la marca' })
     created_at!: Date;
 
     @ApiProperty()

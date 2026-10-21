@@ -29,6 +29,13 @@ export class RoutineAsignExerciseFinished {
     @Column({ type: 'varchar', length: 100, nullable: true })
     user_note?: string | null;
 
+    // El dia en que el alumno hizo el ejercicio (D25, 20/10), sin hora. Lo manda el cliente al
+    // marcar (el servidor no calcula "hoy") y se puede corregir: permite marcar en diferido.
+    // created_at sigue siendo cuando se registro la marca. TypeORM hidrata date como 'YYYY-MM-DD'
+    @ApiProperty({ example: '2026-10-20', description: 'Día en que el alumno hizo el ejercicio (YYYY-MM-DD, sin hora)' })
+    @Column({ type: 'date', nullable: false })
+    finished_at!: string;
+
     @ApiProperty()
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     created_at!: Date;
