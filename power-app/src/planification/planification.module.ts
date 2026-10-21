@@ -7,6 +7,8 @@ import { Routine } from '../entities/routine.entity';
 import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { UserPlanification } from '../entities/user_planification.entity';
 import { RoutineAsignationUser } from '../entities/routine_asignation_user.entity';
+import { User } from '../entities/user.entity';
+import { Coach } from '../entities/coach.entity';
 import { AuthModule } from '../authentication/auth.module';
 
 @Module({
@@ -16,6 +18,9 @@ import { AuthModule } from '../authentication/auth.module';
     RoutineAsignation,
     UserPlanification,
     RoutineAsignationUser,
+    // E-13 valida al destinatario y al coach del token
+    User,
+    Coach,
   ]), AuthModule],
   controllers: [PlanificationController],
   providers: [PlanificationService]

@@ -27,9 +27,12 @@ import { AssignRoutineToPlanificationDto } from '../dtos/planification/assign_ro
 import { AssignRoutinesToPlanificationDto } from '../dtos/planification/assign_routines_to_planification.dto';
 import { SetRoutineAsignationActiveDto } from '../dtos/planification/set_routine_asignation_active.dto';
 import { SetRoutineAsignationsActiveDto } from '../dtos/planification/set_routine_asignations_active.dto';
-// TODO: crear los siguientes DTOs en src/dtos/planification/ (CU-E-13 y E-14)
-// import { AssignPlanificationToUserDto } from '../dtos/planification/assign_planification_to_user.dto';
-// import { EditUserPlanificationDto } from '../dtos/planification/edit_user_planification.dto';
+import { AssignPlanificationToUserDto } from '../dtos/planification/assign_planification_to_user.dto';
+import { UserPlanificationResponseDto, AssignPlanificationOverlapResponseDto } from '../dtos/planification/user_planification_response.dto';
+import { CurrentUser } from '../authentication/decorators/current-user.decorator';
+import { AuthUser } from '../authentication/auth-user.interface';
+// Los andamiajes de E-14 que quedan abajo (GET /user/:id/active, POST /user/edit/:id y
+// DELETE /user/:id) los retira BE-19: una asignacion no se edita (D22) y quitarla es set-active (D23)
 // CU-E-19 y CU-E-20 (asignar/quitar rutina individual a un alumno) salieron de aca el 27/8:
 // son del paquete "Administrar Rutinas" y viven en routine/ (POST /routine/assign-user y
 // DELETE /routine/assign-user/:id, desde BE-11). El listado GET /routine/assigned/:userId
@@ -168,14 +171,20 @@ export class PlanificationController {
 
     // ===================== ASIGNACIONES A ALUMNOS (CU-E-13, E-14, U-08) =====================
 
+    // Solo el coach (D20): coach_id sale del token, y el admin no tiene fila en Coach
     @Post('/user/assign')
-    @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 201, type: UserPlanification })
+    @Auth(UserRole.coach)
+    @ApiResponse({ status: 201, type: UserPlanificationResponseDto, description: 'La asignación creada. Sin end_date en el body, el fin es el domingo de la semana duration de la plantilla' })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, end_date anterior a start_date, planificación dada de baja o sin rutinas vigentes, planificación de duración 0 sin end_date, fin calculado fuera del calendario, o el destinatario no es un alumno o tiene la cuenta cerrada' })
+    @ApiResponse({ status: 403, description: 'El usuario no es coach, o no tiene una fila activa en Coach (Tu usuario no está registrado como entrenador.)' })
+    @ApiResponse({ status: 404, description: 'Planificación o usuario no encontrado' })
+    @ApiResponse({ status: 409, type: AssignPlanificationOverlapResponseDto, description: 'El alumno tiene otra planificación activa que se pisa con esas fechas (los dos extremos inclusivos). Reenviando con confirm_overlap: true se crea igual' })
     async assignPlanificationToUser(
-        @Body() assignPlanificationToUserDto: any,
+        @Body() assignPlanificationToUserDto: AssignPlanificationToUserDto,
+        @CurrentUser() user: AuthUser,
         @Res() res: Response,
     ) {
-        // this.planificationService.assignPlanificationToUser(assignPlanificationToUserDto, res);
+        await this.planificationService.assignPlanificationToUser(assignPlanificationToUserDto, user, res);
     }
 
     @Get('/user/:id')

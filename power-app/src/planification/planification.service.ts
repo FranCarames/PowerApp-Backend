@@ -14,6 +14,12 @@ import { AssignRoutineToPlanificationDto } from '../dtos/planification/assign_ro
 import { AssignRoutinesToPlanificationDto } from '../dtos/planification/assign_routines_to_planification.dto';
 import { SetRoutineAsignationActiveDto } from '../dtos/planification/set_routine_asignation_active.dto';
 import { SetRoutineAsignationsActiveDto } from '../dtos/planification/set_routine_asignations_active.dto';
+import { AssignPlanificationToUserDto } from '../dtos/planification/assign_planification_to_user.dto';
+import { UserPlanification } from '../entities/user_planification.entity';
+import { User, UserRole } from '../entities/user.entity';
+import { Coach } from '../entities/coach.entity';
+import { AuthUser } from '../authentication/auth-user.interface';
+import { defaultPlanEndDate } from './plan_weeks';
 
 @Injectable()
 export class PlanificationService {
@@ -26,6 +32,12 @@ export class PlanificationService {
         private routineAsignationRepository: Repository<RoutineAsignation>,
         @InjectDataSource()
         private dataSource: DataSource,
+        @InjectRepository(UserPlanification)
+        private userPlanificationRepository: Repository<UserPlanification>,
+        @InjectRepository(User)
+        private userRepository: Repository<User>,
+        @InjectRepository(Coach)
+        private coachRepository: Repository<Coach>,
     ) {
     }
 
@@ -492,6 +504,150 @@ export class PlanificationService {
         }
     }
 
+    // ===================== ASIGNACIONES A ALUMNOS (CU-E-13) =====================
+
+    // Solo el coach asigna (D20): coach_id sale del token. El orden de las validaciones es parte
+    // del contrato (spec del bloque B, §5.1). Es una sola escritura, asi que no hay transaccion: dos
+    // altas simultaneas del mismo alumno pueden saltearse el aviso de solapamiento y quedar
+    // conviviendo, que D21 ya admite
+    async assignPlanificationToUser(
+        assignPlanificationToUserDto: AssignPlanificationToUserDto,
+        currentUser: AuthUser,
+        res: Response
+    ) {
+        const startDate = assignPlanificationToUserDto.start_date;
+
+        // Solo un string cuenta como "vino el fin": null o ausente es calcularlo de la plantilla. El
+        // DTO ya garantizo que los dos son dias YYYY-MM-DD, que se comparan bien como texto
+        const sentEndDate = typeof assignPlanificationToUserDto.end_date === 'string'
+            ? assignPlanificationToUserDto.end_date
+            : undefined;
+
+        // Antes de leer nada: no depende de la base
+        if (sentEndDate !== undefined && sentEndDate < startDate) {
+            return res.status(400).send({ error: 'La fecha de fin no puede ser anterior a la de inicio.' });
+        }
+
+        try {
+            // Rol coach sin su fila en Coach, o con la fila dada de baja: la inconsistencia que arregla
+            // BE-27. Sin fila, la FK de coach_id daria un 500; con la fila de baja, la asignacion
+            // quedaria a nombre de un coach dado de baja (decision del 21/10). No es el texto de la
+            // cuenta deshabilitada: ese es el unico que hace cerrar la sesion en el web
+            const coach = await this.coachRepository.findOne({
+                where: { id: currentUser.id },
+                select: { id: true, active: true },
+            });
+
+            if (!coach || !coach.active) {
+                return res.status(403).send({ error: 'Tu usuario no está registrado como entrenador.' });
+            }
+
+            const planification = await this.planificationRepository.findOne({
+                where: { id: assignPlanificationToUserDto.planification_id },
+                select: { id: true, name: true, duration: true, active: true },
+            });
+
+            if (!planification) {
+                return res.status(404).send({ error: 'Planificación no encontrada' });
+            }
+
+            // Una plantilla de baja no se asigna de nuevo. Lo ya asignado sigue: E-11 no cascadea
+            if (!planification.active) {
+                return res.status(400).send({
+                    error: 'La planificación está dada de baja y no puede asignarse a un alumno.'
+                });
+            }
+
+            // Precondicion del CU. Vigente = el vinculo activo, el mismo criterio que routine_count:
+            // una rutina dada de baja (E-18) dentro del plan se sigue viendo y ejecutando
+            const hasRoutines = await this.routineAsignationRepository.exists({
+                where: { planification_id: planification.id, active: true },
+            });
+
+            if (!hasRoutines) {
+                return res.status(400).send({
+                    error: 'La planificación no tiene rutinas vigentes: asignale rutinas antes de asignarla a un alumno.'
+                });
+            }
+
+            // Sin fin en el body, sale de la plantilla: el domingo de la semana duration (D17, spec
+            // §4). Con duracion 0 no hay de donde sacarlo, y no existe un plan sin fin (NOT NULL)
+            let endDate = sentEndDate;
+
+            if (endDate === undefined) {
+                if (planification.duration === 0) {
+                    return res.status(400).send({
+                        error: 'La planificación no tiene duración fija: indicá la fecha de fin.'
+                    });
+                }
+
+                const defaultEndDate = defaultPlanEndDate(startDate, planification.duration);
+
+                // Tope tecnico (decision del 21/10): con una duracion absurda no hay dia YYYY-MM-DD
+                if (defaultEndDate === null) {
+                    return res.status(400).send({
+                        error: 'La fecha de fin calculada queda fuera del calendario: indicá la fecha de fin.'
+                    });
+                }
+
+                endDate = defaultEndDate;
+            }
+
+            const user = await this.userRepository.findOne({
+                where: { id: assignPlanificationToUserDto.user_id },
+                select: { id: true, role: true, active: true },
+            });
+
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            // Mismo criterio que E-19
+            if (user.role !== UserRole.user) {
+                return res.status(400).send({ error: 'La planificación sólo puede asignarse a un alumno.' });
+            }
+
+            if (!user.active) {
+                return res.status(400).send({
+                    error: 'La cuenta del alumno está cerrada: no se le puede asignar una planificación.'
+                });
+            }
+
+            // D21: si se pisa con otra activa, se avisa con las que se pisan. Reenviando
+            // confirm_overlap: true se crea igual y conviven, asi que con la confirmacion ni se consulta
+            if (assignPlanificationToUserDto.confirm_overlap !== true) {
+                const overlapping = await this.findOverlappingAssignments(user.id, startDate, endDate);
+
+                if (overlapping.length > 0) {
+                    return res.status(409).send({
+                        error: 'El alumno ya tiene una planificación en esas fechas. Reenviá con confirm_overlap: true para asignarla igual.',
+                        overlapping: overlapping.map(
+                            userPlanification => this.buildUserPlanificationResponse(userPlanification, userPlanification.planification)
+                        ),
+                    });
+                }
+            }
+
+            // Los ids salen de las filas leidas y no del body: el iOS manda los UUID en mayuscula, y la
+            // respuesta tiene que devolverlos como estan en la base. La cabecera no se copia (D18)
+            const userPlanification = await this.userPlanificationRepository.save(
+                this.userPlanificationRepository.create({
+                    user_id: user.id,
+                    coach_id: coach.id,
+                    planification_id: planification.id,
+                    start_date: startDate,
+                    end_date: endDate,
+                    coach_note: assignPlanificationToUserDto.coach_note,
+                })
+            );
+
+            return res.status(201).send(this.buildUserPlanificationResponse(userPlanification, planification));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al asignar la planificación.' });
+        }
+    }
+
     // ===================== HELPERS =====================
 
     // La semana cabe si el plan no tiene duracion fija (0) o si no la supera. El minimo
@@ -615,6 +771,52 @@ export class PlanificationService {
                     active: routineAsignation.routine.active,
                 },
             })),
+        };
+    }
+
+    // Las asignaciones ACTIVAS del alumno cuyo rango se pisa con [startDate, endDate], con los dos
+    // extremos inclusivos: empiezan antes o el mismo dia en que termina la nueva, y terminan despues
+    // o el mismo dia en que empieza. Las quitadas (E-14) no cuentan. De la plantilla trae solo la
+    // cabecera de la forma de una asignacion, y el orden es el del listado del alumno (spec §5.3):
+    // de la mas nueva a la mas vieja
+    private findOverlappingAssignments(
+        userId: string,
+        startDate: string,
+        endDate: string
+    ): Promise<UserPlanification[]> {
+        return this.userPlanificationRepository
+            .createQueryBuilder('userPlanification')
+            .innerJoin('userPlanification.planification', 'planification')
+            .addSelect(['planification.id', 'planification.name', 'planification.duration', 'planification.active'])
+            .where('userPlanification.user_id = :userId', { userId })
+            .andWhere('userPlanification.active = true')
+            .andWhere('userPlanification.start_date <= :endDate', { endDate })
+            .andWhere('userPlanification.end_date >= :startDate', { startDate })
+            .orderBy('userPlanification.start_date', 'DESC')
+            .addOrderBy('userPlanification.created_at', 'DESC')
+            .getMany();
+    }
+
+    // La forma de una asignacion (spec del bloque B, §5): la usan la creada y las que se pisan en
+    // E-13 y, desde BE-19, E-14 y el listado. La cabecera del plan se lee de la plantilla (D18)
+    private buildUserPlanificationResponse(userPlanification: UserPlanification, planification: Planification) {
+        return {
+            id: userPlanification.id,
+            user_id: userPlanification.user_id,
+            coach_id: userPlanification.coach_id,
+            planification_id: userPlanification.planification_id,
+            start_date: userPlanification.start_date,
+            end_date: userPlanification.end_date,
+            coach_note: userPlanification.coach_note ?? null,
+            active: userPlanification.active,
+            created_at: userPlanification.created_at,
+            updated_at: userPlanification.updated_at,
+            planification: {
+                id: planification.id,
+                name: planification.name ?? null,
+                duration: planification.duration,
+                active: planification.active,
+            },
         };
     }
 

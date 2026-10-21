@@ -7,14 +7,14 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 65 | 87% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
+| ✅ Implementado | 66 | 88% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
 | 🟡 Parcial | 7 | 9% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
-| 🔵 Andamiaje | 2 | 3% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
+| 🔵 Andamiaje | 1 | 1% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
 | ⬜ No implementado | 0 | 0% | Sin endpoint |
 | — Sin backend | 1 | 1% | Por su spec es del cliente (CU-U-14) |
 | **Total** | **75** | | |
 
-**65 de los 74 CU con backend están completos (88%).** Faltan 9: 7 parciales y 2 en andamiaje; ya no queda ninguno sin endpoint. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
+**66 de los 74 CU con backend están completos (89%).** Faltan 8: 7 parciales y 1 en andamiaje; ya no queda ninguno sin endpoint. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
 > **Nota (17/10):** los ✅ bajan de 63 (corte del 4/9) a 57 porque **cambió el criterio, no porque se rompiera algo**. El de antes daba ✅ a todo endpoint con lógica real; el del roadmap exige además que se cumpla cada camino de la spec. Por eso pasaron a 🟡 CU-U-04 (no envía el mail), CU-A-10 y CU-A-15 (borran en cascada en vez de impedirlo), CU-A-13 y CU-A-14 (no validan el nombre único) y CU-A-17 (falta "ya es entrenador"). Ver los cambios del 17/10.
 > **Base de datos:** la de Render se recreó el 3/10 con el esquema vigente (dato del Status web). Es free tier y **vence alrededor del 2/11** (*sin verificar*), así que hay que regenerarla antes (BE-23). **Desde el 17/10 el esquema del bloque A ya está en `Db Creator`** (BE-10): al regenerar con `01` → `02` → `03` no hace falta el patch `patches/2026-10-17-be-10.sql`, que es para una base viva.
 
@@ -23,11 +23,43 @@
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | Sin backend | % ✅ (sobre los CU con backend) |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 17 | 2 | 0 | 0 | 1 | 89% |
-| Entrenador | 32 | 30 | 0 | 2 | 0 | 0 | 94% |
+| Entrenador | 32 | 31 | 0 | 1 | 0 | 0 | 97% |
 | Admin | 23 | 18 | 5 | 0 | 0 | 0 | 78% |
-| **Total** | **75** | **65** | **7** | **2** | **0** | **1** | **88%** |
+| **Total** | **75** | **66** | **7** | **1** | **0** | **1** | **89%** |
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+
+## Cambios recientes (2026-10-21 · bloque B: asignar una planificación a un alumno)
+
+- **Decimonovena tarea del roadmap (BE-18b): CU-E-13.** Plan: `Doc/plans/2026-10-21-be-18b-asignar-planificacion-plan.md` (repo PowerApp-Docs). `POST /planification/user/assign` deja de colgar. **Sólo el coach** (D20): `coach_id` sale del token, y como el admin no tiene fila en `Coach`, con él la FK fallaría; el admin recibe el `403` del guard de roles.
+- **El contrato** (spec del bloque B, §5.1):
+  - Body `{ planification_id, user_id, start_date, end_date?, coach_note?, confirm_overlap? }`, con los días validados por `IsCalendarDay` y la nota de hasta 100 caracteres.
+  - Validaciones, en este orden: `400` fin anterior al inicio (antes de leer la base) → `403` `Tu usuario no está registrado como entrenador.` → `404` plantilla → `400` plantilla de baja → `400` sin rutinas vigentes → `400` duración 0 sin fin → `400` fin calculado fuera del calendario → `404` usuario → `400` no es alumno o tiene la cuenta cerrada (los textos de E-19) → `409` solapamiento.
+  - `201` con **la forma de una asignación** (`{ id, user_id, coach_id, planification_id, start_date, end_date, coach_note, active, created_at, updated_at, planification: { id, name, duration, active } }`), que BE-19 reutiliza para E-14 y el listado. No trae ningún estado calculado ("vigente", "vencida"): el cliente lo deduce de las fechas.
+  - **Una sola escritura, sin transacción.** Por qué: no hay nada más que crear (D11 eliminó `User_Routine` y D18, la cabecera copiada). La carrera de dos altas simultáneas del mismo alumno puede saltearse el aviso y dejarlas conviviendo; se acepta porque D21 ya admite convivir.
+- **El fin** (D17 y spec §4): opcional. Si no viene, es el domingo de la semana `duration` de la plantilla, contando como semana 1 la de lunes a domingo que contiene el inicio: lunes de inicio + 7·`duration` − 1. Ejemplo de la spec: jueves 22/10 con 4 semanas → domingo 15/11. Con duración 0 es obligatorio (no existe un plan sin fin). Un fin manual más corto, más largo o que no cae en domingo se guarda tal cual. Las cuentas van en `planification/plan_weeks.ts`, funciones puras sobre el string `YYYY-MM-DD` en UTC, nunca con `new Date()` local, para que la zona del servidor no corra un día; las va a reutilizar el home del plan (BE-20).
+- **El solapamiento** (D21): `409` `{ error, overlapping: [<asignación>] }` con las asignaciones **activas** del alumno cuyo rango se pisa con el nuevo, contando los dos extremos. Las quitadas (E-14) no cuentan; las de una plantilla dada de baja sí, y aparecen con su `planification.active: false`. Reenviando `confirm_overlap: true` se crea igual y conviven.
+- **Decisiones del 21/10, con el usuario:**
+  - **Un coach con su fila de `Coach` dada de baja recibe el mismo `403`** que uno sin fila. Por qué: es alcanzable con el mismo bug de BE-27 (`promote_user` sobre un ex-coach cambia el rol antes de reactivar la fila, y si ese guardado falla queda rol `coach` con `Coach.active = false`). La FK no lo frena, así que sin el chequeo la asignación quedaría a nombre de un coach dado de baja.
+  - **Si el fin calculado cae después del 9999-12-31, `400`** `La fecha de fin calculada queda fuera del calendario: indicá la fecha de fin.` Por qué: es un tope técnico, como `INTEGER_MAX` en `duration`. Con una duración absurda (el DTO de la plantilla acepta ~2.100 millones de semanas) no hay día `YYYY-MM-DD`, y la cuenta terminaría en un `500`. Con un fin explícito se asigna igual.
+- **Decisiones del plan** (el usuario las aprobó con él):
+  - **"Rutina vigente" es el vínculo activo** (`Routine_Asignation.active`), sin mirar si la rutina misma está de baja. Por qué: es el criterio de `routine_count` (E-08), y una rutina dada de baja (E-18) dentro de un plan se sigue viendo y ejecutando (§5.4).
+  - **`overlapping` viene en el orden del listado de §5.3** (`start_date` y `created_at` descendentes). Por qué: BE-19 reutiliza la consulta y el web no ve dos órdenes distintos.
+  - **Con `confirm_overlap: true` la consulta de solapamiento ni se hace**: el resultado es el mismo.
+  - **`coach_note` vacía es `400`**, como `Routine.coach_note` en E-16. Para no dejar nota, se omite; como la asignación no se edita (D22), no hace falta la cadena vacía para borrar.
+  - **Los ids que se guardan salen de las filas leídas**, no del body (el iOS manda los UUID en mayúscula), igual que en E-19.
+- **El módulo de planificaciones suma `User` y `Coach` a su `forFeature`.** Sin eso Nest no puede inyectar los repositorios y el server no arranca, pero el build compila igual: por eso hay un script que lo chequea.
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde.
+  - Cinco scripts nuevos sobre el código compilado, escritos antes del código y corridos **en rojo** (1, 1, 18, 37 y 4 fallas) y después en verde:
+    - **las cuentas de semanas** (86 chequeos), en tres zonas horarias: Buenos Aires, Kiritimati (UTC+14) y Pago Pago (UTC−11). Cubren cada día de la semana del ejemplo de la spec, el cruce de año y de un 29 de febrero, el primer día del calendario y el tope del 9999-12-31;
+    - **el DTO** (34);
+    - **el controller y su Swagger** (27): sólo coach, `await` sin devolver el `Response`, `201`/`400`/`403`/`404`/`409` declarados;
+    - **las reglas** (107): el orden de las validaciones, el fin por defecto y el manual, el `409`, lo que se guarda y la respuesta. Usan repositorios falsos y **la consulta de solapamiento real**, con el SQL generado sin base y las filas hidratadas por el transformador de TypeORM: las fechas salen como `'YYYY-MM-DD'`;
+    - **el `INSERT`, las fechas y el módulo** (29): el `RETURNING` trae `id`, `active`, `created_at` y `updated_at`, y el `forFeature` provee cada repositorio que el service inyecta.
+  - **Qué NO se verificó:** el SQL contra un Postgres, que Nest arranque con el módulo nuevo (se probó el `forFeature` contra lo que inyecta el service, no el arranque) y el runtime (BE-35, con el seed de BE-21, que todavía no trae planificaciones con semanas).
+- **E-13 pasa de 🔵 a ✅ (66 ✅ · 7 🟡 · 1 🔵).** Spec de CU reescrita en `Use Cases/` (repo PowerApp-Docs): **E-13** (sin `User_Routine`, el fin calculado de la plantilla, sólo el coach registrado, y los caminos de la plantilla de baja o sin rutinas, el destinatario que no es alumno y el solapamiento con confirmación). **Para el web:** B7 tipa contra §5.1 de la spec. **Sigue BE-19** (E-14, el listado del alumno y el retiro de los tres andamiajes).
+- **De paso, los porcentajes por rol del Status quedaron alineados con las tablas:** el encabezado de Usuario decía 68% (es 89%) y los títulos de sección del dashboard decían 68% y 88% (son 89% y, ahora, 97%). Venían de un corte viejo.
 
 ## Cambios recientes (2026-10-21 · bloque B: la spec y el modelo, con el día de cada marca)
 
@@ -569,7 +601,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | **1** | Seguridad y contrato inmediato | BE-01 a BE-08 | 16 al 19/10 | **H1:** sin agujeros de seguridad conocidos, el web avisado de C2 y el Status con conteos reales | ✅ cerrada el 17/10 |
 | **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | ✅ cerrada el 18/10 (BE-10 y BE-10b el 17/10; BE-11 a BE-16 el 18/10) |
 | ⏱ | Regenerar la base de Render | BE-23 | ≈ 1/11 | Esquema del bloque A aplicado, antes de que venza la base | fecha fija |
-| **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | en curso: BE-17 y BE-18 hechas (20 y 21/10) |
+| **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | en curso: BE-17, BE-18 y BE-18b hechas (20 y 21/10) |
 | **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | |
 | **5** | Verificación y cierre | BE-35 a BE-39 | 12 al 17/11 | **H5:** criterios de "backend terminado" cumplidos y código congelado | |
 
@@ -577,7 +609,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Usuario (20 CU · 68%)
+## Detalle — Rol Usuario (20 CU · 89%)
 
 ### Administrar mi cuenta
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -613,7 +645,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Entrenador (32 CU · 94%)
+## Detalle — Rol Entrenador (32 CU · 97%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -638,7 +670,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-12b | Asignar rutinas en lote | ✅ Implementado | `POST /planification/routine/assign-bulk` · transaccional, una semana por lote, consecutivas al final de la semana (17/10) |
 | CU-E-12c | Quitar o reincorporar una rutina (lógico) | ✅ Implementado | `POST /planification/routine/set-active/:id` · la baja conserva semana y orden; `week` y `order` opcionales al reincorporar (17/10) |
 | CU-E-12d | Quitar o reincorporar rutinas en lote (lógico) | ✅ Implementado | `POST /planification/routine/set-active-bulk` · transaccional; cada una vuelve a su lugar, 400 si alguna queda fuera de la duración (17/10) |
-| CU-E-13 | Asignar planificación a alumno | 🔵 Andamiaje | `POST /planification/user/assign` · `body: any` y llamada comentada: **cuelga** · BE-18b (BE-18 dejó el modelo, 21/10) |
+| CU-E-13 | Asignar planificación a alumno | ✅ Implementado | `POST /planification/user/assign` · sólo coach (`coach_id` del token; `403` si no tiene su fila activa en `Coach`) · el fin por defecto es el domingo de la semana `duration` (obligatorio con duración 0) · `409` con las asignaciones activas que se pisan, salvo `confirm_overlap: true` · 400 → 403 → 404 → 400 → 400 → 400 → 404 → 400 → 409 (BE-18b, 21/10) |
 | CU-E-14 | Eliminar planificación a alumno | 🔵 Andamiaje | `DELETE /planification/user/:id` **cuelga** · pasa a baja lógica (31/8): `POST /planification/user/set-active/:id` apaga la `User_Planification`. Desde el 17/10 ya no hay `User_Routine` que apagar en cascada · BE-19 |
 
 ### Administrar rutinas
