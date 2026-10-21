@@ -15,6 +15,8 @@ import { AssignRoutinesToPlanificationDto } from '../dtos/planification/assign_r
 import { SetRoutineAsignationActiveDto } from '../dtos/planification/set_routine_asignation_active.dto';
 import { SetRoutineAsignationsActiveDto } from '../dtos/planification/set_routine_asignations_active.dto';
 import { AssignPlanificationToUserDto } from '../dtos/planification/assign_planification_to_user.dto';
+import { SetUserPlanificationActiveDto } from '../dtos/planification/set_user_planification_active.dto';
+import { GetUserPlanificationsQueryDto } from '../dtos/planification/get_user_planifications_query.dto';
 import { UserPlanification } from '../entities/user_planification.entity';
 import { User, UserRole } from '../entities/user.entity';
 import { Coach } from '../entities/coach.entity';
@@ -504,7 +506,7 @@ export class PlanificationService {
         }
     }
 
-    // ===================== ASIGNACIONES A ALUMNOS (CU-E-13) =====================
+    // ===================== ASIGNACIONES A ALUMNOS (CU-E-13, CU-E-14 y el listado) =====================
 
     // Solo el coach asigna (D20): coach_id sale del token. El orden de las validaciones es parte
     // del contrato (spec del bloque B, §5.1). Es una sola escritura, asi que no hay transaccion: dos
@@ -648,6 +650,94 @@ export class PlanificationService {
         }
     }
 
+    // Quitar y reincorporar (CU-E-14, D23): el mismo endpoint en los dos sentidos, como el resto de
+    // las bajas logicas. Quitar solo apaga el flag, porque no hay nada que cascadear (D11): el plan
+    // sale del home y lo que el alumno hizo sigue en el historial. Reincorporar no vuelve a chequear
+    // el solapamiento (D23) ni la plantilla o la cuenta del alumno (decision del 21/10): deshace la
+    // baja y deja la asignacion como estaba
+    async setUserPlanificationActive(
+        idUserPlanification: string,
+        setUserPlanificationActiveDto: SetUserPlanificationActiveDto,
+        res: Response
+    ) {
+        const active = setUserPlanificationActiveDto.active;
+
+        try {
+            // Sin filtrar por estado: para reincorporarla hay que encontrar la quitada
+            const userPlanification = await this.userPlanificationQuery()
+                .where('userPlanification.id = :idUserPlanification', { idUserPlanification })
+                .getOne();
+
+            if (!userPlanification) {
+                return res.status(404).send({ error: 'Asignación no encontrada' });
+            }
+
+            // Pedir el estado que ya tiene es 400: es el "informa que no hay nada que quitar" del CU
+            if (userPlanification.active === active) {
+                return res.status(400).send({
+                    error: active
+                        ? 'La planificación del alumno ya está activa.'
+                        : 'La planificación del alumno ya está dada de baja.'
+                });
+            }
+
+            // Un solo UPDATE de las dos columnas, por el id de la fila (el del path puede venir en
+            // mayuscula). updated_at se setea a mano: el onUpdate de las entidades es sintaxis de
+            // MySQL y en Postgres no hace nada (hallazgo 4)
+            const updatedAt = new Date();
+
+            await this.userPlanificationRepository.update(
+                { id: userPlanification.id },
+                { active, updated_at: updatedAt },
+            );
+
+            userPlanification.active = active;
+            userPlanification.updated_at = updatedAt;
+
+            res.status(200).send(
+                this.buildUserPlanificationResponse(userPlanification, userPlanification.planification)
+            );
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al actualizar el estado de la planificación del alumno.' });
+        }
+    }
+
+    // Los planes de un alumno (spec §5.3): el paso 1 de CU-E-14, y el alumno ve los suyos. Por
+    // defecto solo los activos; con include_inactive, tambien los quitados
+    async getUserPlanifications(
+        userId: string,
+        query: GetUserPlanificationsQueryDto,
+        res: Response
+    ) {
+        try {
+            const user = await this.userRepository.findOne({
+                where: { id: userId },
+                select: { id: true },
+            });
+
+            if (!user) {
+                return res.status(404).send({ error: 'Usuario no encontrado' });
+            }
+
+            // El id de la fila y no el del path: el iOS manda los UUID en mayuscula
+            const userPlanificationsQuery = this.userPlanificationsOfUserQuery(user.id);
+
+            if (!query.include_inactive) {
+                userPlanificationsQuery.andWhere('userPlanification.active = true');
+            }
+
+            const userPlanifications = await userPlanificationsQuery.getMany();
+
+            res.status(200).send(userPlanifications.map(
+                userPlanification => this.buildUserPlanificationResponse(userPlanification, userPlanification.planification)
+            ));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener las planificaciones del alumno.' });
+        }
+    }
+
     // ===================== HELPERS =====================
 
     // La semana cabe si el plan no tiene duracion fija (0) o si no la supera. El minimo
@@ -774,31 +864,43 @@ export class PlanificationService {
         };
     }
 
+    // La base de las lecturas de asignaciones: cada una con la cabecera de su plantilla, solo lo que
+    // lleva la forma de una asignacion (spec §5). Inner join: planification_id es NOT NULL con
+    // RESTRICT (D19), asi que la plantilla siempre esta
+    private userPlanificationQuery(): SelectQueryBuilder<UserPlanification> {
+        return this.userPlanificationRepository
+            .createQueryBuilder('userPlanification')
+            .innerJoin('userPlanification.planification', 'planification')
+            .addSelect(['planification.id', 'planification.name', 'planification.duration', 'planification.active']);
+    }
+
+    // Las asignaciones de un alumno, de la mas nueva a la mas vieja: inicio y despues alta,
+    // descendentes (spec §5.3). La comparten el listado y el overlapping del 409 de E-13, para que
+    // el web no vea dos ordenes distintos
+    private userPlanificationsOfUserQuery(userId: string): SelectQueryBuilder<UserPlanification> {
+        return this.userPlanificationQuery()
+            .where('userPlanification.user_id = :userId', { userId })
+            .orderBy('userPlanification.start_date', 'DESC')
+            .addOrderBy('userPlanification.created_at', 'DESC');
+    }
+
     // Las asignaciones ACTIVAS del alumno cuyo rango se pisa con [startDate, endDate], con los dos
     // extremos inclusivos: empiezan antes o el mismo dia en que termina la nueva, y terminan despues
-    // o el mismo dia en que empieza. Las quitadas (E-14) no cuentan. De la plantilla trae solo la
-    // cabecera de la forma de una asignacion, y el orden es el del listado del alumno (spec §5.3):
-    // de la mas nueva a la mas vieja
+    // o el mismo dia en que empieza. Las quitadas (E-14) no cuentan
     private findOverlappingAssignments(
         userId: string,
         startDate: string,
         endDate: string
     ): Promise<UserPlanification[]> {
-        return this.userPlanificationRepository
-            .createQueryBuilder('userPlanification')
-            .innerJoin('userPlanification.planification', 'planification')
-            .addSelect(['planification.id', 'planification.name', 'planification.duration', 'planification.active'])
-            .where('userPlanification.user_id = :userId', { userId })
+        return this.userPlanificationsOfUserQuery(userId)
             .andWhere('userPlanification.active = true')
             .andWhere('userPlanification.start_date <= :endDate', { endDate })
             .andWhere('userPlanification.end_date >= :startDate', { startDate })
-            .orderBy('userPlanification.start_date', 'DESC')
-            .addOrderBy('userPlanification.created_at', 'DESC')
             .getMany();
     }
 
-    // La forma de una asignacion (spec del bloque B, §5): la usan la creada y las que se pisan en
-    // E-13 y, desde BE-19, E-14 y el listado. La cabecera del plan se lee de la plantilla (D18)
+    // La forma de una asignacion (spec del bloque B, §5): la usan E-13 (la creada y las que se
+    // pisan), E-14 y el listado del alumno. La cabecera del plan se lee de la plantilla (D18)
     private buildUserPlanificationResponse(userPlanification: UserPlanification, planification: Planification) {
         return {
             id: userPlanification.id,

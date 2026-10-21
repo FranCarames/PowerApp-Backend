@@ -2,7 +2,6 @@ import {
     Controller,
     Get,
     Post,
-    Delete,
     Body,
     Param,
     Query,
@@ -13,7 +12,6 @@ import { PlanificationService } from './planification.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { Planification } from '../entities/planification.entity';
-import { UserPlanification } from '../entities/user_planification.entity';
 import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
@@ -31,8 +29,10 @@ import { AssignPlanificationToUserDto } from '../dtos/planification/assign_plani
 import { UserPlanificationResponseDto, AssignPlanificationOverlapResponseDto } from '../dtos/planification/user_planification_response.dto';
 import { CurrentUser } from '../authentication/decorators/current-user.decorator';
 import { AuthUser } from '../authentication/auth-user.interface';
-// Los andamiajes de E-14 que quedan abajo (GET /user/:id/active, POST /user/edit/:id y
-// DELETE /user/:id) los retira BE-19: una asignacion no se edita (D22) y quitarla es set-active (D23)
+import { Owner } from '../authentication/decorators/owner.decorator';
+import { SetUserPlanificationActiveDto } from '../dtos/planification/set_user_planification_active.dto';
+import { GetUserPlanificationsQueryDto } from '../dtos/planification/get_user_planifications_query.dto';
+import { AssignedRoutinesParamsDto } from '../dtos/routine/assigned_routines_params.dto';
 // CU-E-19 y CU-E-20 (asignar/quitar rutina individual a un alumno) salieron de aca el 27/8:
 // son del paquete "Administrar Rutinas" y viven en routine/ (POST /routine/assign-user y
 // DELETE /routine/assign-user/:id, desde BE-11). El listado GET /routine/assigned/:userId
@@ -169,7 +169,7 @@ export class PlanificationController {
         await this.planificationService.setRoutineAsignationsActive(setActiveDto, res);
     }
 
-    // ===================== ASIGNACIONES A ALUMNOS (CU-E-13, E-14, U-08) =====================
+    // ===================== ASIGNACIONES A ALUMNOS (CU-E-13 y CU-E-14) =====================
 
     // Solo el coach (D20): coach_id sale del token, y el admin no tiene fila en Coach
     @Post('/user/assign')
@@ -187,45 +187,35 @@ export class PlanificationController {
         await this.planificationService.assignPlanificationToUser(assignPlanificationToUserDto, user, res);
     }
 
-    @Get('/user/:id')
+    // Quitar o reincorporar (D23). Coach y admin: a diferencia de E-13 no se guarda quien lo hizo, y
+    // el gimnasio es compartido (D6). Reemplaza al DELETE /user/:id del andamiaje
+    @Post('/user/set-active/:id')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: UserPlanificationResponseDto, description: 'La asignación con su nuevo estado. Quitar sólo apaga active; reincorporar no vuelve a chequear el solapamiento' })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, o la asignación ya está en ese estado (La planificación del alumno ya está dada de baja. / ya está activa.)' })
+    @ApiResponse({ status: 404, description: 'Asignación no encontrada' })
+    async setUserPlanificationActive(
+        @Param() idUserPlanification: ParameterIdDto,
+        @Body() setUserPlanificationActiveDto: SetUserPlanificationActiveDto,
+        @Res() res: Response,
+    ) {
+        await this.planificationService.setUserPlanificationActive(idUserPlanification.id, setUserPlanificationActiveDto, res);
+    }
+
+    // Con el rol user, @Owner exige que :userId sea el propio id (403); coach y admin ven los de
+    // cualquier alumno (D6). Reemplaza al GET /user/:id del andamiaje, que tomaba el param id
+    @Get('/user/:userId')
     @Auth(UserRole.user, UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [UserPlanification] })
+    @Owner('userId')
+    @ApiResponse({ status: 200, type: [UserPlanificationResponseDto], description: 'Las asignaciones del alumno, de la más nueva a la más vieja (inicio y alta, descendentes). Por defecto sólo las activas. Sin asignaciones, un array vacío' })
+    @ApiResponse({ status: 400, description: 'El id del alumno no es un UUID válido, o include_inactive no es true ni false' })
+    @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
     async getUserPlanifications(
-        @Param() idUser: ParameterIdDto,
+        @Param() params: AssignedRoutinesParamsDto,
+        @Query() query: GetUserPlanificationsQueryDto,
         @Res() res: Response,
     ) {
-        // this.planificationService.getUserPlanifications(idUser.id, res);
-    }
-
-    @Get('/user/:id/active')
-    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: UserPlanification })
-    async getActiveUserPlanification(
-        @Param() idUser: ParameterIdDto,
-        @Res() res: Response,
-    ) {
-        // this.planificationService.getActiveUserPlanification(idUser.id, res);
-    }
-
-    @Post('/user/edit/:id')
-    @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: UserPlanification })
-    async editUserPlanification(
-        @Param() idUserPlanification: ParameterIdDto,
-        @Body() editUserPlanificationDto: any,
-        @Res() res: Response,
-    ) {
-        // this.planificationService.editUserPlanification(idUserPlanification.id, editUserPlanificationDto, res);
-    }
-
-    @Delete('/user/:id')
-    @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200 })
-    async deleteUserPlanification(
-        @Param() idUserPlanification: ParameterIdDto,
-        @Res() res: Response,
-    ) {
-        // this.planificationService.deleteUserPlanification(idUserPlanification.id, res);
+        await this.planificationService.getUserPlanifications(params.userId, query, res);
     }
 
 }

@@ -7,14 +7,14 @@
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 66 | 88% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
+| ✅ Implementado | 67 | 89% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
 | 🟡 Parcial | 7 | 9% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
-| 🔵 Andamiaje | 1 | 1% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
+| 🔵 Andamiaje | 0 | 0% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
 | ⬜ No implementado | 0 | 0% | Sin endpoint |
 | — Sin backend | 1 | 1% | Por su spec es del cliente (CU-U-14) |
 | **Total** | **75** | | |
 
-**66 de los 74 CU con backend están completos (89%).** Faltan 8: 7 parciales y 1 en andamiaje; ya no queda ninguno sin endpoint. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
+**67 de los 74 CU con backend están completos (91%).** Faltan 7, todos parciales: ya no queda ninguno sin endpoint ni en andamiaje. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
 > **Nota (17/10):** los ✅ bajan de 63 (corte del 4/9) a 57 porque **cambió el criterio, no porque se rompiera algo**. El de antes daba ✅ a todo endpoint con lógica real; el del roadmap exige además que se cumpla cada camino de la spec. Por eso pasaron a 🟡 CU-U-04 (no envía el mail), CU-A-10 y CU-A-15 (borran en cascada en vez de impedirlo), CU-A-13 y CU-A-14 (no validan el nombre único) y CU-A-17 (falta "ya es entrenador"). Ver los cambios del 17/10.
 > **Base de datos:** la de Render se recreó el 3/10 con el esquema vigente (dato del Status web). Es free tier y **vence alrededor del 2/11** (*sin verificar*), así que hay que regenerarla antes (BE-23). **Desde el 17/10 el esquema del bloque A ya está en `Db Creator`** (BE-10): al regenerar con `01` → `02` → `03` no hace falta el patch `patches/2026-10-17-be-10.sql`, que es para una base viva.
 
@@ -23,11 +23,39 @@
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | Sin backend | % ✅ (sobre los CU con backend) |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 17 | 2 | 0 | 0 | 1 | 89% |
-| Entrenador | 32 | 31 | 0 | 1 | 0 | 0 | 97% |
+| Entrenador | 32 | 32 | 0 | 0 | 0 | 0 | 100% |
 | Admin | 23 | 18 | 5 | 0 | 0 | 0 | 78% |
-| **Total** | **75** | **66** | **7** | **1** | **0** | **1** | **89%** |
+| **Total** | **75** | **67** | **7** | **0** | **0** | **1** | **91%** |
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+
+## Cambios recientes (2026-10-21 · bloque B: quitar o reincorporar la planificación de un alumno, y sus planes)
+
+- **Vigésima tarea del roadmap (BE-19): CU-E-14 y el listado del alumno.** Plan: `Doc/plans/2026-10-21-be-19-quitar-planificacion-y-listado-plan.md` (repo PowerApp-Docs). Reutiliza la forma de una asignación de BE-18b (`UserPlanificationResponseDto` y `buildUserPlanificationResponse`), así que E-13, E-14 y el listado devuelven exactamente lo mismo.
+- **E-14, el contrato** (spec del bloque B, §5.2): `POST /planification/user/set-active/:id`, coach y admin, body `{ active }`. Validaciones, en este orden: `404` `Asignación no encontrada` → `400` si ya está en ese estado (`La planificación del alumno ya está dada de baja.` / `La planificación del alumno ya está activa.`; es el "informa que no hay nada que quitar" del CU) → `200` con la asignación.
+  - **Quitar sólo apaga `active`.** Por qué: no hay nada que cascadear. `User_Routine` desapareció con D11 (17/10) y la cabecera del plan se lee siempre de la plantilla (D18); el roadmap todavía hablaba de apagar las `User_Routine` en bloque. El plan sale del home, deja de contar para el solapamiento de E-13 y lo que el alumno hizo sigue en el historial.
+  - **Reincorporar no vuelve a chequear el solapamiento** (D23). Por qué: el peor caso es que dos planes convivan, y D21 ya lo admite.
+  - **Coach y admin**, a diferencia de E-13: no se guarda quién lo hizo, así que el admin no necesita fila en `Coach` (D20), y el gimnasio es compartido (D6).
+- **El listado** (§5.3): `GET /planification/user/:userId?include_inactive=`, user con `@Owner('userId')`, coach y admin. `404` si el usuario no existe. `200` con las asignaciones del alumno, de la más nueva a la más vieja (`start_date` y `created_at` descendentes), por defecto sólo las activas y con `include_inactive=true` todas. Por qué ese orden: es el mismo del `overlapping` del `409` de E-13, así el web no ve dos órdenes distintos. Es el paso 1 de E-14 (el coach elige cuál quitar o reincorporar) y el alumno ve los suyos. Reemplaza al andamiaje `GET /user/:id`, que colgaba y usaba el param `id` (con `@Owner` hace falta que el param se llame `userId`).
+- **Se retiran los tres andamiajes:** `GET /planification/user/:id/active` (lo que pedía, el plan del home, es BE-20 y vive en `routine/`, D27), `POST /planification/user/edit/:id` (D22: una asignación no se edita; para cambiar fechas se quita y se asigna de nuevo) y `DELETE /planification/user/:id` (la baja es lógica, D23). **Eran las últimas rutas que colgaban en todo el backend:** ya no queda ningún handler con la llamada al service comentada, y el tile de andamiaje queda en 0.
+- **Decisión del 21/10, con el usuario:** **reincorporar sólo valida que la asignación exista y que esté quitada.** No mira si la plantilla sigue activa ni si la cuenta del alumno sigue abierta, aunque E-13 rechaza las dos cosas. Por qué: reincorporar deshace una baja, igual que D23 no vuelve a chequear el solapamiento. Una plantilla dada de baja no saca lo ya asignado (E-11) y cerrar la cuenta (E-03) tampoco apaga sus planes, así que la asignación reincorporada queda igual que si nunca se hubiera quitado.
+- **Decisiones del plan** (el usuario las aprobó con él):
+  - **Los textos que la spec no fija:** el `404` es `Asignación no encontrada`, el mismo que §5.4 fija para una `User_Planification` que no existe (un solo texto para lo mismo); los `500` son `Error al actualizar el estado de la planificación del alumno.` y `Error al obtener las planificaciones del alumno.`
+  - **E-14 escribe con un solo `UPDATE` de `active` y `updated_at`**, y `updated_at` se setea a mano. Por qué: el `onUpdate` de las entidades no hace nada en Postgres (hallazgo 4), y así la respuesta trae el momento del cambio; es el patrón de marcar en BE-14. Sin transacción: es una escritura. **Carrera aceptada:** dos bajas simultáneas de la misma asignación responden `200` las dos (la segunda, en vez del `400`); el estado final es el mismo.
+  - **El query del listado es un DTO nuevo, sólo con `include_inactive`** (con la misma transformación que `GetPlanificationsQueryDto`). Por qué no ese: aceptaría `keyword` y `type` sin usarlos; con el nuevo, mandarlos da `400`. El path usa `AssignedRoutinesParamsDto`, el de los otros listados por alumno.
+  - **El listado no mira el rol ni la cuenta del usuario**, sólo que exista (§5.3), igual que `GET /routine/assigned/:userId`. Trae también las asignaciones de una plantilla dada de baja, con su `planification.active: false`.
+  - **La consulta de solapamiento de E-13 comparte la base con E-14 y el listado** (la cabecera mínima de la plantilla, el filtro por alumno y el orden), **con el mismo SQL**: lo confirmó la regresión de BE-18b.
+- **Lo congelado (D24) se cumple por construcción:** todavía no existe ningún endpoint que marque, desmarque o anote en una sesión del plan, así que una asignación quitada no se puede modificar. El `400` explícito lo suma BE-20c, que es la que agrega marcar en el plan.
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde.
+  - Tres scripts nuevos sobre el código compilado, escritos antes del código y corridos **en rojo** (19, 22 y 19 fallas) y después en verde, en la primera corrida:
+    - **los DTOs** (24 chequeos): el body `{ active }` y el query, con `include_inactive` como texto (`'true'`, `'false'`, vacío, `'yes'`) y el `400` para `keyword` y `type`;
+    - **el controller y su Swagger** (70): rutas, roles, `@Owner('userId')`, tipos de los parámetros, `await` sin devolver el `Response`, los tres andamiajes fuera del documento y, **para todo `planification/`, que cada handler llame al service** (un handler que no lo llama es una ruta que cuelga);
+    - **las reglas** (80): los `404` y `400`, quitar y reincorporar, el `UPDATE` de dos columnas, el listado con y sin `include_inactive`, con repositorios falsos y **las consultas reales**: el SQL generado sin base y las filas hidratadas por el transformador de TypeORM (las fechas salen como `'YYYY-MM-DD'`). También el `UPDATE` que arma TypeORM con esos argumentos: `SET "active" = $1, "updated_at" = $2 WHERE "id" = $3`, sin nada implícito, con el `false` como `0` (así persiste TypeORM los booleanos en Postgres, que lo acepta).
+  - **Regresión:** los tres scripts de BE-18b siguen en verde (27, 107 y 29 chequeos); el de reglas imprime el SQL del solapamiento y exige el mismo `WHERE`, los mismos parámetros y el mismo `ORDER BY`.
+  - `git grep` sin ningún handler con la llamada al service comentada en `power-app/src`.
+  - **Qué NO se verificó:** el SQL contra un Postgres, el `OwnerGuard` corriendo en esta ruta (se probó su metadata; el guard se probó en BE-02) y el runtime (BE-35, con el seed de BE-21, que todavía no trae asignaciones de plan).
+- **E-14 pasa de 🔵 a ✅ (67 ✅ · 7 🟡 · 0 🔵): el Entrenador queda completo (32 de 32).** Spec de CU reescrita en `Use Cases/` (repo PowerApp-Docs): **E-14** (sin `User_Routine`: sólo apaga la asignación; el listado como paso 1; el camino nuevo de reincorporar, sin volver a chequear nada; la asignación quitada queda congelada para el alumno). **De paso:** la fila de U-08 nombraba como faltante un andamiaje que se retira acá; ahora nombra el endpoint de BE-20. **Para el web:** B7 tipa contra §5.2 y §5.3 de la spec. **Sigue BE-20** (el plan en el home).
 
 ## Cambios recientes (2026-10-21 · bloque B: asignar una planificación a un alumno)
 
@@ -601,7 +629,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | **1** | Seguridad y contrato inmediato | BE-01 a BE-08 | 16 al 19/10 | **H1:** sin agujeros de seguridad conocidos, el web avisado de C2 y el Status con conteos reales | ✅ cerrada el 17/10 |
 | **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | ✅ cerrada el 18/10 (BE-10 y BE-10b el 17/10; BE-11 a BE-16 el 18/10) |
 | ⏱ | Regenerar la base de Render | BE-23 | ≈ 1/11 | Esquema del bloque A aplicado, antes de que venza la base | fecha fija |
-| **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | en curso: BE-17, BE-18 y BE-18b hechas (20 y 21/10) |
+| **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | en curso: BE-17, BE-18, BE-18b y BE-19 hechas (20 y 21/10) |
 | **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | |
 | **5** | Verificación y cierre | BE-35 a BE-39 | 12 al 17/11 | **H5:** criterios de "backend terminado" cumplidos y código congelado | |
 
@@ -625,7 +653,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Mi entrenamiento
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-U-08 | Obtener mi planificación | 🟡 Parcial | `GET /routine/assigned/:userId?from=&to=` · la parte **individual** del home, con su progreso (18/10) · **falta la parte del plan**: `GET /planification/user/:id/active` sigue colgando · BE-20 |
+| CU-U-08 | Obtener mi planificación | 🟡 Parcial | `GET /routine/assigned/:userId?from=&to=` · la parte **individual** del home, con su progreso (18/10) · **falta la parte del plan**: `GET /routine/assigned-plan/:userId` (spec del bloque B, §5.5) · BE-20 |
 | CU-U-09 | Ver detalle de rutina | ✅ Implementado | `GET /routine/assign-user/:id` · el alumno lee la rutina **por su asignación** (`403` si es de otro; coach y admin, la de cualquiera) · mismo árbol que `GET /routine/:id`, con lo dado de baja que completó y lo hecho en `finished` (18/10) · el detalle de una asignación del plan es del bloque B |
 | CU-U-10 | Ver detalle de un ejercicio | ✅ Implementado | Se resuelve dentro del detalle de la asignación (`GET /routine/assign-user/:id`): ficha del ejercicio, series ordenadas, nota del coach y, en `finished`, la nota del alumno · `GET /exercise/:id` sigue siendo la ficha de catálogo (18/10) |
 | CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user` (`@Owner`, ids en minúscula desde el 16/10), orden por fecha DESC |
@@ -645,7 +673,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Entrenador (32 CU · 97%)
+## Detalle — Rol Entrenador (32 CU · 100%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -671,7 +699,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-E-12c | Quitar o reincorporar una rutina (lógico) | ✅ Implementado | `POST /planification/routine/set-active/:id` · la baja conserva semana y orden; `week` y `order` opcionales al reincorporar (17/10) |
 | CU-E-12d | Quitar o reincorporar rutinas en lote (lógico) | ✅ Implementado | `POST /planification/routine/set-active-bulk` · transaccional; cada una vuelve a su lugar, 400 si alguna queda fuera de la duración (17/10) |
 | CU-E-13 | Asignar planificación a alumno | ✅ Implementado | `POST /planification/user/assign` · sólo coach (`coach_id` del token; `403` si no tiene su fila activa en `Coach`) · el fin por defecto es el domingo de la semana `duration` (obligatorio con duración 0) · `409` con las asignaciones activas que se pisan, salvo `confirm_overlap: true` · 400 → 403 → 404 → 400 → 400 → 400 → 404 → 400 → 409 (BE-18b, 21/10) |
-| CU-E-14 | Eliminar planificación a alumno | 🔵 Andamiaje | `DELETE /planification/user/:id` **cuelga** · pasa a baja lógica (31/8): `POST /planification/user/set-active/:id` apaga la `User_Planification`. Desde el 17/10 ya no hay `User_Routine` que apagar en cascada · BE-19 |
+| CU-E-14 | Eliminar planificación a alumno | ✅ Implementado | `POST /planification/user/set-active/:id` · quitar y reincorporar (`{ active }`), coach y admin · `400` si ya está en ese estado · quitar sólo apaga la asignación (sin cascada); reincorporar no vuelve a chequear el solapamiento · 404 → 400 · el paso 1 es `GET /planification/user/:userId?include_inactive=` (BE-19, 21/10) |
 
 ### Administrar rutinas
 | CU | Caso de uso | Estado | Endpoint / nota |
