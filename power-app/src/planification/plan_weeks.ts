@@ -1,7 +1,8 @@
 // Las cuentas de las semanas del plan (spec del bloque B, §4), sobre dias 'YYYY-MM-DD'. Se hacen
 // interpretando el dia en UTC ('2026-10-22T00:00:00Z') y nunca con new Date() local, para que la
 // zona horaria del servidor no corra un dia. Funciones puras, sin Nest: las usan E-13 (el fin por
-// defecto) y el home del plan (BE-20, desde routine/)
+// defecto), el plan del home (BE-20, desde routine/) y el home en un solo pedido (BE-20e). La unica
+// que mira el reloj es todayIn
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
@@ -55,4 +56,24 @@ export function planWeekBounds(startDate: string, week: number): { week_start: s
         week_start: fromUtcMs(weekStartMs),
         week_end: fromUtcMs(Math.min(weekStartMs + 6 * DAY_MS, LAST_DAY_MS)),
     };
+}
+
+// El rango del home (spec del home, D32 y D33): `weeks` semanas enteras, del lunes de la semana que
+// contiene el dia al domingo de la ultima. Devuelve null si ese domingo cae despues del 9999-12-31,
+// el mismo tope tecnico que el del fin por defecto
+export function weeksRange(day: string, weeks: number): { start_date: string; end_date: string } | null {
+    const startMs = toUtcMs(mondayOf(day));
+    const endMs = startMs + (7 * weeks - 1) * DAY_MS;
+
+    return endMs <= LAST_DAY_MS ? { start_date: fromUtcMs(startMs), end_date: fromUtcMs(endMs) } : null;
+}
+
+// El dia de hoy en una zona horaria (D32: el home sin date usa hoy en Argentina, no el reloj UTC del
+// servidor, que los domingos de 21 a 24 h ya va por el lunes). Se arma con formatToParts y no con el
+// formato de un locale, que cambia entre versiones de ICU. now es un parametro para poder probarla
+export function todayIn(timeZone: string, now: Date = new Date()): string {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)!.value;
+
+    return `${part('year')}-${part('month')}-${part('day')}`;
 }
