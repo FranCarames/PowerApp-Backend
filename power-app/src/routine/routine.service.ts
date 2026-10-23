@@ -1474,18 +1474,7 @@ export class RoutineService {
             const { week_start, week_end } = planWeekBounds(userPlanification.start_date, week);
 
             return {
-                user_planification: {
-                    id: userPlanification.id,
-                    start_date: userPlanification.start_date,
-                    end_date: userPlanification.end_date,
-                    coach_note: userPlanification.coach_note ?? null,
-                    planification: {
-                        id: userPlanification.planification.id,
-                        name: userPlanification.planification.name ?? null,
-                        duration: userPlanification.planification.duration,
-                        active: userPlanification.planification.active,
-                    },
-                },
+                user_planification: this.buildPlanUserPlanificationResponse(userPlanification),
                 week,
                 week_start,
                 week_end,
@@ -1516,6 +1505,72 @@ export class RoutineService {
         groups.sort((a, b) => (a.week_start < b.week_start ? -1 : a.week_start > b.week_start ? 1 : 0));
 
         return groups;
+    }
+
+    // Lo que el alumno abre desde el home en la via del plan (CU-U-09 y U-10, spec del detalle de una
+    // sesion del plan): la rutina de una sesion del plan, con lo que ya hizo. El equivalente de
+    // GET /routine/assign-user/:id, con los mismos builders. Se lee aunque la asignacion este quitada
+    // (D24): user_planification.active le avisa al cliente que no se puede marcar (D37)
+    async getPlanSessionDetail(
+        userPlanificationId: string,
+        routineAsignationId: string,
+        currentUser: AuthUser,
+        res: Response
+    ) {
+        try {
+            const session = await this.findPlanSession(userPlanificationId, routineAsignationId, currentUser);
+
+            if ('error' in session) {
+                return res.status(session.status).send({ error: session.error });
+            }
+
+            const { userPlanification, routineAsignation } = session;
+
+            // Por los ids de las filas y no por los del path, que pueden venir en mayuscula
+            const finishedRows = await this.routineExerciseFinishedRepository.find({
+                where: {
+                    user_planification_id: userPlanification.id,
+                    routine_asignation_id: routineAsignation.id,
+                },
+                order: { created_at: 'ASC', routine_exercise_id: 'ASC' },
+            });
+
+            // D29 y D38: una rutina quitada del plan en la que el alumno no hizo nada no existe para
+            // el, y el coach y el admin ven lo mismo que el alumno
+            if (!routineAsignation.active && finishedRows.length === 0) {
+                return res.status(404).send({ error: 'La rutina fue quitada de la planificación.' });
+            }
+
+            // La misma consulta y los mismos builders que GET /routine/:id y el detalle individual
+            const routine = await this.findRoutineDetail(routineAsignation.routine_id);
+
+            if (!routine) {
+                return res.status(404).send({ error: 'Rutina no encontrada' });
+            }
+
+            const { visibleInactiveIds, completedIds } = this.buildAssignmentVisibility(routine, finishedRows);
+            const { week_start, week_end } = planWeekBounds(userPlanification.start_date, routineAsignation.week);
+
+            return res.status(200).send({
+                user_planification: {
+                    ...this.buildPlanUserPlanificationResponse(userPlanification),
+                    active: userPlanification.active,
+                },
+                routine_asignation_id: routineAsignation.id,
+                week: routineAsignation.week,
+                week_start,
+                week_end,
+                order: routineAsignation.order,
+                active: routineAsignation.active,
+                // En una rutina quitada del plan, como si todos sus vinculos estuvieran dados de baja:
+                // solo lo completado, que es el total del home (finished = total)
+                routine: this.buildRoutineDetailResponse(routine, visibleInactiveIds, completedIds, !routineAsignation.active),
+                finished: finishedRows.map(row => this.buildFinishedResponse(row)),
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener la rutina del plan.' });
+        }
     }
 
     // ===================== EL HOME DEL ALUMNO (BE-20e) =====================
@@ -1723,15 +1778,15 @@ export class RoutineService {
         return { finished: finishedIds.size, total: visible.size };
     }
 
-    // Que parte de lo dado de baja se le muestra al alumno en el detalle de una asignacion (spec
-    // §4.4): un Routine_Exercise apagado, si lo completo; un Routine_Circuit apagado, si completo
-    // algo de ese circuito. Se mira el CIRCUITO y no el vinculo porque la base no registra el
-    // hecho por vinculo: con un circuito repetido (A, B, A) el ejercicio completado es el mismo en
-    // los dos. Con esto, los ejercicios del detalle (sin repetir ids) son exactamente los de
-    // BE-12: los activos de los vinculos activos mas los completados
+    // Que parte de lo dado de baja se le muestra al alumno en el detalle de una asignacion o de una
+    // sesion del plan (spec §4.4; las dos vias): un Routine_Exercise apagado, si lo completo; un
+    // Routine_Circuit apagado, si completo algo de ese circuito. Se mira el CIRCUITO y no el vinculo
+    // porque la base no registra el hecho por vinculo: con un circuito repetido (A, B, A) el ejercicio
+    // completado es el mismo en los dos. Con esto, los ejercicios del detalle (sin repetir ids) son
+    // exactamente los de BE-12: los activos de los vinculos activos mas los completados
     private buildAssignmentVisibility(
         routine: Routine,
-        finishedRows: RoutineAsignExerciseFinished[]
+        finishedRows: (RoutineAsignExerciseFinished | RoutineExerciseFinished)[]
     ): { visibleInactiveIds: Set<string>; completedIds: Set<string> } {
         const completedIds = new Set(finishedRows.map(row => row.routine_exercise_id));
         const circuitsWithCompleted = new Set<string>();
@@ -1761,9 +1816,9 @@ export class RoutineService {
     }
 
     // "Dueño" = la asignacion es del alumno del token, comparado en minuscula (el iOS manda los
-    // UUID en mayuscula). Lo usan el detalle, marcar y desmarcar: el path trae el id de la
-    // asignacion y no el del alumno, asi que no alcanza con @Owner
-    private isAssignmentOwner(assignment: RoutineAsignationUser, currentUser: AuthUser): boolean {
+    // UUID en mayuscula). Lo usan el detalle, marcar y desmarcar de las dos vias (la individual y la
+    // del plan): el path trae el id de la asignacion y no el del alumno, asi que no alcanza con @Owner
+    private isAssignmentOwner(assignment: RoutineAsignationUser | UserPlanification, currentUser: AuthUser): boolean {
         return assignment.user_id.toLowerCase() === currentUser.id.toLowerCase();
     }
 
@@ -1810,9 +1865,9 @@ export class RoutineService {
     }
 
     // Lo que el cliente cruza con el arbol de la rutina por routine_exercise_id. La misma forma en
-    // el detalle (finished) y en la respuesta de marcar. finished_at es el dia en que lo hizo y
-    // created_at, cuando se registro la marca
-    private buildFinishedResponse(row: RoutineAsignExerciseFinished) {
+    // el detalle (finished) y en la respuesta de marcar, en las dos vias. finished_at es el dia en
+    // que lo hizo y created_at, cuando se registro la marca
+    private buildFinishedResponse(row: RoutineAsignExerciseFinished | RoutineExerciseFinished) {
         return {
             routine_exercise_id: row.routine_exercise_id,
             user_note: row.user_note ?? null,
@@ -1820,6 +1875,69 @@ export class RoutineService {
             created_at: row.created_at,
             updated_at: row.updated_at,
         };
+    }
+
+    // ===================== HELPERS DEL PLAN DEL ALUMNO =====================
+
+    // La asignacion de la que sale cada grupo del home del plan (BE-20) y el detalle de una sesion
+    // del plan (BE-20b, que le suma active): lo propio de la User_Planification y la cabecera de la
+    // plantilla, que se lee en vivo (D18). Un solo builder, para que las dos sean iguales por
+    // construccion. La User_Planification tiene que venir con su planification
+    private buildPlanUserPlanificationResponse(userPlanification: UserPlanification) {
+        return {
+            id: userPlanification.id,
+            start_date: userPlanification.start_date,
+            end_date: userPlanification.end_date,
+            coach_note: userPlanification.coach_note ?? null,
+            planification: {
+                id: userPlanification.planification.id,
+                name: userPlanification.planification.name ?? null,
+                duration: userPlanification.planification.duration,
+                active: userPlanification.planification.active,
+            },
+        };
+    }
+
+    // Las validaciones de una sesion del plan, el par (User_Planification, Routine_Asignation), en el
+    // orden de §5.4 del bloque B (D39). Las comparten el detalle (BE-20b) y marcar y desmarcar
+    // (BE-20c). Devuelve la sesion o el error que responde el handler, como checkExerciseIsMarkable.
+    // El 403 va antes del segundo 404: un alumno no averigua que hay en los planes de otro
+    private async findPlanSession(
+        userPlanificationId: string,
+        routineAsignationId: string,
+        currentUser: AuthUser
+    ): Promise<{ userPlanification: UserPlanification; routineAsignation: RoutineAsignation } | { status: number; error: string }> {
+        // Con la cabecera de la plantilla que devuelve el detalle (D37): la misma seleccion que el
+        // home del plan. El inner join es seguro: planification_id es NOT NULL con FK (D19)
+        const userPlanification = await this.userPlanificationRepository
+            .createQueryBuilder('userPlanification')
+            .innerJoin('userPlanification.planification', 'planification')
+            .addSelect(['planification.id', 'planification.name', 'planification.duration', 'planification.active'])
+            .where('userPlanification.id = :userPlanificationId', { userPlanificationId })
+            .getOne();
+
+        if (!userPlanification) {
+            return { status: 404, error: 'Asignación no encontrada' };
+        }
+
+        // Coach y admin abren la de cualquier alumno (gimnasio compartido, D6). Marcar y desmarcar son
+        // solo del rol user: para ellos, esto es el chequeo del dueño. El texto no puede ser el de la
+        // cuenta deshabilitada: es el unico que hace cerrar la sesion en el web
+        if (currentUser.role === UserRole.user && !this.isAssignmentOwner(userPlanification, currentUser)) {
+            return { status: 403, error: OTHER_STUDENT_ASSIGNMENT_ERROR };
+        }
+
+        // Por id Y por la plantilla de la asignacion: la regla que la base no garantiza (§3 del bloque
+        // B). Que no exista y que sea de otra plantilla dan lo mismo
+        const routineAsignation = await this.routineAsignationRepository.findOne({
+            where: { id: routineAsignationId, planification_id: userPlanification.planification_id },
+        });
+
+        if (!routineAsignation) {
+            return { status: 404, error: 'La rutina no pertenece a esta planificación.' };
+        }
+
+        return { userPlanification, routineAsignation };
     }
 
     // ===================== HELPERS DE RUTINA =====================
@@ -1881,11 +1999,16 @@ export class RoutineService {
     // que se muestra es porque completo algo de ese circuito, pero el circuito ya no integra la
     // rutina: de el se ve lo completado y nada mas (si no, el detalle mostraria como pendientes
     // ejercicios que el entrenador saco). Ojo: el vinculo apagado tiene order null, asi que no
-    // conserva su posicion y Postgres lo manda al final
+    // conserva su posicion y Postgres lo manda al final.
+    // onlyCompleted: la rutina entera cuenta como sacada, asi que se arma como si todos sus vinculos
+    // estuvieran apagados: cada uno aparece solo si su circuito tiene algo completado, y de el solo
+    // lo completado. Lo usa el detalle de una sesion del plan cuya rutina el coach quito del plan
+    // (BE-20b, D29): asi coincide con el total del home, que ahi es finished = total
     private buildRoutineDetailResponse(
         routine: Routine,
         visibleInactiveIds?: Set<string>,
-        completedIds?: Set<string>
+        completedIds?: Set<string>,
+        onlyCompleted = false
     ) {
         return {
             id: routine.id,
@@ -1895,7 +2018,9 @@ export class RoutineService {
             created_at: routine.created_at,
             updated_at: routine.updated_at,
             circuits: routine.routineCircuits
-                .filter(routineCircuit => routineCircuit.active || visibleInactiveIds?.has(routineCircuit.id))
+                .filter(routineCircuit => onlyCompleted
+                    ? routineCircuit.circuit.routineExercises.some(routineExercise => completedIds?.has(routineExercise.id))
+                    : routineCircuit.active || visibleInactiveIds?.has(routineCircuit.id))
                 .map(routineCircuit => ({
                     id: routineCircuit.id,
                     order: routineCircuit.order,
@@ -1903,7 +2028,7 @@ export class RoutineService {
                     circuit: this.buildCircuitDetailResponse(
                         routineCircuit.circuit,
                         visibleInactiveIds,
-                        routineCircuit.active ? undefined : completedIds,
+                        routineCircuit.active && !onlyCompleted ? undefined : completedIds,
                     ),
                 })),
         };

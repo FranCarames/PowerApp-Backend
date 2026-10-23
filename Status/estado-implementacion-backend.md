@@ -29,6 +29,67 @@
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
 
+## Cambios recientes (2026-10-22 · bloque B: el detalle de una sesión del plan)
+
+- **BE-20b: el detalle de una sesión del plan** (U-09 y U-10 por la vía de la planificación). Spec: `Doc/specs/2026-10-22-detalle-de-una-sesion-del-plan-design.md`; plan: `Doc/plans/2026-10-22-be-20b-detalle-de-una-sesion-del-plan-plan.md` (repo PowerApp-Docs). Una sesión del plan es el par (`User_Planification`, `Routine_Asignation`): una rutina de una semana del plan, para ese alumno. Es lo que abre cada rutina de un grupo del home, y el equivalente de `GET /routine/assign-user/:id` (BE-13) en la vía de la planificación.
+- **El contrato** (§5.4 y §5.6 de la spec del bloque B, revisados en la spec del detalle): `GET /routine/assign-plan/:userPlanificationId/:routineAsignationId`. Roles: user (el dueño, chequeado en el service, porque el path no trae el id del alumno), coach y admin. Validaciones, en este orden:
+  1. `400` del DTO, si algún id no es un UUID.
+  2. `404` `Asignación no encontrada`.
+  3. `403` si, con el rol `user`, la asignación es de otro alumno. Va antes del segundo `404`, así un alumno no averigua qué hay en los planes de otro.
+  4. `404` `La rutina no pertenece a esta planificación.` si no existe o es de otra plantilla.
+  5. `404` `La rutina fue quitada de la planificación.` si el coach la quitó del plan y el alumno no hizo nada en ella en esta asignación.
+- **La respuesta (`200`):** `{ user_planification: { id, start_date, end_date, coach_note, planification: { id, name, duration, active }, active }, routine_asignation_id, week, week_start, week_end, order, active, routine, finished }`.
+  - `routine` es el árbol de `GET /routine/:id`, armado con los mismos builders.
+  - `finished` tiene la forma de la vía individual.
+  - Se lee también con la asignación quitada (D24).
+  - Una plantilla o una rutina dadas de baja se ven con su `active: false`.
+  - Una semana posterior al fin se abre igual (D5).
+- **Decisiones del 22/10, con el usuario (D37 a D39 de la spec del detalle):**
+  - **D37: la respuesta trae el bloque `user_planification` del home más su `active`, y la semana con `week_start` y `week_end`.** §5.6 traía sólo el id, y le faltaban dos cosas:
+    - **Si la asignación estaba quitada** (D24): el cliente se enteraba recién con el `400` de marcar.
+    - **El `active` de la plantilla,** que §5.4 promete como dato informativo.
+
+    Así la pantalla se arma sola, venga de donde venga el cliente (el home, un link o el historial del coach), y el front reutiliza el tipo del bloque del home.
+  - **D38: una rutina quitada del plan sin nada hecho da `404` para todos los roles, con su propio texto.** Es el "para el alumno no existe" de D29. El coach y el admin ven lo mismo que el alumno, como en el detalle individual. Reusar el texto de "no pertenece" engañaría: la rutina sí es del plan.
+  - **D39: las validaciones de §5.4 se escriben una sola vez** (`findPlanSession`), para el detalle y para marcar y desmarcar (BE-20c). El `403` sale cuando el rol es `user`. Para el detalle es exactamente §5.4, y marcar y desmarcar sólo admiten ese rol.
+- **Cómo se hizo:**
+  - **`getPlanSessionDetail`** valida con `findPlanSession`, lee las marcas de la sesión (por los ids de las filas, no por los del path), aplica D38 y arma el árbol con `findRoutineDetail`, `buildAssignmentVisibility` y `buildRoutineDetailResponse`, los de BE-13.
+  - **`buildRoutineDetailResponse` suma `onlyCompleted`,** para la rutina quitada del plan. La arma como si todos sus vínculos estuvieran dados de baja, así coincide con el `total` del home (`finished = total`).
+  - **Los tipos de `buildAssignmentVisibility`, `buildFinishedResponse` e `isAssignmentOwner` se abrieron a las dos vías,** con uniones de las entidades.
+  - **El detalle individual y `GET /routine/:id` responden igual que antes:** lo prueba una foto de sus respuestas, sacada antes de tocar el código.
+- **Decisiones del plan** (el usuario las aprobó con él):
+  - **El bloque `user_planification` sale de un builder nuevo, `buildPlanUserPlanificationResponse`,** que usa también el home del plan. Así son iguales por construcción, como D36.
+  - **`active` va al final del bloque,** porque el DTO hereda del bloque del home y lo suma.
+  - **`planWeekBounds` recorta también el lunes al 9999-12-31.** Una plantilla sin duración fija acepta semanas hasta la INTEGER_MAX, y el detalle abre cualquier semana por su ruta. Sin el recorte, desde la semana ~416.000 el lunes salía mal formado, y desde la ~14 millones, un `500`. Al home no le cambia nada.
+  - **Textos:** el `500` dice `Error al obtener la rutina del plan.`, y cada id tiene su mensaje en el DTO.
+  - **U-10 suma un camino:** con la planificación quitada, sólo se ofrece ver los RMs.
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde.
+  - **El código se probó antes de aprobar el plan** en una copia de `HEAD` en el scratchpad, compilada con `tsc` y con `node_modules` enlazado, y se aplicó tal cual. Un script comprueba que el repo tiene exactamente el cambio probado: el `HEAD` más las ediciones del plan da cada archivo.
+  - **Tres scripts nuevos sobre el código compilado,** escritos antes del código, corridos **en rojo** (1, 9 y 42 fallas) y después en verde:
+    - **los params** (15 chequeos);
+    - **el controller y su Swagger** (74);
+    - **las reglas** (152). Usan las consultas reales sin base y cubren:
+      - los códigos y su orden, con los tres roles;
+      - el SQL de las tres consultas y la hidratación;
+      - la forma, y el bloque idéntico al del home;
+      - la asignación quitada y las bajas;
+      - las semanas fuera del plan;
+      - y doce escenarios de visibilidad en los que el árbol coincide con el `total` del home.
+  - **La foto del detalle individual y de `GET /routine/:id`** dio idéntica (19 respuestas).
+  - **Regresión en verde:** BE-12 (24, 27 y 58), BE-18b (86), BE-20 (92, 95 y 113), BE-20e (96, 31, 76 y 58) y BE-18 (47, 130, 48 y 43). Los dos controllers suman dos chequeos porque recorren todos los handlers.
+  - **Qué NO se verificó:**
+    - el SQL contra un Postgres;
+    - el detalle con marcas reales del plan: nada escribe `Routine_Exercise_Finished` hasta BE-20c;
+    - el runtime (BE-35, con el seed de BE-21).
+- **Sin cambios de estado: U-09 y U-10 ya estaban ✅ desde BE-13.**
+  - **Specs de CU reescritas** en `Use Cases/` (repo PowerApp-Docs):
+    - **U-09:** la asignación puede ser una sesión del plan. Caminos nuevos: la rutina no es de la planificación, el coach quitó la rutina del plan, el coach quitó la planificación, y la planificación dada de baja.
+    - **U-10:** el ejercicio puede ser de una sesión del plan. Con la planificación quitada, sólo se ven los RMs.
+  - **Nota en la spec del bloque B** (§5.6).
+  - **Para el web y el iOS:** la pantalla de la rutina del plan reutiliza el árbol y el cruce por `routine_exercise_id` de la vía individual. La cabecera sale de `user_planification` y de la semana. Con `user_planification.active: false`, no se ofrece marcar ni anotar.
+  - **Sigue BE-20c** (marcar, la nota y desmarcar en el plan), que arranca con `findPlanSession` y los params hechos.
+
 ## Cambios recientes (2026-10-22 · catálogo de músculos: bajas con integridad y nombre de grupo único)
 
 - **BE-24, BE-25 y BE-26 del roadmap, adelantadas de la fase 4** (pedido del usuario del 22/10). Las tres viven en `muscles.service.ts` y siguen patrones ya acordados, así que van juntas y en un solo commit. Sin spec ni plan propios: el "qué" está en el roadmap (§5, fase 4) y las decisiones, abajo.
@@ -733,8 +794,8 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-U-08 | Obtener mi planificación | ✅ Implementado | `GET /routine/home/:userId?date=&week=` · **el home en un solo pedido**: `week` semanas enteras (1 a 8) desde el lunes de la semana de `date` (hoy en Argentina si no viene), cada una con las dos fuentes (BE-20e, 21/10) · `GET /routine/assigned/:userId?from=&to=` · la parte **individual** del home, por día y con su progreso (18/10) · `GET /routine/assigned-plan/:userId?from=&to=` · la parte **del plan**: las semanas de cada asignación activa que caen en el rango, sus rutinas sin día y con su progreso; una rutina quitada del plan sólo si el alumno hizo algo · tope de 520 semanas (BE-20, 21/10) |
-| CU-U-09 | Ver detalle de rutina | ✅ Implementado | `GET /routine/assign-user/:id` · el alumno lee la rutina **por su asignación** (`403` si es de otro; coach y admin, la de cualquiera) · mismo árbol que `GET /routine/:id`, con lo dado de baja que completó y lo hecho en `finished` (18/10) · el detalle de una asignación del plan es del bloque B |
-| CU-U-10 | Ver detalle de un ejercicio | ✅ Implementado | Se resuelve dentro del detalle de la asignación (`GET /routine/assign-user/:id`): ficha del ejercicio, series ordenadas, nota del coach y, en `finished`, la nota del alumno · `GET /exercise/:id` sigue siendo la ficha de catálogo (18/10) |
+| CU-U-09 | Ver detalle de rutina | ✅ Implementado | `GET /routine/assign-user/:id` · el alumno lee la rutina **por su asignación** (`403` si es de otro; coach y admin, la de cualquiera) · mismo árbol que `GET /routine/:id`, con lo dado de baja que completó y lo hecho en `finished` (18/10) · `GET /routine/assign-plan/:userPlanificationId/:routineAsignationId` · el detalle de una **sesión del plan**: el mismo árbol, con la asignación, su plantilla y la semana; se lee aunque la planificación esté quitada, y de una rutina quitada del plan se ve sólo lo completado (BE-20b, 22/10) |
+| CU-U-10 | Ver detalle de un ejercicio | ✅ Implementado | Se resuelve dentro del detalle de la asignación (`GET /routine/assign-user/:id`) o de la sesión del plan (`GET /routine/assign-plan/:userPlanificationId/:routineAsignationId`, BE-20b): ficha del ejercicio, series ordenadas, nota del coach y, en `finished`, la nota del alumno · `GET /exercise/:id` sigue siendo la ficha de catálogo (18/10) |
 | CU-U-11 | Ver mis RMs de un ejercicio | ✅ Implementado | `GET /user_rm/user/:idUser/exercise/:idExercise` · check de dueño para rol `user` (`@Owner`, ids en minúscula desde el 16/10), orden por fecha DESC |
 | CU-U-12 | Marcar serie como realizado | ✅ Implementado | `POST /routine/assign-user/:id/finished` y `DELETE …/finished/:routineExerciseId` · el hecho es **por ejercicio** (el tildado por serie es de la interfaz) · idempotentes · sólo el alumno dueño (`403` si es de otro) · marcar un ejercicio que el coach sacó es `400`, pero se puede desmarcar y editar su nota (18/10) · el alumno indica el día en que lo hizo (`finished_at`, obligatorio al marcar y corregible) (21/10) · la vía del plan es del bloque B |
 | CU-U-13 | Dejar una nota en el ejercicio | ✅ Implementado | Es un camino incluido de U-12 (D3): `user_note` va en el mismo `POST …/finished`, hasta 100 caracteres, y la cadena vacía la borra · la nota vive en la fila del hecho, así que sólo se anota un ejercicio realizado (o se marca y anota en una sola llamada) (18/10) · en la misma operación puede ir el día en que lo hizo (21/10) |

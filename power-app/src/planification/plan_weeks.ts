@@ -1,8 +1,8 @@
 // Las cuentas de las semanas del plan (spec del bloque B, §4), sobre dias 'YYYY-MM-DD'. Se hacen
 // interpretando el dia en UTC ('2026-10-22T00:00:00Z') y nunca con new Date() local, para que la
 // zona horaria del servidor no corra un dia. Funciones puras, sin Nest: las usan E-13 (el fin por
-// defecto), el plan del home (BE-20, desde routine/) y el home en un solo pedido (BE-20e). La unica
-// que mira el reloj es todayIn
+// defecto), el plan del home (BE-20, desde routine/), el home en un solo pedido (BE-20e) y el detalle
+// de una sesion del plan (BE-20b). La unica que mira el reloj es todayIn
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
@@ -46,14 +46,17 @@ export function planWeekOf(startDate: string, day: string): number {
 }
 
 // El lunes y el domingo de la semana `week` del plan (spec §4), aunque el plan arranque o termine a
-// mitad de semana. El domingo se recorta al 9999-12-31: solo lo toca la semana que contiene ese dia
-// (un viernes), cuyo domingo ya no entra en el formato YYYY-MM-DD. Es el mismo tope tecnico que el
-// del fin por defecto
+// mitad de semana. Los dos se recortan al 9999-12-31, el mismo tope tecnico que el del fin por
+// defecto. El domingo, en la semana que contiene ese dia (un viernes), cuyo domingo ya no entra en el
+// formato YYYY-MM-DD. El lunes, en una semana que empieza despues: el home nunca la pide (no pasa del
+// fin de la asignacion), pero el detalle de una sesion del plan (BE-20b) abre cualquier semana, y una
+// plantilla sin duracion fija acepta hasta la INTEGER_MAX. Sin el recorte, el dia saldria mal formado
+// o toISOString tiraria un RangeError
 export function planWeekBounds(startDate: string, week: number): { week_start: string; week_end: string } {
     const weekStartMs = toUtcMs(mondayOf(startDate)) + (week - 1) * WEEK_MS;
 
     return {
-        week_start: fromUtcMs(weekStartMs),
+        week_start: fromUtcMs(Math.min(weekStartMs, LAST_DAY_MS)),
         week_end: fromUtcMs(Math.min(weekStartMs + 6 * DAY_MS, LAST_DAY_MS)),
     };
 }

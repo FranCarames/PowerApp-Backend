@@ -47,6 +47,8 @@ import { RoutineHistorySessionDto } from '../dtos/routine/routine_history_respon
 import { RoutineAssignedPlanWeekResponseDto } from '../dtos/routine/routine_assigned_plan_response.dto';
 import { GetRoutineHomeQueryDto } from '../dtos/routine/get_routine_home_query.dto';
 import { RoutineHomeWeekResponseDto } from '../dtos/routine/routine_home_response.dto';
+import { PlanSessionParamsDto } from '../dtos/routine/plan_session_params.dto';
+import { RoutinePlanSessionDetailResponseDto } from '../dtos/routine/routine_plan_session_detail_response.dto';
 
 @ApiTags('Routine')
 @Controller('routine')
@@ -323,6 +325,24 @@ export class RoutineController {
         @Res() res: Response,
     ) {
         await this.routineService.getRoutineHome(params.userId, query, res);
+    }
+
+    // El detalle de una sesion del plan (U-09 y U-10 por la via de la planificacion): el par que da
+    // cada rutina de un grupo del home. Como en assign-user/:id, el dueño se chequea en el service y
+    // no con @Owner, porque el path no trae el id del alumno: con el rol user, 403 si la asignacion
+    // es de otro; coach y admin abren la de cualquiera. Tres segmentos: no compite con otra ruta
+    @Get('assign-plan/:userPlanificationId/:routineAsignationId')
+    @Auth(UserRole.user, UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: RoutinePlanSessionDetailResponseDto, description: 'También con la asignación quitada (user_planification.active = false): se lee, pero no se puede modificar' })
+    @ApiResponse({ status: 400, description: 'Alguno de los ids no es un UUID válido' })
+    @ApiResponse({ status: 403, description: 'La asignación es de otro alumno' })
+    @ApiResponse({ status: 404, description: 'Asignación no encontrada, la rutina no pertenece a esta planificación, o el entrenador la quitó del plan y el alumno no hizo nada en ella' })
+    async getPlanSessionDetail(
+        @Param() params: PlanSessionParamsDto,
+        @CurrentUser() user: AuthUser,
+        @Res() res: Response,
+    ) {
+        await this.routineService.getPlanSessionDetail(params.userPlanificationId, params.routineAsignationId, user, res);
     }
 
     // Historial de entrenamientos del alumno (E-06) y su filtro por ejercicio (E-07). Solo coach y
