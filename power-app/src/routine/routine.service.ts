@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, DataSource, In, SelectQueryBuilder, QueryFailedError } from 'typeorm';
+import { Repository, DataSource, In, SelectQueryBuilder } from 'typeorm';
 import { Circuit } from '../entities/circuit.entity';
 import { Exercise } from '../entities/exercise.entity';
 import { Routine } from '../entities/routine.entity';
@@ -30,6 +30,7 @@ import { GetAssignedRoutinesQueryDto } from '../dtos/routine/get_assigned_routin
 import { GetRoutineHomeQueryDto } from '../dtos/routine/get_routine_home_query.dto';
 import { AuthUser } from '../authentication/auth-user.interface';
 import { planWeekOf, planWeekBounds, weeksRange, todayIn } from '../planification/plan_weeks';
+import { isDatabaseError } from '../common/database_error';
 
 // Los dos 409 de la rutina individual. El de "ya entreno" sale por dos caminos (el chequeo
 // previo y la FK RESTRICT de la base), y el de duplicado tambien (chequeo previo y unico)
@@ -895,7 +896,7 @@ export class RoutineService {
         } catch (error) {
             // Dos altas simultaneas pasan las dos el chequeo previo y la segunda choca con el
             // unico. Se mira el nombre del unico para no disfrazar de duplicado otro error
-            if (this.isDatabaseError(error, '23505', 'uk_rau_routine_user_date')) {
+            if (isDatabaseError(error, '23505', 'uk_rau_routine_user_date')) {
                 return res.status(409).send({ error: ASSIGN_DUPLICATE_ERROR });
             }
 
@@ -936,7 +937,7 @@ export class RoutineService {
         } catch (error) {
             // Si el alumno marco un ejercicio entre el chequeo y el borrado, el RESTRICT de la
             // base frena el DELETE (23503): es el mismo caso de "ya entreno"
-            if (this.isDatabaseError(error, '23503')) {
+            if (isDatabaseError(error, '23503')) {
                 return res.status(409).send({ error: REMOVE_TRAINED_ERROR });
             }
 
@@ -1104,7 +1105,7 @@ export class RoutineService {
                     // Dos marcas simultaneas pasan las dos la lectura y la segunda choca con el
                     // unico: se trata como "ya estaba marcado" (spec §4.5). Se mira el nombre del
                     // unico para no disfrazar otro error, y si la fila no aparece se relanza
-                    if (!this.isDatabaseError(error, '23505', 'uk_raef_asign_exercise')) {
+                    if (!isDatabaseError(error, '23505', 'uk_raef_asign_exercise')) {
                         throw error;
                     }
 
@@ -1819,18 +1820,6 @@ export class RoutineService {
             created_at: row.created_at,
             updated_at: row.updated_at,
         };
-    }
-
-    // Reconoce un error de Postgres por su codigo (23505 = unico, 23503 = clave foranea).
-    // constraint es opcional: sirve para no confundir el unico que importa con cualquier otro
-    private isDatabaseError(error: unknown, code: string, constraint?: string): boolean {
-        if (!(error instanceof QueryFailedError)) {
-            return false;
-        }
-
-        const driverError: { code?: string; constraint?: string } | undefined = error.driverError;
-
-        return driverError?.code === code && (!constraint || driverError.constraint === constraint);
     }
 
     // ===================== HELPERS DE RUTINA =====================

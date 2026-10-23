@@ -1,20 +1,20 @@
 # PowerApp Backend — Estado de implementación vs. Casos de Uso
 
-> **Corte:** 2026-10-21 · **Fuente:** `Use Cases/` del repo PowerApp-Docs (fuente de verdad de los CU) comparado contra `power-app/src`
+> **Corte:** 2026-10-22 · **Fuente:** `Use Cases/` del repo PowerApp-Docs (fuente de verdad de los CU) comparado contra `power-app/src`
 > **Método:** mapeo 1:1 de los 75 CU contra los `controller` y `service` del código, con el criterio del inventario del [roadmap del 16/10](https://github.com/FranCarames/PowerApp-Docs/blob/main/Doc/plans/2026-10-16-roadmap-backend.md) (§9): un CU es ✅ sólo si **todos los caminos de su spec** se cumplen.
 
 ## Resumen
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 68 | 91% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
-| 🟡 Parcial | 6 | 8% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
+| ✅ Implementado | 72 | 96% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
+| 🟡 Parcial | 2 | 3% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
 | 🔵 Andamiaje | 0 | 0% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
 | ⬜ No implementado | 0 | 0% | Sin endpoint |
 | — Sin backend | 1 | 1% | Por su spec es del cliente (CU-U-14) |
 | **Total** | **75** | | |
 
-**68 de los 74 CU con backend están completos (92%).** Faltan 6, todos parciales: ya no queda ninguno sin endpoint ni en andamiaje. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
+**72 de los 74 CU con backend están completos (97%).** Faltan 2, los dos parciales (CU-U-04, BE-29, y CU-A-17, BE-27): ya no queda ninguno sin endpoint ni en andamiaje. Dos de los ✅ tienen un defecto abierto (⚠): CU-E-29 y CU-A-04.
 > **Nota (17/10):** los ✅ bajan de 63 (corte del 4/9) a 57 porque **cambió el criterio, no porque se rompiera algo**. El de antes daba ✅ a todo endpoint con lógica real; el del roadmap exige además que se cumpla cada camino de la spec. Por eso pasaron a 🟡 CU-U-04 (no envía el mail), CU-A-10 y CU-A-15 (borran en cascada en vez de impedirlo), CU-A-13 y CU-A-14 (no validan el nombre único) y CU-A-17 (falta "ya es entrenador"). Ver los cambios del 17/10.
 > **Base de datos:** la de Render se recreó el 3/10 con el esquema vigente (dato del Status web). Es free tier y **vence alrededor del 2/11** (*sin verificar*), así que hay que regenerarla antes (BE-23). **Desde el 17/10 el esquema del bloque A ya está en `Db Creator`** (BE-10): al regenerar con `01` → `02` → `03` no hace falta el patch `patches/2026-10-17-be-10.sql`, que es para una base viva.
 
@@ -24,10 +24,34 @@
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 18 | 1 | 0 | 0 | 1 | 95% |
 | Entrenador | 32 | 32 | 0 | 0 | 0 | 0 | 100% |
-| Admin | 23 | 18 | 5 | 0 | 0 | 0 | 78% |
-| **Total** | **75** | **68** | **6** | **0** | **0** | **1** | **92%** |
+| Admin | 23 | 22 | 1 | 0 | 0 | 0 | 96% |
+| **Total** | **75** | **72** | **2** | **0** | **0** | **1** | **97%** |
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+
+## Cambios recientes (2026-10-22 · catálogo de músculos: bajas con integridad y nombre de grupo único)
+
+- **BE-24, BE-25 y BE-26 del roadmap, adelantadas de la fase 4** (pedido del usuario del 22/10). Las tres viven en `muscles.service.ts` y siguen patrones ya acordados, así que van juntas y en un solo commit. Sin spec ni plan propios: el "qué" está en el roadmap (§5, fase 4) y las decisiones, abajo.
+- **BE-25 · CU-A-15:** `DELETE /muscles/mg/:id` borraba el grupo y, por la FK `Muscle.muscle_group_id` en `CASCADE`, también sus músculos y los vínculos de esos músculos con ejercicios (así falló DEL-10 en las pruebas del 12/10). Ahora, si el grupo tiene algún músculo, responde `409` con `No se puede eliminar el grupo muscular: todavía tiene músculos`.
+- **BE-24 · CU-A-10:** `DELETE /muscles/:id` sacaba el músculo de sus ejercicios (FK `Exercised_Muscle.muscle_id` en `CASCADE`; DEL-06 y DEL-07). Ahora, si está en `Exercised_Muscle`, responde `409` con `No se puede eliminar el músculo: está asociado a ejercicios`. Es el patrón de A-06 (12/10).
+- **BE-26 · CU-A-13 y A-14:** el nombre del grupo muscular es único (GRP-06 y GRP-09), con el criterio de ejercicios y membresías (12/10): comparación en memoria, sin distinguir mayúsculas ni espacios en los extremos, `409` con `Ya existe un grupo muscular con ese nombre`, y en la edición sólo si el nombre cambia (un duplicado heredado se puede seguir editando y cambiarle las mayúsculas al propio nombre es válido). Las tildes cuentan, como en ejercicios: "Abdómen" y "Abdomen" son nombres distintos. **Sin `UNIQUE` en la base**, por las mismas razones del 12/10: obligaría a regenerarla y fallaría con los duplicados que dejaron las pruebas.
+- **Decisión del 22/10, con el usuario: las FK de las dos bajas pasan a `RESTRICT`** (adelanta dos de las cuatro de BE-22). Por qué: el control del service deja una ventana —un músculo creado en el grupo, o un ejercicio que suma el músculo, entre el chequeo y el `DELETE`— y con `CASCADE` la base borraría eso en silencio. Con `RESTRICT` la base frena el borrado, y el service traduce **sólo el `23503` de su constraint** (`fk_muscle_muscle_group` o `fk_exercised_muscle_muscle`) al mismo `409` con el mismo texto: el patrón de las carreras de BE-11. En A-06 (12/10) esa ventana se había dejado abierta porque cerrarla obligaba a un delta sobre la base en uso; acá lo resuelve el patch. **Quedan para BE-22 las dos FK de `Exercise`** (`User_RM.exercise_id` y `Routine_Exercise.exercise_id`).
+- **Cambio de esquema, así que `Db Creator`:** `ddl.py` y `01_estructura.sql` (las dos FK en `RESTRICT`); el `02` y el `03` no cambian. En las entidades, `onDelete: 'RESTRICT'` en `Muscle.muscle_group` y en `ExercisedMuscle.muscle`. **Hallazgo:** la entidad `Muscle` no declaraba `onDelete` (TypeORM la tomaba como `NO ACTION`) mientras el DDL decía `CASCADE`; ahora las dos dicen lo mismo. El diagrama de `Doc/` no dibuja el `ON DELETE`, así que no cambia.
+- **Patch para la base viva: `Db Creator/patches/2026-10-22-be-24-25.sql`.** Recrea las dos FK en `RESTRICT` sin tocar datos (las filas que hay ya cumplen la FK). Aborta antes de cambiar nada si encuentra otra FK, con otro nombre, sobre esas columnas: el `DROP` va por nombre y dejaría la vieja en `CASCADE` al lado de la nueva. Es idempotente y trae su consulta de verificación (3 filas en `ok`). **Se ejecutó el 22/10 sobre la base de Render** (el usuario, desde DBeaver, como los de BE-10 y BE-18) y la verificación dio las 3 filas en `ok`: la base viva ya tiene las dos FK en `RESTRICT`. No se probaron la idempotencia ni la guarda que aborta.
+- **`isDatabaseError` pasa a `src/common/database_error.ts`**, compartido. Era un método privado de `routine.service.ts` (BE-11) y ahora también lo usa `muscles/`; su cuerpo no cambió, y en `routine.service.ts` sólo cambian el import y las tres llamadas.
+- **`MusclesModule` registra `ExercisedMuscle` en su `forFeature`**, porque el service lo inyecta para contar los vínculos. `ExerciseModule` y `UserRmModule`, que también instancian `MusclesService`, ya lo tenían.
+- **Swagger:** los cuatro endpoints declaran sus `404` y `409`.
+- **Para el web** (lo hace en su repo):
+  - **Grupos, `GroupsSection`:** al eliminar pisa sólo el `404` y el `500`, así que el `409` nuevo caería en el genérico "Ya existe un registro con esos datos.". Hay que pasar su texto del `500` al `409` (DEL-10).
+  - **Grupos, `GroupFormModal`:** el `409` de nombre repetido cae en el mismo genérico. Alcanza, pero conviene un texto propio (GRP-06 y GRP-09).
+  - **Músculos, `MusclesSection`:** el diálogo dice "Lo usa 1 ejercicio: se quita de él." y deja de ser cierto; y el texto del rechazo está en el `500`, así que hay que pasarlo al `409` (DEL-06). **DEL-07 deja de ser alcanzable.**
+  - **Plan de pruebas `Tests/Musculos`:** hay que re-correr GRP-06, GRP-09, DEL-06 y DEL-10, y sus avisos "Hoy no cumple el CU." quedan viejos.
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde. `Db Creator` regenerado: sólo cambia el `01`, y dos corridas seguidas dan los mismos bytes.
+  - Un script sobre el código compilado, con 51 chequeos, **en verde, y en rojo contra `HEAD`** (21 fallas, y corta en las consultas, que no existían): el `onDelete` de las FK en la metadata; que los tres módulos que instancian `MusclesService` registren sus tres repositorios; los caminos de los tres CU con repositorios falsos con estado (`404`, `409`, `200`/`201`, mayúsculas y espacios, el propio nombre, el duplicado heredado, la carrera con el `23503` de su constraint → `409` y de otra → `500`); el SQL de las consultas nuevas, generado sin base; el helper compartido y los códigos de Swagger.
+  - **El patch, contra Postgres:** corrido en Render el 22/10, con su verificación en `ok` (ver arriba).
+  - **Qué NO se verificó:** el SQL de las consultas nuevas contra un Postgres, que el server arranque con la inyección nueva (se probó el registro, no la inyección) y el runtime (BE-35).
+- **A-10, A-13, A-14 y A-15 pasan de 🟡 a ✅ (72 ✅ · 2 🟡 · 0 🔵).** El Admin queda en 22 de 23: falta A-17 (BE-27). Las specs de los cuatro CU ya pedían esto, así que no cambian.
 
 ## Cambios recientes (2026-10-21 · bloque B: el home del alumno en un solo pedido)
 
@@ -685,7 +709,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | ✅ cerrada el 18/10 (BE-10 y BE-10b el 17/10; BE-11 a BE-16 el 18/10) |
 | ⏱ | Regenerar la base de Render | BE-23 | ≈ 1/11 | Esquema del bloque A aplicado, antes de que venza la base | fecha fija |
 | **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | en curso: BE-17, BE-18, BE-18b, BE-19 y BE-20 hechas (20 y 21/10) |
-| **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | |
+| **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | en curso: BE-24, BE-25 y BE-26 adelantadas (22/10), con dos de las FK de BE-22 |
 | **5** | Verificación y cierre | BE-35 a BE-39 | 12 al 17/11 | **H5:** criterios de "backend terminado" cumplidos y código congelado | |
 
 > **Dependencias del usuario:** el diagrama de `Doc/` actualizado antes de BE-10 (el modelo manda), la fecha real de vencimiento de la base de Render (BE-23), la cuenta del proveedor de mail (BE-29) y la corrida del plan de pruebas (BE-35).
@@ -785,7 +809,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Admin (23 CU · 78%)
+## Detalle — Rol Admin (23 CU · 96%)
 
 ### Administrar ejercicios
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -803,16 +827,16 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU-A-07 | Obtener músculos | ✅ Implementado | `GET /muscles/all` |
 | CU-A-08 | Crear músculo | ✅ Implementado | `POST /muscles/create` |
 | CU-A-09 | Editar músculo | ✅ Implementado | `POST /muscles/edit/:id` |
-| CU-A-10 | Eliminar músculo | 🟡 Parcial | `DELETE /muscles/:id` · borra en cascada (lo quita de sus ejercicios) en vez de impedir la baja de un músculo en uso · BE-24 |
+| CU-A-10 | Eliminar músculo | ✅ Implementado | `DELETE /muscles/:id` · `409` si está asociado a ejercicios (`Exercised_Muscle`), con la FK en `RESTRICT` de respaldo (BE-24, 22/10) |
 | CU-A-11 | Obtener grupos musculares | ✅ Implementado | `GET /muscles/mg/all` |
 
 ### Administrar grupos musculares
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-A-12 | Obtener músculos del grupo muscular | ✅ Implementado | `GET /muscles/mg/get/:id` · incluye músculos |
-| CU-A-13 | Crear grupo muscular | 🟡 Parcial | `POST /muscles/mg/create` · no valida que el nombre sea único · BE-26 |
-| CU-A-14 | Editar grupo muscular | 🟡 Parcial | `POST /muscles/mg/edit/:id` · no valida que el nombre sea único · BE-26 |
-| CU-A-15 | Eliminar grupo muscular | 🟡 Parcial | `DELETE /muscles/mg/:id` · borra el grupo, sus músculos y sus vínculos en cascada en vez de impedirlo · BE-25 |
+| CU-A-13 | Crear grupo muscular | ✅ Implementado | `POST /muscles/mg/create` · nombre único, sin distinguir mayúsculas ni espacios en los extremos: `409` (BE-26, 22/10) |
+| CU-A-14 | Editar grupo muscular | ✅ Implementado | `POST /muscles/mg/edit/:id` · `409` si el nombre nuevo ya es de otro grupo; sólo se controla si cambia (BE-26, 22/10) |
+| CU-A-15 | Eliminar grupo muscular | ✅ Implementado | `DELETE /muscles/mg/:id` · `409` si todavía tiene músculos, con la FK en `RESTRICT` de respaldo (BE-25, 22/10) |
 
 ### Administrar entrenadores
 | CU | Caso de uso | Estado | Endpoint / nota |

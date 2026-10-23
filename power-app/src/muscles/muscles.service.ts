@@ -5,10 +5,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Muscle } from '../entities/muscle.entity';
 import { MuscleGroup } from '../entities/muscle_group.entity';
+import { ExercisedMuscle } from '../entities/exercised_muscle.entity';
 import { CreateMuscleDto } from '../dtos/muscles/create_muscle.dto';
 import { EditMuscleDto } from '../dtos/muscles/edit_muscle.dto';
 import { CreateMuscleGroupDto } from '../dtos/muscle_groups/create_muscle_group.dto';
 import { EditMuscleGroupDto } from '../dtos/muscle_groups/edit_muscle_group.dto';
+import { isDatabaseError } from '../common/database_error';
+
+/** Conflicto de unicidad del nombre del grupo muscular (CU-A-13 y CU-A-14). */
+const DUPLICATE_GROUP_NAME_ERROR = 'Ya existe un grupo muscular con ese nombre';
+
+/** Bajas que impide la integridad referencial (CU-A-10 y CU-A-15). */
+const DELETE_MUSCLE_IN_USE_ERROR = 'No se puede eliminar el músculo: está asociado a ejercicios';
+const DELETE_GROUP_WITH_MUSCLES_ERROR = 'No se puede eliminar el grupo muscular: todavía tiene músculos';
 
 @Injectable()
 export class MusclesService {
@@ -17,6 +26,8 @@ export class MusclesService {
         private muscleRepository: Repository<Muscle>,
         @InjectRepository(MuscleGroup)
         private muscleGroupsRepository: Repository<MuscleGroup>,
+        @InjectRepository(ExercisedMuscle)
+        private exercisedMuscleRepository: Repository<ExercisedMuscle>,
     ) {
     }
 
@@ -143,9 +154,21 @@ export class MusclesService {
             if (!muscle) {
                 return res.status(404).send({ error: 'Músculo no encontrado' });
             }
+
+            // Un músculo asociado a ejercicios no se elimina (CU-A-10): antes la FK en CASCADE lo
+            // sacaba de sus ejercicios. Desde BE-24 la FK es RESTRICT, y el catch cubre la carrera
+            // de un ejercicio que lo suma entre este control y el DELETE.
+            if (await this.exercisedMuscleRepository.count({ where: { muscle_id: muscleId } }) > 0) {
+                return res.status(409).send({ error: DELETE_MUSCLE_IN_USE_ERROR });
+            }
+
             await this.muscleRepository.remove(muscle);
             res.status(200).send({ message: 'Músculo eliminado correctamente' });
         } catch (error) {
+            if (isDatabaseError(error, '23503', 'fk_exercised_muscle_muscle')) {
+                return res.status(409).send({ error: DELETE_MUSCLE_IN_USE_ERROR });
+            }
+
             console.error(error);
             res.status(500).send({ error: 'Error al eliminar el músculo' });
         }
@@ -208,11 +231,31 @@ export class MusclesService {
         } 
     }
 
+    /** Nombre listo para compararlo: sin espacios en los extremos y sin distinguir mayúsculas. */
+    private normalizeName(name: string): string {
+        return name.trim().toLowerCase();
+    }
+
+    /**
+     * Si otro grupo muscular ya tiene ese nombre. Se compara en memoria, igual que ejercicios y
+     * membresías: son unos pocos grupos, y así no depende del collation ni del LOWER de la base.
+     */
+    private async isGroupNameTaken(name: string, excludeId?: string): Promise<boolean> {
+        const wanted = this.normalizeName(name);
+        const muscleGroups = await this.muscleGroupsRepository.find({ select: { id: true, name: true } });
+
+        return muscleGroups.some(mg => mg.id !== excludeId && this.normalizeName(mg.name) === wanted);
+    }
+
     async createMuscleGroup(
         createMuscleGroupDto: CreateMuscleGroupDto,
         res: Response
     ) {
         try {
+            if (await this.isGroupNameTaken(createMuscleGroupDto.name)) {
+                return res.status(409).send({ error: DUPLICATE_GROUP_NAME_ERROR });
+            }
+
             const newMuscleGroup = this.muscleGroupsRepository.create(createMuscleGroupDto);
             const savedMuscleGroup = await this.muscleGroupsRepository.save(newMuscleGroup);
             res.status(201).send(savedMuscleGroup);
@@ -231,6 +274,13 @@ export class MusclesService {
             const muscleGroup = await this.muscleGroupsRepository.findOne({ where: { id: idMuscleGroup } });
             if (!muscleGroup) {
                 return res.status(404).send({ error: 'Grupo muscular no encontrado' });
+            }
+
+            // Sólo se controla si el nombre cambia (igual que ejercicios y membresías): un duplicado
+            // heredado no bloquea editar las imágenes.
+            if (this.normalizeName(editMuscleGroupDto.name) !== this.normalizeName(muscleGroup.name)
+                && await this.isGroupNameTaken(editMuscleGroupDto.name, muscleGroup.id)) {
+                return res.status(409).send({ error: DUPLICATE_GROUP_NAME_ERROR });
             }
 
             muscleGroup.name = editMuscleGroupDto.name;
@@ -255,9 +305,21 @@ export class MusclesService {
             if (!muscleGroup) {
                 return res.status(404).send({ error: 'Grupo muscular no encontrado' });
             }
+
+            // Un grupo con músculos no se elimina (CU-A-15): antes la FK en CASCADE borraba sus
+            // músculos y los vínculos de esos músculos con ejercicios. Desde BE-25 la FK es RESTRICT,
+            // y el catch cubre la carrera de un músculo creado entre este control y el DELETE.
+            if (await this.muscleRepository.count({ where: { muscle_group_id: muscleGroupId } }) > 0) {
+                return res.status(409).send({ error: DELETE_GROUP_WITH_MUSCLES_ERROR });
+            }
+
             await this.muscleGroupsRepository.remove(muscleGroup);
             res.status(200).send({ message: 'Grupo muscular eliminado correctamente' });
         } catch (error) {
+            if (isDatabaseError(error, '23503', 'fk_muscle_muscle_group')) {
+                return res.status(409).send({ error: DELETE_GROUP_WITH_MUSCLES_ERROR });
+            }
+
             console.error(error);
             res.status(500).send({ error: 'Error al eliminar el grupo muscular' });
         }

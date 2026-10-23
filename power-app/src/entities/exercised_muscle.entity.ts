@@ -30,7 +30,8 @@ export class ExercisedMuscle {
     @JoinColumn({ name: 'exercise_id' })
     exercise!: Exercise;
 
-    @ManyToOne(() => Muscle, muscle => muscle.exercisedMuscles, { onDelete: 'CASCADE' })
+    // RESTRICT (BE-24): un músculo asociado a ejercicios no se elimina (CU-A-10)
+    @ManyToOne(() => Muscle, muscle => muscle.exercisedMuscles, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'muscle_id' })
     muscle!: Muscle;
 }

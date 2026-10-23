@@ -63,6 +63,8 @@ export class MusclesController {
     @Delete(':id')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 200 })
+    @ApiResponse({ status: 404, description: 'Músculo no encontrado' })
+    @ApiResponse({ status: 409, description: 'El músculo está asociado a ejercicios y no se puede eliminar' })
     async deleteMuscle(
         @Param() idMuscle: ParameterIdDto,
         @Res() res: Response,
@@ -87,6 +89,7 @@ export class MusclesController {
     @Post('mg/create')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 201, type: MuscleGroup })
+    @ApiResponse({ status: 409, description: 'Ya existe un grupo muscular con ese nombre' })
     async createMuscleGroup(
         @Body() createMuscleGroupDto: CreateMuscleGroupDto,
         @Res() res: Response,
@@ -97,6 +100,8 @@ export class MusclesController {
     @Post('mg/edit/:id')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: MuscleGroup })
+    @ApiResponse({ status: 404, description: 'Grupo muscular no encontrado' })
+    @ApiResponse({ status: 409, description: 'Otro grupo muscular ya tiene ese nombre' })
     async editMuscleGroup(
         @Param() idMuscleGroup: ParameterIdDto,
         @Body() editMuscleGroupDto: EditMuscleGroupDto,
@@ -108,6 +113,8 @@ export class MusclesController {
     @Delete('mg/:id')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 200 })
+    @ApiResponse({ status: 404, description: 'Grupo muscular no encontrado' })
+    @ApiResponse({ status: 409, description: 'El grupo muscular todavía tiene músculos y no se puede eliminar' })
     async deleteMuscleGroup(
         @Param() idMuscleGroup: ParameterIdDto,
         @Res() res: Response,

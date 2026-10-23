@@ -132,8 +132,10 @@ CREATE TABLE public."Muscle" (
     preview_image   VARCHAR(150),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- RESTRICT (BE-25): un grupo con musculos no se elimina (CU-A-15). El service lo controla
+    -- antes; la FK cubre la carrera de un musculo creado en el medio
     CONSTRAINT fk_muscle_muscle_group
-        FOREIGN KEY (muscle_group_id) REFERENCES public."Muscle_Group"(id) ON DELETE CASCADE
+        FOREIGN KEY (muscle_group_id) REFERENCES public."Muscle_Group"(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE public."Exercised_Muscle" (
@@ -144,8 +146,10 @@ CREATE TABLE public."Exercised_Muscle" (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_exercised_muscle_exercise
         FOREIGN KEY (exercise_id) REFERENCES public."Exercise"(id) ON DELETE CASCADE,
+    -- RESTRICT (BE-24): un musculo asociado a ejercicios no se elimina (CU-A-10). Idem: el
+    -- service lo controla antes y la FK cubre la carrera
     CONSTRAINT fk_exercised_muscle_muscle
-        FOREIGN KEY (muscle_id)   REFERENCES public."Muscle"(id)   ON DELETE CASCADE,
+        FOREIGN KEY (muscle_id)   REFERENCES public."Muscle"(id)   ON DELETE RESTRICT,
     CONSTRAINT uk_exercise_muscle UNIQUE (exercise_id, muscle_id)
 );
 

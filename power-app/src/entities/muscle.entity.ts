@@ -38,7 +38,8 @@ export class Muscle {
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS
-    @ManyToOne(() => MuscleGroup, muscleGroup => muscleGroup.muscles)
+    // RESTRICT (BE-25): un grupo con músculos no se elimina (CU-A-15)
+    @ManyToOne(() => MuscleGroup, muscleGroup => muscleGroup.muscles, { onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'muscle_group_id' })
     muscle_group!: MuscleGroup;
 
