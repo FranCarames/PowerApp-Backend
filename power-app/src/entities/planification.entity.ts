@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn, OneToMany } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoutineAsignation } from './routine_asignation.entity';
 import { UserPlanification } from './user_planification.entity';
@@ -45,7 +45,7 @@ export class Planification {
     created_at!: Date;
 
     @ApiProperty()
-    @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+    @UpdateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS

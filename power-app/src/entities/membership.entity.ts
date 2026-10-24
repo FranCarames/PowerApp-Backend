@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn, OneToMany } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { MembershipPayment } from './membership_payment.entity';
 
@@ -29,7 +29,7 @@ export class Membership {
     created_at!: Date;
 
     @ApiProperty()
-    @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+    @UpdateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS

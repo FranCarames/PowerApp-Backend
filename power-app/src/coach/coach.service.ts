@@ -120,7 +120,7 @@ export class CoachService {
 
     // El rol del User y el registro Coach, en una transaccion: antes el rol se cambiaba primero y, si
     // el Coach no se podia guardar (un email repetido), el usuario quedaba con role = coach y sin su
-    // Coach. updated_at se setea a mano: el onUpdate de las entidades es sintaxis de MySQL
+    // Coach. updated_at lo pone la base (@UpdateDateColumn) y save() lo trae de vuelta en la entidad
     private async savePromotion(
         user: User,
         existingCoach: Coach | null,
@@ -134,17 +134,13 @@ export class CoachService {
             await queryRunner.connect();
             await queryRunner.startTransaction();
 
-            const now = new Date();
-
             user.role = UserRole.coach;
-            user.updated_at = now;
             const coachUser = await queryRunner.manager.save(User, user);
 
             const coach = existingCoach ?? this.coachRepository.create({ id: promoteCoachDto.user_id });
             coach.coach_email = promoteCoachDto.coach_email;
             coach.cuil = promoteCoachDto.cuil;
             coach.active = true;
-            coach.updated_at = now;
             const coachRegister = await queryRunner.manager.save(Coach, coach);
 
             await queryRunner.commitTransaction();

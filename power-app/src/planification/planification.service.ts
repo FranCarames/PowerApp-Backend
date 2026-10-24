@@ -682,8 +682,8 @@ export class PlanificationService {
             }
 
             // Un solo UPDATE de las dos columnas, por el id de la fila (el del path puede venir en
-            // mayuscula). updated_at se setea a mano: el onUpdate de las entidades es sintaxis de
-            // MySQL y en Postgres no hace nada (hallazgo 4)
+            // mayuscula). updated_at va en el update(): repository.update() no refresca la entidad y la
+            // respuesta devuelve updated_at (ver markExerciseFinished)
             const updatedAt = new Date();
 
             await this.userPlanificationRepository.update(

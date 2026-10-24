@@ -196,7 +196,6 @@ export class UsersService {
             }
 
             user.active = setUserActiveDto.active;
-            user.updated_at = new Date();
 
             const savedUser = await this.usersRepository.save(user);
             res.status(200).send(instanceToPlain(savedUser));
@@ -225,7 +224,6 @@ export class UsersService {
             if (user) {
                 const tempPassword = this.authService.generateRandomPassword();
                 user.temp_password = await this.authService.hashPassword(tempPassword);
-                user.updated_at = new Date();
                 await this.usersRepository.save(user);
 
                 // Hasta el mail real (BE-29) la temporal sólo se ve en la consola, y sólo con
@@ -273,7 +271,6 @@ export class UsersService {
             user.password = await this.authService.hashPassword(new_password);
             // La temporal queda anulada siempre: una vez cambiada la contraseña deja de ser válida.
             user.temp_password = null;
-            user.updated_at = new Date();
 
             await this.usersRepository.save(user);
 
@@ -324,8 +321,6 @@ export class UsersService {
             if (editUserDto.profile_picture !== undefined) {
                 user.profile_picture = editUserDto.profile_picture;
             }
-
-            user.updated_at = new Date();
 
             const savedUser = await this.usersRepository.save(user);
             res.status(200).send(instanceToPlain(savedUser));

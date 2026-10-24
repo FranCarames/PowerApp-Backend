@@ -391,9 +391,10 @@ export class RoutineService {
                 }
             }
 
-            // La cabecera se pisa entera. updated_at se setea a mano porque el onUpdate de
-            // las entidades es sintaxis de MySQL y en Postgres no hace nada: sin esto, una
-            // rutina editada seguiria mostrando la fecha del alta
+            // La cabecera se pisa entera. updated_at se fuerza a mano aunque sea una
+            // @UpdateDateColumn: TypeORM no escribe una fila sin cambios, y editar solo los circuitos
+            // (los vinculos de arriba) deja la cabecera igual. Sin esto, esa edicion no moveria la
+            // fecha de la rutina
             routine.name = editRoutineDto.name;
             routine.coach_note = editRoutineDto.coach_note ?? null;
             routine.updated_at = new Date();
@@ -750,9 +751,10 @@ export class RoutineService {
                 }
             }
 
-            // La cabecera se pisa entera. updated_at se setea a mano porque el onUpdate de
-            // las entidades es sintaxis de MySQL y en Postgres no hace nada: sin esto, un
-            // circuito editado seguiria mostrando la fecha del alta
+            // La cabecera se pisa entera. updated_at se fuerza a mano aunque sea una
+            // @UpdateDateColumn: TypeORM no escribe una fila sin cambios, y editar solo los ejercicios
+            // y las series (que se reemplazan arriba) deja la cabecera igual. Sin esto, esa edicion no
+            // moveria la fecha del circuito
             circuit.name = editCircuitDto.name;
             circuit.description = editCircuitDto.description ?? null;
             circuit.type = editCircuitDto.type;
@@ -1166,8 +1168,9 @@ export class RoutineService {
             }
 
             // Ya estaba marcado: idempotente. Se escribe solo lo que vino y cambio (la nota y el
-            // dia), en un solo UPDATE. updated_at se setea a mano: el onUpdate de las entidades es
-            // sintaxis de MySQL y en Postgres no hace nada
+            // dia), en un solo UPDATE. updated_at va en el update(): repository.update() no pide
+            // RETURNING ni refresca la entidad, y la respuesta devuelve updated_at. Pasarlo a mano
+            // evita releer la fila, y TypeORM no lo duplica con su CURRENT_TIMESTAMP
             const changes = this.diffFinishedChanges(finished, sentNote, sentDay);
 
             if (Object.keys(changes).length > 0) {
@@ -1689,7 +1692,7 @@ export class RoutineService {
             }
 
             // Ya estaba marcado: idempotente. Se escribe solo lo que vino y cambio, en un solo UPDATE
-            // (updated_at a mano, como en la via individual). Se edita tambien lo que el coach saco
+            // (updated_at en el update(), como en la via individual). Se edita tambien lo que el coach saco
             // despues: forma parte de lo que el alumno hizo
             const changes = this.diffFinishedChanges(finished, sentNote, sentDay);
 

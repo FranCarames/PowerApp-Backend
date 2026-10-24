@@ -135,7 +135,6 @@ export class MusclesService {
             muscle.description = editMuscleDto.description;
             muscle.image_url = editMuscleDto.image_url;
             muscle.preview_image = editMuscleDto.preview_image;
-            muscle.updated_at = new Date(); 
 
             const savedMuscle = await this.muscleRepository.save(muscle);
             res.status(201).send(savedMuscle);
@@ -286,7 +285,6 @@ export class MusclesService {
             muscleGroup.name = editMuscleGroupDto.name;
             muscleGroup.image_url = editMuscleGroupDto.image_url;
             muscleGroup.preview_image = editMuscleGroupDto.preview_image;
-            muscleGroup.updated_at = new Date();
 
             const savedMuscleGroup = await this.muscleGroupsRepository.save(muscleGroup);
             res.status(201).send(savedMuscleGroup);

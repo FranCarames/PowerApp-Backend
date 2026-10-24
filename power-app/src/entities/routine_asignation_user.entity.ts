@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Unique } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn, ManyToOne, JoinColumn, Unique } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Routine } from './routine.entity';
 import { User } from './user.entity';
@@ -32,7 +32,7 @@ export class RoutineAsignationUser {
     created_at!: Date;
 
     @ApiProperty()
-    @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+    @UpdateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     updated_at!: Date;
 
     // JOIN RELATIONSHIPS

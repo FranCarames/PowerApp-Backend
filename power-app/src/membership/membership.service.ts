@@ -138,8 +138,7 @@ export class MembershipService {
             membership.name = editMembershipDto.name;
             membership.duration = editMembershipDto.duration;
             membership.price = editMembershipDto.price;
-            membership.updated_at = new Date();
-                
+
             const savedMembership = await this.membershipRepository.save(membership);
             res.status(201).send(savedMembership);
         } catch (error) {
@@ -160,7 +159,6 @@ export class MembershipService {
             }
 
             membership.active = setMembershipActiveDto.active;
-            membership.updated_at = new Date();
 
             const savedMembership = await this.membershipRepository.save(membership);
             res.status(200).send(savedMembership);
