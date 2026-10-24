@@ -21,9 +21,9 @@ Se implementa **caso de uso por caso de uso (CU)** contra las especificaciones. 
 
 ### Artefactos de Status (`Status/`)
 Reflejan el avance de implementación de los CU. **Se mantienen a mano.**
-El repo de documentación (`PowerApp-Docs`) publica una **copia** de estos dos archivos, que **el usuario sincroniza a mano**. En el flujo de Status se editan **sólo** los de este repo: no tocar `PowerApp-Docs`.
-- `Status/estado-implementacion-CU.md` — informe: mapeo 1:1 de cada CU vs el código (estado, endpoint, notas), conteos por rol, hallazgos y sección "Cambios recientes".
-- `Status/dashboard-estado-CU.html` — dashboard visual del mismo informe (copia local del artifact publicado en claude.ai).
+El repo de documentación (`PowerApp-Docs`) publica una **copia** de estos dos archivos en `D:\Power App\Docs\PowerApp-Docs\Status\`. **La sincronización es automática (desde el 2026-10-24):** cada vez que se actualiza el Status del backend, en el mismo paso se **copian los dos archivos** a esa carpeta, ya terminados y verificados (con `cp`, byte a byte; confirmar con `cmp`), y se dejan **sin stagear**: cada repo tiene su commit y lo hace el usuario. La copia **no se edita a mano ni por separado**: se edita siempre acá y se vuelve a copiar. Sólo se copian los `*-backend`; los `*-web` son del repo de la web.
+- `Status/estado-implementacion-backend.md` — informe: mapeo 1:1 de cada CU vs el código (estado, endpoint, notas), conteos por rol, hallazgos y sección "Cambios recientes".
+- `Status/dashboard-estado-backend.html` — dashboard visual del mismo informe (copia local del artifact publicado en claude.ai).
 
 ### Scripts de recreación de la DB (`Db Creator/`)
 **Única** fuente para levantar la base desde cero (la vieja carpeta `db/` se eliminó por duplicada). Pipeline generador en Python (sin librerías externas):
@@ -46,7 +46,7 @@ Mapa entidad → script que la referencia:
 
 **Cada vez que se modifica la estructura de una clase/entidad** (agregar, quitar o cambiar un campo), en el mismo cambio hay que actualizar:
 
-1. **Los artefactos de Status** — `Status/estado-implementacion-CU.md` y `Status/dashboard-estado-CU.html`: reflejar el/los CU afectados y los conteos.
+1. **Los artefactos de Status** — `Status/estado-implementacion-backend.md` y `Status/dashboard-estado-backend.html`: reflejar el/los CU afectados y los conteos (y copiarlos a `PowerApp-Docs/Status/`, ver arriba).
 2. **Los scripts de `Db Creator` que referencian esa clase** — como mínimo `ddl.py` y su salida `01_estructura.sql`; y si cambia la lista de columnas de un INSERT, el generador de datos correspondiente (`gen_seed.py` / `static_extra.py` / `catalogo_ejercicios.py` / `dynamic_data.py`) y su `.sql` generado (`02` / `03`). Usar el mapa de arriba para saber cuáles tocar.
 
 > Los `.sql` se pueden regenerar con `python build_sql.py` dentro de `Db Creator/`, y deben quedar **en sync** con los `.py` (verificable regenerando y comparando).
@@ -56,7 +56,7 @@ Mapa entidad → script que la referencia:
 1. Implementar el cambio en `power-app/src`.
 2. Verificar compilación: `npm --prefix power-app run build`.
 3. Si cambió la **estructura** de una entidad → actualizar los scripts de `Db Creator` (regla de arriba).
-4. Actualizar los **artefactos de Status** (informe `.md` + dashboard `.html`), sólo en este repo (la copia al sitio de `PowerApp-Docs` la sincroniza el usuario).
+4. Actualizar los **artefactos de Status** (informe `.md` + dashboard `.html`) en este repo y, **en el mismo paso, copiarlos a `PowerApp-Docs/Status/`** sin stagear (sincronización automática, ver "Artefactos de Status").
 5. Commit (el usuario commitea con su estilo).
 
 > Las **specs** (`Doc/specs/`) y **planes** (`Doc/plans/`) de cada cambio se escriben en el repo `PowerApp-Docs` y se dejan stageados ahí. Cada repo tiene su propio commit, que hace el usuario.

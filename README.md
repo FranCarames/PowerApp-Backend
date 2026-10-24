@@ -46,7 +46,7 @@ Status/            → Informe y dashboard del avance de implementación por CU.
 Db Creator/        → Scripts (Python) que regeneran la base desde cero → 3 archivos .sql.
 ```
 
-> La documentación (modelo de datos, especificaciones de CU, prototipos y el sitio de GitHub Pages) vive en el repo hermano **[PowerApp-Docs](https://github.com/FranCarames/PowerApp-Docs)**. `Status/` es la fuente del avance; el sitio publica una copia que se sincroniza a mano.
+> La documentación (modelo de datos, especificaciones de CU, prototipos y el sitio de GitHub Pages) vive en el repo hermano **[PowerApp-Docs](https://github.com/FranCarames/PowerApp-Docs)**. `Status/` es la fuente del avance; el sitio publica una copia que se sincroniza automáticamente cada vez que se actualiza el Status.
 
 > Las **entidades TypeORM** (`power-app/src/entities`) son la fuente de verdad del modelo ("código primero"): `synchronize` está en `false` y no hay migraciones, así que los cambios de schema se aplican **regenerando la base** con los scripts de `Db Creator/`.
 
