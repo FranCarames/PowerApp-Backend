@@ -4,8 +4,8 @@ import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * Params de una sesión del plan: el par (User_Planification, Routine_Asignation), que es lo que el
- * alumno abre y marca (spec del bloque B, §5.4). Los usan el detalle (BE-20b) y, desde BE-20c,
- * marcar y desmarcar.
+ * alumno abre y marca (spec del bloque B, §5.4). Los usan el detalle (BE-20b) y marcar (BE-20c);
+ * desmarcar los extiende con el ejercicio (`PlanSessionFinishedParamsDto`).
  */
 export class PlanSessionParamsDto {
 

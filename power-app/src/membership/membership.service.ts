@@ -26,6 +26,11 @@ const DEFAULT_EXPIRING_SOON_DAYS = 7;
 const DUPLICATE_DURATION_ERROR = 'Ya existe una membresía con esa duración';
 const DUPLICATE_NAME_ERROR = 'Ya existe una membresía con ese nombre';
 
+// Los tres 400 de registrar un pago (CU-E-29): lo que existe pero no corresponde
+const PAYMENT_NOT_STUDENT_ERROR = 'El destinatario del pago tiene que ser un alumno.';
+const PAYMENT_ACCOUNT_CLOSED_ERROR = 'La cuenta del alumno está cerrada: no se puede registrar el pago.';
+const PAYMENT_TYPE_INACTIVE_ERROR = 'El tipo de membresía está dado de baja.';
+
 @Injectable()
 export class MembershipService {
     /** Cuántos días antes del vencimiento se considera una membresía "por vencer". */
@@ -189,6 +194,9 @@ export class MembershipService {
         }
     }
 
+    // CU-E-29. Primero la existencia (404 del alumno y del tipo), despues lo que existe pero no
+    // corresponde (400): el destinatario tiene que ser un alumno con la cuenta abierta, y el tipo no
+    // puede estar dado de baja
     async registerMembershipPayment(
         registerMembershipPaymentDto: RegisterMembershipPaymentDto,
         res: Response
@@ -203,7 +211,19 @@ export class MembershipService {
             const membership = await this.membershipRepository.findOne({ where: { id: registerMembershipPaymentDto.membership_id } });
 
             if (!membership) {
-                return res.status(400).send({ error: 'Membresía no encontrada' });
+                return res.status(404).send({ error: 'Membresía no encontrada' });
+            }
+
+            if (user.role !== UserRole.user) {
+                return res.status(400).send({ error: PAYMENT_NOT_STUDENT_ERROR });
+            }
+
+            if (!user.active) {
+                return res.status(400).send({ error: PAYMENT_ACCOUNT_CLOSED_ERROR });
+            }
+
+            if (!membership.active) {
+                return res.status(400).send({ error: PAYMENT_TYPE_INACTIVE_ERROR });
             }
 
             const newMembershipPayment = this.membershipPaymentRepository.create({

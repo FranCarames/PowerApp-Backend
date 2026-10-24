@@ -8,7 +8,7 @@ import {
     Query,
     Res,
 } from '@nestjs/common';
-import { ApiTags, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiResponse, ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
 import { RoutineService } from './routine.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
@@ -43,11 +43,12 @@ import { MarkExerciseFinishedDto } from '../dtos/routine/mark_exercise_finished.
 import { AssignedFinishedParamsDto } from '../dtos/routine/assigned_finished_params.dto';
 import { RoutineAssignedUnfinishedResponseDto } from '../dtos/routine/routine_assigned_unfinished_response.dto';
 import { GetTrainingHistoryQueryDto } from '../dtos/routine/get_training_history_query.dto';
-import { RoutineHistorySessionDto } from '../dtos/routine/routine_history_response.dto';
+import { RoutineHistoryIndividualSessionDto, RoutineHistoryPlanSessionDto } from '../dtos/routine/routine_history_response.dto';
 import { RoutineAssignedPlanWeekResponseDto } from '../dtos/routine/routine_assigned_plan_response.dto';
 import { GetRoutineHomeQueryDto } from '../dtos/routine/get_routine_home_query.dto';
 import { RoutineHomeWeekResponseDto } from '../dtos/routine/routine_home_response.dto';
 import { PlanSessionParamsDto } from '../dtos/routine/plan_session_params.dto';
+import { PlanSessionFinishedParamsDto } from '../dtos/routine/plan_session_finished_params.dto';
 import { RoutinePlanSessionDetailResponseDto } from '../dtos/routine/routine_plan_session_detail_response.dto';
 
 @ApiTags('Routine')
@@ -345,12 +346,69 @@ export class RoutineController {
         await this.routineService.getPlanSessionDetail(params.userPlanificationId, params.routineAsignationId, user, res);
     }
 
+    // Marcar, dejar o editar la nota (U-12, con U-13 incluido) en una sesion del plan. Como en
+    // assign-user/:id/finished, solo el alumno dueño y el dueño se chequea en el service. El hecho es
+    // POR EJERCICIO, no por serie: el tildado serie por serie es de la interfaz
+    @Post('assign-plan/:userPlanificationId/:routineAsignationId/finished')
+    @Auth(UserRole.user)
+    @ApiResponse({ status: 201, type: RoutineAssignedFinishedDto, description: 'El ejercicio no estaba marcado: se creó la marca (con la nota, si vino)' })
+    @ApiResponse({ status: 200, type: RoutineAssignedFinishedDto, description: 'Ya estaba marcado (también si dos marcas chocaron): idempotente. Si vinieron user_note o finished_at y cambiaron, se actualizaron; la cadena vacía borra la nota. También en una rutina que el entrenador quitó del plan' })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, la planificación fue quitada (no se puede modificar), falta finished_at al marcar un ejercicio que no estaba marcado, el ejercicio no pertenece a la rutina, o el entrenador lo sacó de la rutina o quitó la rutina del plan y todavía no estaba marcado' })
+    @ApiResponse({ status: 403, description: 'La asignación es de otro alumno' })
+    @ApiResponse({ status: 404, description: 'Asignación no encontrada, o la rutina no pertenece a esta planificación' })
+    async markPlanExerciseFinished(
+        @Param() params: PlanSessionParamsDto,
+        @Body() markExerciseFinishedDto: MarkExerciseFinishedDto,
+        @CurrentUser() user: AuthUser,
+        @Res() res: Response,
+    ) {
+        await this.routineService.markPlanExerciseFinished(params.userPlanificationId, params.routineAsignationId, markExerciseFinishedDto, user, res);
+    }
+
+    // Borra la marca y su nota. Idempotente: 200 también si el ejercicio no estaba marcado. Se puede
+    // desmarcar un ejercicio, o en una rutina, que el entrenador sacó del plan después. Con la
+    // planificación quitada, 400
+    @Delete('assign-plan/:userPlanificationId/:routineAsignationId/finished/:routineExerciseId')
+    @Auth(UserRole.user)
+    @ApiResponse({ status: 200, type: RoutineAssignedUnfinishedResponseDto })
+    @ApiResponse({ status: 400, description: 'Alguno de los ids no es un UUID válido, o la planificación fue quitada (no se puede modificar)' })
+    @ApiResponse({ status: 403, description: 'La asignación es de otro alumno' })
+    @ApiResponse({ status: 404, description: 'Asignación no encontrada, o la rutina no pertenece a esta planificación' })
+    async unmarkPlanExerciseFinished(
+        @Param() params: PlanSessionFinishedParamsDto,
+        @CurrentUser() user: AuthUser,
+        @Res() res: Response,
+    ) {
+        await this.routineService.unmarkPlanExerciseFinished(params.userPlanificationId, params.routineAsignationId, params.routineExerciseId, user, res);
+    }
+
     // Historial de entrenamientos del alumno (E-06) y su filtro por ejercicio (E-07). Solo coach y
     // admin: gimnasio compartido (D6), cualquiera ve el de cualquier alumno. Las dos rutas de dos
-    // segmentos no compiten con 'GET /:id'
+    // segmentos no compiten con 'GET /:id'. La lista mezcla las sesiones de las asignaciones
+    // individuales y las de las planificaciones (BE-20d): se distinguen por `source`
     @Get('history/:userId')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [RoutineHistorySessionDto], description: 'Las sesiones con al menos un ejercicio hecho, de la más nueva a la más vieja (día descendente y nombre de rutina). Sin historial, un array vacío' })
+    @ApiExtraModels(RoutineHistoryIndividualSessionDto, RoutineHistoryPlanSessionDto)
+    @ApiResponse({
+        status: 200,
+        description: 'Las sesiones con al menos un ejercicio hecho, de la más nueva a la más vieja (día descendente, nombre de rutina y alta), las individuales y las de las planificaciones juntas: se distinguen por source. Sin historial, un array vacío',
+        schema: {
+            type: 'array',
+            items: {
+                oneOf: [
+                    { $ref: getSchemaPath(RoutineHistoryIndividualSessionDto) },
+                    { $ref: getSchemaPath(RoutineHistoryPlanSessionDto) },
+                ],
+                discriminator: {
+                    propertyName: 'source',
+                    mapping: {
+                        individual: getSchemaPath(RoutineHistoryIndividualSessionDto),
+                        plan: getSchemaPath(RoutineHistoryPlanSessionDto),
+                    },
+                },
+            },
+        },
+    })
     @ApiResponse({ status: 400, description: 'El id del alumno o el exercise_id no son UUID válidos' })
     @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
     async getTrainingHistory(

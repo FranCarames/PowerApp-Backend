@@ -126,6 +126,8 @@ export class MembershipController {
     @Post('payment/register')
     @Auth(UserRole.coach, UserRole.admin)
     @ApiResponse({ status: 201, type: MembershipPayment })
+    @ApiResponse({ status: 400, description: 'Datos inválidos, el destinatario no es un alumno, su cuenta está cerrada o el tipo de membresía está dado de baja' })
+    @ApiResponse({ status: 404, description: 'Alumno (usuario) o tipo de membresía no encontrado' })
     async registerMembershipPayment(
         @Body() registerMembershipPaymentDto: RegisterMembershipPaymentDto,
         @Res() res: Response,

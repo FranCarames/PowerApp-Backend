@@ -40,6 +40,7 @@ Mapa entidad → script que la referencia:
 | *Todas* | `ddl.py` → `01_estructura.sql` | — |
 | `Muscle_Group`, `Muscle`, `Exercise`, `Exercised_Muscle` | `ddl.py` | `gen_seed.py` / `static_extra.py` / `catalogo_ejercicios.py` → `02_datos_estaticos.sql` |
 | `User`, `Coach`, `Membership`, `Membership_Payment`, `User_RM` | `ddl.py` | `dynamic_data.py` → `03_datos_dinamicos.sql` |
+| `Circuit`, `Routine`, `Routine_Exercise`, `Exercise_Set`, `Routine_Circuit`, `Planification`, `Routine_Asignation`, `User_Planification`, `Routine_Asignation_User`, `Routine_Asign_Exercise_Finished`, `Routine_Exercise_Finished` (la cadena de entrenamiento, BE-21) | `ddl.py` | `dynamic_data.py` (sección «Cadena de entrenamiento») → `03_datos_dinamicos.sql`; los `INSERT` los arma `build_sql.py` |
 
 ## Regla de mantenimiento (IMPORTANTE)
 

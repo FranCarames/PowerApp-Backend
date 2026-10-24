@@ -1,6 +1,7 @@
 -- =============================================================
 --  PowerApp DB - DATOS DINAMICOS (de prueba)
---  Usuarios, coaches, membresias y pagos para testear la app.
+--  Usuarios, coaches, membresias, pagos y la cadena de entrenamiento
+--  (circuitos, rutinas, planificaciones, asignaciones y ejecuciones) para testear la app.
 --  Ejecutar DESPUES de 02_datos_estaticos.sql
 -- =============================================================
 
@@ -165,3 +166,200 @@ INSERT INTO public."User_RM" (id, user_id, exercise_id, weight, reps, date, crea
     ('7c8968f4-2f39-50b0-b50a-caad91fc8158'::uuid, '42700ec1-2304-51cd-899c-ea58b477a2c6'::uuid, 'ba54bcf2-4709-550e-817e-96986073f43b'::uuid, 45.00, 1, '2026-01-22', '2026-01-22 10:00:00-03', '2026-01-22 10:00:00-03'),
     ('f01aed4e-a62f-576a-8e67-f5d175d20d5f'::uuid, '42700ec1-2304-51cd-899c-ea58b477a2c6'::uuid, 'ba54bcf2-4709-550e-817e-96986073f43b'::uuid, 47.50, 1, '2026-02-12', '2026-02-12 10:00:00-03', '2026-02-12 10:00:00-03')
 ON CONFLICT (id) DO NOTHING;
+
+-- =============================================================
+--  Cadena de entrenamiento: un escenario por alumno (ver dynamic_data.py)
+--  Fechas fijas de octubre a diciembre de 2026
+-- =============================================================
+
+-- Circuitos
+INSERT INTO public."Circuit" (id, name, description, type, active, created_at, updated_at) VALUES
+    ('b4bc8877-ce2b-5460-a981-c1eb79a998ff'::uuid, 'Piernas - Fuerza', 'Sentadilla y bisagra de cadera pesadas', 'normal', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('5bc76477-9b6d-5cc8-baec-eb2ef7f4a4df'::uuid, 'Piernas - Hipertrofia', 'Volumen para cuádriceps y gemelos', 'normal', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('25f11067-f78b-55f1-84ef-36f63f11c50a'::uuid, 'Empuje', 'Pecho y hombros', 'normal', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('6e6a9787-d9ec-5e5a-844b-08dc5107e194'::uuid, 'Tracción', 'Espalda y hombro posterior', 'normal', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('1add7a71-fae2-587f-a9fc-8fe901a99adb'::uuid, 'Core', 'Abdomen en superserie', 'superserie', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('3f562512-8d47-57bd-96fb-5f5737e11d9a'::uuid, 'Metabólico', 'Cierre cronometrado', 'amrap', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('a2958226-3fc2-56ce-90ed-811e71ccba73'::uuid, 'Circuito en desuso', 'Dado de baja', 'normal', false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03')
+ON CONFLICT DO NOTHING;
+
+-- Rutinas
+INSERT INTO public."Routine" (id, name, coach_note, active, created_at, updated_at) VALUES
+    ('343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, 'Día A - Piernas', 'Entrá en calor 10 minutos', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, 'Día B - Empuje', NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, 'Día C - Tracción', NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, 'Full Body', 'Para los días sueltos', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('a8131666-55ff-5fed-bf5c-43e92fb173c6'::uuid, 'Metabólico', 'Cardio de cierre', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('6c9e999a-ce38-563a-837d-50258a55cdbb'::uuid, 'Rutina de prueba (baja)', 'Dada de baja', false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03')
+ON CONFLICT DO NOTHING;
+
+-- Ejercicios de cada circuito (Routine_Exercise) y sus series
+INSERT INTO public."Routine_Exercise" (id, exercise_id, circuit_id, exercise_order, coach_note, active, created_at, updated_at) VALUES
+    ('f58979d6-a776-5a6b-a2ab-994e73f4be92'::uuid, '2c164517-e18f-4c97-a3a7-d31b9865640e'::uuid, 'b4bc8877-ce2b-5460-a981-c1eb79a998ff'::uuid, 1, 'Bajá controlado y subí explosivo', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('7ca68d13-341c-5df7-86b4-8d85c6b0f851'::uuid, '990c3124-f1fe-543d-bf70-6f3d072a7cb1'::uuid, 'b4bc8877-ce2b-5460-a981-c1eb79a998ff'::uuid, 2, 'Espalda neutra todo el recorrido', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('3ea9a990-1cc3-59b1-a298-9bef75416050'::uuid, 'ccda9680-fe88-5197-9e1b-ec60162ad24c'::uuid, 'b4bc8877-ce2b-5460-a981-c1eb79a998ff'::uuid, 3, NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('c8ca7b81-3f39-51d4-97e2-c642705a5e21'::uuid, '5cd0a1c2-15b6-535f-b9a0-a63500bbcad6'::uuid, '5bc76477-9b6d-5cc8-baec-eb2ef7f4a4df'::uuid, 1, 'Sin bloquear las rodillas', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('8a95b4a9-0492-5b61-841f-906645b38a4b'::uuid, '6f240294-3880-58b6-b5f5-191e0cbb1b34'::uuid, '5bc76477-9b6d-5cc8-baec-eb2ef7f4a4df'::uuid, 2, NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('e079d164-cc5e-5006-827a-ecb02de6acca'::uuid, 'eec97d7f-360e-5b9f-8fd8-1b65851d51cf'::uuid, '5bc76477-9b6d-5cc8-baec-eb2ef7f4a4df'::uuid, 3, 'Pausa de un segundo arriba', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('80735f92-04b5-52d6-8f0a-49ad244d84ba'::uuid, 'ae44805a-6931-55e1-aafb-a4f7e2462b6b'::uuid, '25f11067-f78b-55f1-84ef-36f63f11c50a'::uuid, 1, 'Escápulas retraídas', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('e692545e-85fc-5a79-a839-4912a46f4bc3'::uuid, 'e94d30b5-329a-562a-91eb-d5875345bc5b'::uuid, '25f11067-f78b-55f1-84ef-36f63f11c50a'::uuid, 2, NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('8cf3a5ee-84d7-56f5-8845-ee5e52f4201f'::uuid, '1f0313c0-138a-52f6-be0d-1faadc1b88bc'::uuid, '25f11067-f78b-55f1-84ef-36f63f11c50a'::uuid, 3, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('6ce7867c-89fc-50b1-8f24-0d0d6d2e1125'::uuid, 'ba54bcf2-4709-550e-817e-96986073f43b'::uuid, '6e6a9787-d9ec-5e5a-844b-08dc5107e194'::uuid, 1, 'Pecho al frente, sin balanceo', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('f756d807-7c83-5ea8-a5a3-b899a1e1369a'::uuid, '81909633-9160-5a5f-9b30-99ff1b5db93b'::uuid, '6e6a9787-d9ec-5e5a-844b-08dc5107e194'::uuid, 2, NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('c79bb8c7-f6ef-5c51-85de-a04442d861c3'::uuid, '1f6ea70d-d1e1-5e42-bdb7-0dc663a6e19c'::uuid, '6e6a9787-d9ec-5e5a-844b-08dc5107e194'::uuid, 3, 'Codos altos', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('507485d0-00ff-5484-8f08-50e94bdad3b9'::uuid, '86c069fe-addd-5e92-966b-125d03d540fa'::uuid, '1add7a71-fae2-587f-a9fc-8fe901a99adb'::uuid, 1, 'Cuerpo en línea', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('de3cbe5d-fcb8-5167-810c-07b7703d1a23'::uuid, '4e6844e3-2493-50f3-bcbe-a644ff152d93'::uuid, '1add7a71-fae2-587f-a9fc-8fe901a99adb'::uuid, 2, NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('75caf135-26d5-532f-912d-78a0bead5ce1'::uuid, '9475f6be-a53e-5c2c-aa4d-6cd451079552'::uuid, '1add7a71-fae2-587f-a9fc-8fe901a99adb'::uuid, 3, NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('19baa85c-9054-5ead-95ee-d7d0b0a992f2'::uuid, '67d50929-5b29-59b1-98cb-35043b9e0e7f'::uuid, '3f562512-8d47-57bd-96fb-5f5737e11d9a'::uuid, 1, 'Al ritmo que puedas sostener', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('2331fb72-d16b-5539-abf9-0ff72189fe3f'::uuid, '883e317c-f6cc-5b47-9024-c15fce7bc1ce'::uuid, '3f562512-8d47-57bd-96fb-5f5737e11d9a'::uuid, 2, NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('000eba69-0103-5ade-b585-de17fb400b03'::uuid, '87f73ccf-af0d-5337-abed-dee8eee6afc6'::uuid, 'a2958226-3fc2-56ce-90ed-811e71ccba73'::uuid, 1, NULL, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."Exercise_Set" (id, routine_exercise_id, set_order, set_count, rep_count, weight, rpe, rir, rm_perc, amrap, amrap_time, rm, created_at, updated_at) VALUES
+    ('8070dcdf-f1d7-5b9f-b057-f1291ee10590'::uuid, 'f58979d6-a776-5a6b-a2ab-994e73f4be92'::uuid, 1, 1, 5, NULL, NULL, NULL, 60, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('4c13da93-06e6-53ef-9bce-3557fe0e2838'::uuid, 'f58979d6-a776-5a6b-a2ab-994e73f4be92'::uuid, 2, 3, 5, NULL, 7, NULL, 75, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('1eb5d332-9037-58c2-878d-259399e790fa'::uuid, '7ca68d13-341c-5df7-86b4-8d85c6b0f851'::uuid, 1, 3, 8, 60.00, NULL, 2, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('5f180d47-25ae-5f0a-b320-b6f48d2c6966'::uuid, '3ea9a990-1cc3-59b1-a298-9bef75416050'::uuid, 1, 3, 10, 14.00, NULL, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('a8ab4a6d-1a32-52bb-943d-95ce0449387a'::uuid, 'c8ca7b81-3f39-51d4-97e2-c642705a5e21'::uuid, 1, 3, 12, 120.00, 8, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('527ee143-7ad7-5d98-be02-3744179c06cf'::uuid, '8a95b4a9-0492-5b61-841f-906645b38a4b'::uuid, 1, 3, 12, 35.00, NULL, 2, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('13396022-fee1-5355-8e89-4d1d846bc060'::uuid, 'e079d164-cc5e-5006-827a-ecb02de6acca'::uuid, 1, 4, 15, 50.00, NULL, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('604185bb-2eb2-5c9f-aad0-5b9b4d0bb03f'::uuid, '80735f92-04b5-52d6-8f0a-49ad244d84ba'::uuid, 1, 4, 6, NULL, 7, NULL, 75, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('5bd3a01f-74ce-5b2e-af41-18ea8a9c6528'::uuid, '80735f92-04b5-52d6-8f0a-49ad244d84ba'::uuid, 2, 1, 8, NULL, NULL, NULL, 70, true, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('de51e110-91a7-5ed3-8497-ef73a228787e'::uuid, 'e692545e-85fc-5a79-a839-4912a46f4bc3'::uuid, 1, 3, 8, 30.00, 8, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('563d0751-39f7-52a9-ba75-13ea66c80b53'::uuid, '8cf3a5ee-84d7-56f5-8845-ee5e52f4201f'::uuid, 1, 3, 10, NULL, NULL, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('41ed04c8-0331-56bc-b641-05c22c692eba'::uuid, '6ce7867c-89fc-50b1-8f24-0d0d6d2e1125'::uuid, 1, 4, 8, 40.00, NULL, 2, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('b0e65253-f591-5ef0-b335-51104d9b60fd'::uuid, 'f756d807-7c83-5ea8-a5a3-b899a1e1369a'::uuid, 1, 3, 6, NULL, NULL, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('666082bf-7e5d-5d8d-9d32-337cf099b748'::uuid, 'c79bb8c7-f6ef-5c51-85de-a04442d861c3'::uuid, 1, 3, 15, 15.00, NULL, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('a36e4b51-fa1f-5369-8ae8-fddfb0ad1a63'::uuid, '507485d0-00ff-5484-8f08-50e94bdad3b9'::uuid, 1, 3, 1, NULL, NULL, NULL, NULL, true, 45, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('af5bff97-0647-5bd5-83c8-0dfe1f6a0875'::uuid, 'de3cbe5d-fcb8-5167-810c-07b7703d1a23'::uuid, 1, 3, 10, NULL, NULL, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('08cef4fe-0c9b-5226-9d27-2d7e22376348'::uuid, '75caf135-26d5-532f-912d-78a0bead5ce1'::uuid, 1, 3, 15, NULL, NULL, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('4554382c-2879-55e6-a295-1ef78f6f8bc1'::uuid, '19baa85c-9054-5ead-95ee-d7d0b0a992f2'::uuid, 1, 1, 10, NULL, NULL, NULL, NULL, true, 300, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('588f6cc6-bf1e-5667-b360-527b31b337d3'::uuid, '2331fb72-d16b-5539-abf9-0ff72189fe3f'::uuid, 1, 1, 1, NULL, NULL, NULL, NULL, true, 300, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('1ca0be6f-3d94-5f3a-852e-50eb9697b0dc'::uuid, '000eba69-0103-5ade-b585-de17fb400b03'::uuid, 1, 3, 10, 20.00, NULL, NULL, NULL, false, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03')
+ON CONFLICT DO NOTHING;
+
+-- Circuitos de cada rutina (los apagados no tienen orden)
+INSERT INTO public."Routine_Circuit" (id, routine_id, circuit_id, "order", active, created_at, updated_at) VALUES
+    ('7c8d62b1-4c45-527e-98f9-bb4eb41ac97a'::uuid, '343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, 'b4bc8877-ce2b-5460-a981-c1eb79a998ff'::uuid, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('287e9f1c-8bbd-5665-9166-f5b846066aab'::uuid, '343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, '5bc76477-9b6d-5cc8-baec-eb2ef7f4a4df'::uuid, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('2787f57c-a6aa-5a48-ae00-0e6f808c8879'::uuid, 'e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, '25f11067-f78b-55f1-84ef-36f63f11c50a'::uuid, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('6ca90f6e-14cc-51bf-ad7e-34059a99ec4c'::uuid, 'e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, '1add7a71-fae2-587f-a9fc-8fe901a99adb'::uuid, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('2bbc4334-2835-52fe-a1d2-e524aa32abe6'::uuid, 'b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, '6e6a9787-d9ec-5e5a-844b-08dc5107e194'::uuid, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('ad978f99-f354-534d-8c19-3345cb03ad25'::uuid, 'b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, '1add7a71-fae2-587f-a9fc-8fe901a99adb'::uuid, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('5b387bd2-53f2-5ef8-a447-212ba6941821'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, 'b4bc8877-ce2b-5460-a981-c1eb79a998ff'::uuid, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('1d947bc5-d775-509e-8db9-abd09233679b'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, '25f11067-f78b-55f1-84ef-36f63f11c50a'::uuid, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('3d95d6cb-e5e6-592b-91f8-7f148c022074'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, '6e6a9787-d9ec-5e5a-844b-08dc5107e194'::uuid, 3, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('0e4f9362-1abc-5c42-b0c7-e23244147699'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, '3f562512-8d47-57bd-96fb-5f5737e11d9a'::uuid, NULL, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('73f983a5-8f43-5cdd-9aed-48c4829ef944'::uuid, 'a8131666-55ff-5fed-bf5c-43e92fb173c6'::uuid, '3f562512-8d47-57bd-96fb-5f5737e11d9a'::uuid, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('4b4abf4e-8af6-5cbf-a3f4-587a5556e5ac'::uuid, '6c9e999a-ce38-563a-837d-50258a55cdbb'::uuid, '1add7a71-fae2-587f-a9fc-8fe901a99adb'::uuid, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03')
+ON CONFLICT DO NOTHING;
+
+-- Planificaciones y las rutinas de cada semana
+INSERT INTO public."Planification" (id, name, description, number_of_routines, type, duration, active, created_at, updated_at) VALUES
+    ('fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 'Fuerza 4 semanas', 'Tres días por semana, con foco en los básicos', 3, 'Fuerza', 4, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 'Hipertrofia 6 semanas', 'Semanas 1 a 3 cargadas; el resto lo completa el coach', 3, 'Hipertrofia', 6, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('d50cba0d-0637-593e-8a66-cdbac232cc03'::uuid, 'Plan libre', 'Sin duración fija: el fin lo define cada asignación', 2, 'General', 0, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('0286af56-612d-5bd4-b998-3b1feb473646'::uuid, 'Plan descontinuado', 'Dado de baja', 1, 'Fuerza', 2, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."Routine_Asignation" (id, routine_id, planification_id, "order", week, active, created_at, updated_at) VALUES
+    ('5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, '343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 1, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('dd9a7c9a-5782-5cf2-876a-dc46e9e79633'::uuid, 'e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 2, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('b3da651b-a5a1-5778-98ab-af4f26a08d8a'::uuid, 'b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 3, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('e76f983e-ca2b-5495-bcb3-9efa5850c256'::uuid, '343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 1, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('606170dc-8de5-5df8-8d93-510329b6c8bc'::uuid, 'e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 2, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('ba6cca34-7101-50fc-9b62-ea24bcc25492'::uuid, 'b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 3, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('eb4873a9-33ca-5b6a-9834-9187f9c3858e'::uuid, '343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 1, 3, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('2a657b93-26a5-5a98-aebb-53d62b9881b2'::uuid, 'e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 2, 3, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('94f3854e-1ed0-505b-b038-083f2163d1ff'::uuid, 'b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 3, 3, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('09d56237-a650-5547-9fbc-ed8d17285f63'::uuid, '343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 1, 4, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('2ff9f20a-a8f7-5f9e-987a-96b6a426f4ce'::uuid, 'e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 2, 4, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('d4c9e700-81b7-5c3d-9dfa-f1ff2fb2f62e'::uuid, 'b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 3, 4, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('95adff3a-5c90-528d-b005-34fa4f0e648e'::uuid, 'a8131666-55ff-5fed-bf5c-43e92fb173c6'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 4, 2, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('9836bd0e-5b28-5258-8c14-c1e54a7c8af9'::uuid, '343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 1, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('96942ea2-4abf-5f03-9735-62ea9412de9d'::uuid, 'e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 2, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('c3b936a0-2cbe-5518-ac3c-ed5c3938465d'::uuid, 'b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 3, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('d214edf4-9f2c-5201-a7dc-b4ec291e9208'::uuid, '343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 1, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('bd6a28b3-cb94-58e9-920d-a351ef23a823'::uuid, 'e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 2, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('c4f9d1e0-e313-57e2-abf4-668ebca8db6c'::uuid, 'b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 3, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('f6199282-663c-5824-a0a5-c0728a6b4609'::uuid, '343ccd24-4d5f-57fe-8d14-512031feef9e'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 1, 3, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('0b923aa9-8e29-5d0c-a86b-60930bb0a688'::uuid, 'e84a65db-0887-5945-8dae-96eb59ae9db3'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 2, 3, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('f2476054-0780-5f87-8254-b1d086ba51cf'::uuid, 'b2aa7676-03ce-595b-82cc-912da9c194a9'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 3, 3, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('fde45437-d0b4-5473-bf77-d6b2bdcf5265'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, 'd50cba0d-0637-593e-8a66-cdbac232cc03'::uuid, 1, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('2f622d1b-327e-5928-94e7-67c7d6a970be'::uuid, 'a8131666-55ff-5fed-bf5c-43e92fb173c6'::uuid, 'd50cba0d-0637-593e-8a66-cdbac232cc03'::uuid, 2, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('97196a6a-e3db-5fbe-b4e6-788f65702fb2'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, 'd50cba0d-0637-593e-8a66-cdbac232cc03'::uuid, 1, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('de57c53a-a5f1-5314-975a-30939e5dedb2'::uuid, 'a8131666-55ff-5fed-bf5c-43e92fb173c6'::uuid, 'd50cba0d-0637-593e-8a66-cdbac232cc03'::uuid, 2, 2, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('0dd333cb-eb46-5696-a499-c6d25bdc1de6'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, '0286af56-612d-5bd4-b998-3b1feb473646'::uuid, 1, 1, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03')
+ON CONFLICT DO NOTHING;
+
+-- Planificaciones asignadas a alumnos (vigentes, futuras y quitadas)
+INSERT INTO public."User_Planification" (id, user_id, coach_id, planification_id, coach_note, start_date, end_date, active, created_at, updated_at) VALUES
+    ('4f733808-da34-58b1-a422-61a13717828b'::uuid, 'ab2dfcb8-e8cb-5565-8e9e-53af5c65333d'::uuid, '2e37489b-2807-58f2-9725-5284575441cb'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 'Foco en técnica de sentadilla', '2026-10-19', '2026-11-15', true, '2026-10-17 09:00:00-03', '2026-10-17 09:00:00-03'),
+    ('cda60abb-c8e4-5ff1-8870-d03469334a8d'::uuid, '71ac17cd-daf2-5ce5-ad9f-d1005c0b7ae9'::uuid, '2e37489b-2807-58f2-9725-5284575441cb'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, NULL, '2026-10-26', '2026-11-22', true, '2026-10-22 10:00:00-03', '2026-10-22 10:00:00-03'),
+    ('ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, '204c5b5f-fad9-50f3-9d75-55838ac4ecc2'::uuid, '6984459b-6f61-5b67-b85f-ef2252edec90'::uuid, 'fa72fd85-fae0-5c05-b256-a9c80544fdc4'::uuid, 'Retoma después de la lesión', '2026-10-05', '2026-11-01', false, '2026-10-03 11:00:00-03', '2026-10-20 18:00:00-03'),
+    ('c928e61e-16d8-536f-b22e-afae61c4af04'::uuid, '204c5b5f-fad9-50f3-9d75-55838ac4ecc2'::uuid, '6984459b-6f61-5b67-b85f-ef2252edec90'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, NULL, '2026-10-26', '2026-12-06', true, '2026-10-20 18:05:00-03', '2026-10-20 18:05:00-03'),
+    ('501bcc84-7905-5f19-9720-6ae2fdcae03f'::uuid, 'e738c602-139c-554f-b690-6d8cd0328df5'::uuid, '6984459b-6f61-5b67-b85f-ef2252edec90'::uuid, 'f9d44bac-d02c-5fc1-9681-205463375904'::uuid, 'Arranca después del viaje', '2026-11-30', '2027-01-10', true, '2026-10-21 10:00:00-03', '2026-10-21 10:00:00-03')
+ON CONFLICT DO NOTHING;
+
+-- Rutinas individuales asignadas a alumnos
+INSERT INTO public."Routine_Asignation_User" (id, routine_id, user_id, date, created_at, updated_at) VALUES
+    ('6343a1a1-c435-55f1-822c-e341ebfcc1d4'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, '42700ec1-2304-51cd-899c-ea58b477a2c6'::uuid, '2026-10-19', '2026-10-16 10:00:00-03', '2026-10-16 10:00:00-03'),
+    ('4a861d24-8172-5cab-ab35-4f711bc6d92f'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, '42700ec1-2304-51cd-899c-ea58b477a2c6'::uuid, '2026-10-26', '2026-10-22 10:00:00-03', '2026-10-22 10:00:00-03'),
+    ('fdc911c8-5edf-5e0e-a7fc-ebd98c52c843'::uuid, 'a8131666-55ff-5fed-bf5c-43e92fb173c6'::uuid, '42700ec1-2304-51cd-899c-ea58b477a2c6'::uuid, '2026-10-26', '2026-10-22 10:05:00-03', '2026-10-22 10:05:00-03'),
+    ('71b6eee6-c496-5fc6-b512-c77ebca9da1e'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, '42700ec1-2304-51cd-899c-ea58b477a2c6'::uuid, '2026-11-02', '2026-10-22 10:10:00-03', '2026-10-22 10:10:00-03'),
+    ('21abb7fb-a4ad-5273-8861-a7295c872805'::uuid, 'a8131666-55ff-5fed-bf5c-43e92fb173c6'::uuid, 'ab2dfcb8-e8cb-5565-8e9e-53af5c65333d'::uuid, '2026-10-24', '2026-10-20 10:00:00-03', '2026-10-20 10:00:00-03'),
+    ('fbbd1891-e0f7-5f4b-81f7-d0183409db05'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, '71ac17cd-daf2-5ce5-ad9f-d1005c0b7ae9'::uuid, '2026-10-21', '2026-10-19 10:00:00-03', '2026-10-19 10:00:00-03'),
+    ('ca1ac0f2-f669-593b-8540-46639e9dbcff'::uuid, '109cc24f-1d15-51b3-8f02-12bb50d31bea'::uuid, 'e738c602-139c-554f-b690-6d8cd0328df5'::uuid, '2026-11-04', '2026-10-22 11:00:00-03', '2026-10-22 11:00:00-03')
+ON CONFLICT DO NOTHING;
+
+-- Ejercicios hechos: via individual
+INSERT INTO public."Routine_Asign_Exercise_Finished" (id, user_routine_asign_id, routine_exercise_id, user_note, finished_at, created_at, updated_at) VALUES
+    ('ae8bafef-a5b3-5c01-ae99-93c3e509b8a1'::uuid, '6343a1a1-c435-55f1-822c-e341ebfcc1d4'::uuid, 'f58979d6-a776-5a6b-a2ab-994e73f4be92'::uuid, 'Subí 5 kg', '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('e36b883f-5c5c-5f75-a5c8-ea0640ae9fee'::uuid, '6343a1a1-c435-55f1-822c-e341ebfcc1d4'::uuid, '7ca68d13-341c-5df7-86b4-8d85c6b0f851'::uuid, NULL, '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('7848307d-436d-5cc2-b741-b6f8d97c3f93'::uuid, '6343a1a1-c435-55f1-822c-e341ebfcc1d4'::uuid, '3ea9a990-1cc3-59b1-a298-9bef75416050'::uuid, 'Las hice al otro día', '2026-10-20', '2026-10-20 19:30:00-03', '2026-10-20 19:30:00-03'),
+    ('8355ecc6-aa7a-505f-8457-4ccc0acea4a6'::uuid, '6343a1a1-c435-55f1-822c-e341ebfcc1d4'::uuid, '80735f92-04b5-52d6-8f0a-49ad244d84ba'::uuid, 'Cómodo con 40 kg', '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('dd5a1447-d327-5838-826f-ece180f4a821'::uuid, '6343a1a1-c435-55f1-822c-e341ebfcc1d4'::uuid, 'e692545e-85fc-5a79-a839-4912a46f4bc3'::uuid, NULL, '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('af769b24-1488-5d7d-94e2-44a9ce9a82c3'::uuid, '6343a1a1-c435-55f1-822c-e341ebfcc1d4'::uuid, '6ce7867c-89fc-50b1-8f24-0d0d6d2e1125'::uuid, NULL, '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('e9256dca-bfd0-5411-b578-5beb91befaad'::uuid, '6343a1a1-c435-55f1-822c-e341ebfcc1d4'::uuid, 'f756d807-7c83-5ea8-a5a3-b899a1e1369a'::uuid, 'Las marqué al día siguiente', '2026-10-19', '2026-10-20 19:30:00-03', '2026-10-20 19:30:00-03'),
+    ('8f68d8d7-2544-5d0c-ae8a-7cdb1885a208'::uuid, '6343a1a1-c435-55f1-822c-e341ebfcc1d4'::uuid, '19baa85c-9054-5ead-95ee-d7d0b0a992f2'::uuid, 'Lo hice al final', '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('219a60a7-b637-51a6-90e2-8d1c3d7888ed'::uuid, '21abb7fb-a4ad-5273-8861-a7295c872805'::uuid, '19baa85c-9054-5ead-95ee-d7d0b0a992f2'::uuid, 'Muy duro, paré a los 4 minutos', '2026-10-24', '2026-10-24 19:30:00-03', '2026-10-24 19:30:00-03'),
+    ('9f4aee34-6db9-5b98-873e-995e6fef5c61'::uuid, 'fbbd1891-e0f7-5f4b-81f7-d0183409db05'::uuid, 'f58979d6-a776-5a6b-a2ab-994e73f4be92'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('aa1fcf21-ffa3-5a4c-a9d7-9efa8da45067'::uuid, 'fbbd1891-e0f7-5f4b-81f7-d0183409db05'::uuid, '7ca68d13-341c-5df7-86b4-8d85c6b0f851'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('b4a4743b-7c18-5be7-b0e9-7570fce3b5f3'::uuid, 'fbbd1891-e0f7-5f4b-81f7-d0183409db05'::uuid, '3ea9a990-1cc3-59b1-a298-9bef75416050'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('1cb42103-9c33-5eff-85a4-9882c327938d'::uuid, 'fbbd1891-e0f7-5f4b-81f7-d0183409db05'::uuid, '80735f92-04b5-52d6-8f0a-49ad244d84ba'::uuid, 'Último set al fallo', '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('8031439c-9474-59d9-9c0d-52651bbdd3a6'::uuid, 'fbbd1891-e0f7-5f4b-81f7-d0183409db05'::uuid, 'e692545e-85fc-5a79-a839-4912a46f4bc3'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('77e5f7c7-5a70-5417-9e58-e08c393095b1'::uuid, 'fbbd1891-e0f7-5f4b-81f7-d0183409db05'::uuid, '6ce7867c-89fc-50b1-8f24-0d0d6d2e1125'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('cd422b9b-e9e5-56fe-9f3b-ed162accb484'::uuid, 'fbbd1891-e0f7-5f4b-81f7-d0183409db05'::uuid, 'f756d807-7c83-5ea8-a5a3-b899a1e1369a'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('fed7fdac-3255-5281-bf9f-c64594f1a48e'::uuid, 'fbbd1891-e0f7-5f4b-81f7-d0183409db05'::uuid, 'c79bb8c7-f6ef-5c51-85de-a04442d861c3'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03')
+ON CONFLICT DO NOTHING;
+
+-- Ejercicios hechos: via de la planificacion
+INSERT INTO public."Routine_Exercise_Finished" (id, user_planification_id, routine_asignation_id, routine_exercise_id, user_note, finished_at, created_at, updated_at) VALUES
+    ('1d6579f6-2389-5b69-9071-8cc9b4874891'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, 'f58979d6-a776-5a6b-a2ab-994e73f4be92'::uuid, 'Rodillas bien alineadas', '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('9c88b856-48f8-5aae-8b61-ebe5ba6b69f8'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, '7ca68d13-341c-5df7-86b4-8d85c6b0f851'::uuid, NULL, '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('f04f1b17-b2d1-5d4d-9913-792f1ce5bb4f'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, '3ea9a990-1cc3-59b1-a298-9bef75416050'::uuid, NULL, '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('18afb58b-7a2f-5dea-8841-805254abab3d'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, 'c8ca7b81-3f39-51d4-97e2-c642705a5e21'::uuid, 'Subí 10 kg', '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('c4f17cb8-2d88-591f-b3e3-a3d86a323e4e'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, '8a95b4a9-0492-5b61-841f-906645b38a4b'::uuid, NULL, '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('d360f7f3-ff54-5c8e-8a04-00dbb4236c0f'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, 'e079d164-cc5e-5006-827a-ecb02de6acca'::uuid, NULL, '2026-10-19', '2026-10-19 19:30:00-03', '2026-10-19 19:30:00-03'),
+    ('684ebc1a-295a-50c9-9852-304ea2c5c569'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'dd9a7c9a-5782-5cf2-876a-dc46e9e79633'::uuid, '80735f92-04b5-52d6-8f0a-49ad244d84ba'::uuid, 'Buen ritmo', '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('8137a46d-a6e5-5398-bd59-f428bd4d218b'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'dd9a7c9a-5782-5cf2-876a-dc46e9e79633'::uuid, 'e692545e-85fc-5a79-a839-4912a46f4bc3'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('de663b53-fce5-53e0-ab7c-e20c3042d5b2'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'dd9a7c9a-5782-5cf2-876a-dc46e9e79633'::uuid, '8cf3a5ee-84d7-56f5-8845-ee5e52f4201f'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('a040acf3-b777-5ae8-ab2d-1ab14e94957f'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'dd9a7c9a-5782-5cf2-876a-dc46e9e79633'::uuid, '507485d0-00ff-5484-8f08-50e94bdad3b9'::uuid, NULL, '2026-10-21', '2026-10-22 19:30:00-03', '2026-10-22 19:30:00-03'),
+    ('42b6a2ab-cb25-5f47-bd07-9f6951422dee'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'dd9a7c9a-5782-5cf2-876a-dc46e9e79633'::uuid, 'de3cbe5d-fcb8-5167-810c-07b7703d1a23'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('91d7991a-45cb-5c3f-8511-9ebb0cc5a46c'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'dd9a7c9a-5782-5cf2-876a-dc46e9e79633'::uuid, '75caf135-26d5-532f-912d-78a0bead5ce1'::uuid, NULL, '2026-10-21', '2026-10-21 19:30:00-03', '2026-10-21 19:30:00-03'),
+    ('8a6978d2-6eec-531b-9aaf-f7b1eff9761a'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'b3da651b-a5a1-5778-98ab-af4f26a08d8a'::uuid, '6ce7867c-89fc-50b1-8f24-0d0d6d2e1125'::uuid, NULL, '2026-10-23', '2026-10-23 19:30:00-03', '2026-10-23 19:30:00-03'),
+    ('829cbcde-dbae-55a2-8be8-878b8ae57637'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'b3da651b-a5a1-5778-98ab-af4f26a08d8a'::uuid, 'f756d807-7c83-5ea8-a5a3-b899a1e1369a'::uuid, 'Llegué a 6 limpias', '2026-10-23', '2026-10-23 19:30:00-03', '2026-10-23 19:30:00-03'),
+    ('d6b277f2-6c7c-5de7-9e6e-da97d9bdb5f9'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'b3da651b-a5a1-5778-98ab-af4f26a08d8a'::uuid, 'c79bb8c7-f6ef-5c51-85de-a04442d861c3'::uuid, NULL, '2026-10-23', '2026-10-23 19:30:00-03', '2026-10-23 19:30:00-03'),
+    ('11eae112-6754-5e03-b038-b7a70e89ef4a'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'e76f983e-ca2b-5495-bcb3-9efa5850c256'::uuid, 'f58979d6-a776-5a6b-a2ab-994e73f4be92'::uuid, NULL, '2026-10-26', '2026-10-26 19:30:00-03', '2026-10-26 19:30:00-03'),
+    ('3306e08c-2706-55b6-b52a-4e05cae227f1'::uuid, '4f733808-da34-58b1-a422-61a13717828b'::uuid, 'e76f983e-ca2b-5495-bcb3-9efa5850c256'::uuid, '7ca68d13-341c-5df7-86b4-8d85c6b0f851'::uuid, NULL, '2026-10-26', '2026-10-26 19:30:00-03', '2026-10-26 19:30:00-03'),
+    ('46e1807f-717a-53b9-98ba-6015ddd21456'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, 'f58979d6-a776-5a6b-a2ab-994e73f4be92'::uuid, 'Primera semana tras la lesión', '2026-10-05', '2026-10-05 19:30:00-03', '2026-10-05 19:30:00-03'),
+    ('784f9e46-0f1e-535f-895d-14841687d40d'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, '7ca68d13-341c-5df7-86b4-8d85c6b0f851'::uuid, NULL, '2026-10-05', '2026-10-05 19:30:00-03', '2026-10-05 19:30:00-03'),
+    ('d2e91ea1-fd0a-5805-9861-70695c4718c8'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, '3ea9a990-1cc3-59b1-a298-9bef75416050'::uuid, NULL, '2026-10-05', '2026-10-05 19:30:00-03', '2026-10-05 19:30:00-03'),
+    ('ac745f2b-a656-52fe-b1d4-fbf64abdc2b6'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, 'c8ca7b81-3f39-51d4-97e2-c642705a5e21'::uuid, NULL, '2026-10-05', '2026-10-05 19:30:00-03', '2026-10-05 19:30:00-03'),
+    ('35eeb76e-e5d1-5df8-bcce-a742d51de619'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, '8a95b4a9-0492-5b61-841f-906645b38a4b'::uuid, NULL, '2026-10-05', '2026-10-05 19:30:00-03', '2026-10-05 19:30:00-03'),
+    ('4fc34f8f-18f6-5e48-a756-bfda5fd5bd8b'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, '5f4c980b-ff63-53f1-a354-de37c7b1f83d'::uuid, 'e079d164-cc5e-5006-827a-ecb02de6acca'::uuid, NULL, '2026-10-05', '2026-10-05 19:30:00-03', '2026-10-05 19:30:00-03'),
+    ('c470c3bb-2c19-5674-ab6c-8e184baf3f28'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, 'dd9a7c9a-5782-5cf2-876a-dc46e9e79633'::uuid, '80735f92-04b5-52d6-8f0a-49ad244d84ba'::uuid, NULL, '2026-10-07', '2026-10-07 19:30:00-03', '2026-10-07 19:30:00-03'),
+    ('e8cb1534-6e2f-5862-93c4-5c418ac0c83b'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, 'dd9a7c9a-5782-5cf2-876a-dc46e9e79633'::uuid, 'e692545e-85fc-5a79-a839-4912a46f4bc3'::uuid, NULL, '2026-10-07', '2026-10-07 19:30:00-03', '2026-10-07 19:30:00-03'),
+    ('aa553314-7b96-55ea-a935-ee34dbc43dcd'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, 'e76f983e-ca2b-5495-bcb3-9efa5850c256'::uuid, 'f58979d6-a776-5a6b-a2ab-994e73f4be92'::uuid, NULL, '2026-10-12', '2026-10-12 19:30:00-03', '2026-10-12 19:30:00-03'),
+    ('38ad672d-65f8-511e-a30a-e7a5d04784d8'::uuid, 'ce91dbd0-bee9-5987-a794-158b9f367968'::uuid, '95adff3a-5c90-528d-b005-34fa4f0e648e'::uuid, '19baa85c-9054-5ead-95ee-d7d0b0a992f2'::uuid, 'Antes de que la quitaran', '2026-10-14', '2026-10-14 19:30:00-03', '2026-10-14 19:30:00-03')
+ON CONFLICT DO NOTHING;

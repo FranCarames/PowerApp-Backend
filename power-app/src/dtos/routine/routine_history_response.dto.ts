@@ -72,10 +72,14 @@ export class RoutineHistoryExerciseDto {
     sets!: RoutineHistorySetDto[];
 }
 
-export class RoutineHistorySessionDto {
+// El historial tiene dos tipos de sesion, que se distinguen por `source` (spec del bloque B, §5.9):
+// la de una asignacion individual y la de una rutina de una planificacion. La respuesta es una lista
+// de las dos, mezcladas y ordenadas juntas
 
-    @ApiProperty({ enum: ['individual', 'plan'], example: 'individual', description: 'De dónde viene la sesión. Hoy sólo sale individual (una asignación individual); las sesiones de una planificación llegan con el bloque B, con campos extra, sin cambiar esta forma' })
-    source!: 'individual' | 'plan';
+export class RoutineHistoryIndividualSessionDto {
+
+    @ApiProperty({ enum: ['individual'], example: 'individual', description: 'De dónde viene la sesión: una asignación individual (una rutina asignada para un día)' })
+    source!: 'individual';
 
     @ApiProperty({ example: 'uuid-1234', description: 'Id de la Routine_Asignation_User' })
     assignment_id!: string;
@@ -87,5 +91,42 @@ export class RoutineHistorySessionDto {
     routine!: RoutineHistoryRoutineDto;
 
     @ApiProperty({ type: [RoutineHistoryExerciseDto], description: 'Los ejercicios que el alumno hizo en la sesión, por el día en que los hizo y, dentro del mismo día, en el orden en que los marcó. Incluye los que el coach dio de baja después' })
+    exercises!: RoutineHistoryExerciseDto[];
+}
+
+export class RoutineHistoryPlanificationDto {
+
+    @ApiProperty({ example: 'uuid-1234', description: 'Id de la plantilla (Planification)' })
+    id!: string;
+
+    @ApiProperty({ example: 'Fuerza 4 semanas', nullable: true, type: String, description: 'Nombre de la plantilla, leído en vivo; null si no tiene' })
+    name!: string | null;
+}
+
+// No tiene assignment_id: la sesion es el par (User_Planification, Routine_Asignation)
+export class RoutineHistoryPlanSessionDto {
+
+    @ApiProperty({ enum: ['plan'], example: 'plan', description: 'De dónde viene la sesión: una rutina de la planificación asignada al alumno' })
+    source!: 'plan';
+
+    @ApiProperty({ example: 'uuid-1234', description: 'Id de la User_Planification: la planificación asignada al alumno' })
+    user_planification_id!: string;
+
+    @ApiProperty({ example: 'uuid-1234', description: 'Id de la Routine_Asignation: la rutina del plan. Con el anterior, identifica la sesión (y es el par del detalle, GET /routine/assign-plan/:userPlanificationId/:routineAsignationId)' })
+    routine_asignation_id!: string;
+
+    @ApiProperty({ example: 2, description: 'Semana del plan en la que va la rutina' })
+    week!: number;
+
+    @ApiProperty({ example: '2026-10-20', description: 'La rutina del plan no tiene día: es el día más viejo en que el alumno hizo alguno de los ejercicios que se devuelven (YYYY-MM-DD, sin hora). Con exercise_id, el día en que hizo ese ejercicio' })
+    date!: string;
+
+    @ApiProperty({ type: RoutineHistoryPlanificationDto })
+    planification!: RoutineHistoryPlanificationDto;
+
+    @ApiProperty({ type: RoutineHistoryRoutineDto })
+    routine!: RoutineHistoryRoutineDto;
+
+    @ApiProperty({ type: [RoutineHistoryExerciseDto], description: 'Los ejercicios que el alumno hizo en la sesión, con la misma forma y el mismo orden que en la sesión individual. Incluye los que el coach quitó del plan después, y los de una planificación que le quitaron al alumno' })
     exercises!: RoutineHistoryExerciseDto[];
 }

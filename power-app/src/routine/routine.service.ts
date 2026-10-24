@@ -41,9 +41,15 @@ const REMOVE_TRAINED_ERROR = 'El alumno ya entrenó esta rutina: no se puede qui
 // No puede ser el texto de la cuenta deshabilitada: es el unico que hace cerrar la sesion en el web
 const OTHER_STUDENT_ASSIGNMENT_ERROR = 'No podés acceder a una rutina asignada a otro alumno.';
 
-// El 400 de marcar un ejercicio que no estaba marcado sin decir que dia se hizo (D25). Lo van a
-// compartir las dos vias: la del plan llega en BE-20c
+// El 400 de marcar un ejercicio que no estaba marcado sin decir que dia se hizo (D25). Lo comparten
+// las dos vias
 const FINISHED_DAY_REQUIRED_ERROR = 'Indicá el día en que hiciste el ejercicio (finished_at).';
+
+// Los dos 400 de marcar y desmarcar que solo tiene la via del plan. Una asignacion quitada (E-14)
+// queda congelada: lo hecho es historia (D24). Y en una rutina que el coach quito del plan (E-12c)
+// no se marca nada nuevo, solo se edita lo que el alumno ya hizo (spec del bloque B, §5.7)
+const PLAN_REMOVED_ERROR = 'La planificación fue quitada: no se puede modificar.';
+const ROUTINE_REMOVED_FROM_PLAN_ERROR = 'La rutina fue quitada de la planificación: ya no se puede marcar.';
 
 // El tope de semanas del plan en el home (decision del 21/10). Un fin absurdo (un 9999 tipeado por
 // 2026) pedido sin filtro armaria cientos de miles de semanas y tiraria el proceso. El home pide a lo
@@ -54,6 +60,58 @@ const PLAN_WEEKS_LIMIT_ERROR = `Hay más de ${PLAN_WEEKS_LIMIT} semanas de plan 
 // La zona del "hoy" del home cuando no llega date (D32). El servidor corre en UTC: los domingos de 21
 // a 24 h de Argentina ya es lunes, y con su reloj el home saltaria a la semana siguiente
 const HOME_TIME_ZONE = 'America/Argentina/Buenos_Aires';
+
+// Una sesion del historial (E-06 y E-07) con lo que hace falta para ordenarla junto a las de la otra
+// via (spec del bloque B, §5.9): el dia, el nombre de la rutina y el alta, que es el de la asignacion
+// individual o, en el plan, el de la User_Planification y despues el de la Routine_Asignation
+interface HistoryEntry {
+    date: string;
+    routineName: string;
+    createdAt: [number, number];
+    tieKey: string;
+    session: { exercises: unknown[]; [field: string]: unknown };
+}
+
+// El orden del historial: el dia mas nuevo primero, despues el nombre de la rutina y despues el alta.
+// Los dias son 'YYYY-MM-DD', asi que se comparan como texto
+function compareHistoryEntries(a: HistoryEntry, b: HistoryEntry): number {
+    if (a.date !== b.date) {
+        return a.date < b.date ? 1 : -1;
+    }
+
+    const byName = a.routineName.localeCompare(b.routineName, 'es');
+
+    if (byName !== 0) {
+        return byName;
+    }
+
+    if (a.createdAt[0] !== b.createdAt[0]) {
+        return a.createdAt[0] - b.createdAt[0];
+    }
+
+    if (a.createdAt[1] !== b.createdAt[1]) {
+        return a.createdAt[1] - b.createdAt[1];
+    }
+
+    return a.tieKey < b.tieKey ? -1 : a.tieKey > b.tieKey ? 1 : 0;
+}
+
+// Junta las dos listas en una. Las individuales ya vienen ordenadas por la base y el plan se ordena
+// aca (su dia sale de los ejercicios): se intercalan sin reordenar las individuales entre si, asi su
+// orden no depende de como compare los nombres JavaScript (la collation de la base manda). Solo el
+// cruce entre las dos fuentes usa compareHistoryEntries
+function mergeHistoryEntries(individual: HistoryEntry[], plan: HistoryEntry[]): HistoryEntry[] {
+    const sortedPlan = [...plan].sort(compareHistoryEntries);
+    const merged: HistoryEntry[] = [];
+    let i = 0;
+    let j = 0;
+
+    while (i < individual.length && j < sortedPlan.length) {
+        merged.push(compareHistoryEntries(sortedPlan[j], individual[i]) < 0 ? sortedPlan[j++] : individual[i++]);
+    }
+
+    return [...merged, ...individual.slice(i), ...sortedPlan.slice(j)];
+}
 
 @Injectable()
 export class RoutineService {
@@ -1060,17 +1118,7 @@ export class RoutineService {
                 return res.status(403).send({ error: OTHER_STUDENT_ASSIGNMENT_ERROR });
             }
 
-            // Solo un string cuenta como "viene la nota": '' la borra (spec §4.5) y null o ausente
-            // significa no tocarla
-            const sentNote = typeof markExerciseFinishedDto.user_note === 'string'
-                ? (markExerciseFinishedDto.user_note === '' ? null : markExerciseFinishedDto.user_note)
-                : undefined;
-
-            // Lo mismo con el dia: obligatorio para crear la marca, y opcional para corregirla
-            // (null o ausente = no tocarlo). El DTO ya garantizo que es un dia valido
-            const sentDay = typeof markExerciseFinishedDto.finished_at === 'string'
-                ? markExerciseFinishedDto.finished_at
-                : undefined;
+            const { sentNote, sentDay } = this.readMarkInput(markExerciseFinishedDto);
 
             let finished = await this.findFinishedRow(assignment.id, markExerciseFinishedDto.routine_exercise_id);
 
@@ -1120,15 +1168,7 @@ export class RoutineService {
             // Ya estaba marcado: idempotente. Se escribe solo lo que vino y cambio (la nota y el
             // dia), en un solo UPDATE. updated_at se setea a mano: el onUpdate de las entidades es
             // sintaxis de MySQL y en Postgres no hace nada
-            const changes: { user_note?: string | null; finished_at?: string } = {};
-
-            if (sentNote !== undefined && sentNote !== (finished.user_note ?? null)) {
-                changes.user_note = sentNote;
-            }
-
-            if (sentDay !== undefined && sentDay !== finished.finished_at) {
-                changes.finished_at = sentDay;
-            }
+            const changes = this.diffFinishedChanges(finished, sentNote, sentDay);
 
             if (Object.keys(changes).length > 0) {
                 const updatedAt = new Date();
@@ -1187,8 +1227,9 @@ export class RoutineService {
     }
 
     // CU-E-06 y E-07: lo que un alumno entreno. Una "sesion" es una asignacion individual con al
-    // menos un ejercicio hecho (la via del plan se suma en el bloque B, con source 'plan'). Gimnasio
-    // compartido (D6): cualquier coach o admin ve el historial de cualquier alumno
+    // menos un ejercicio hecho (source 'individual') o una rutina de una planificacion con al menos
+    // un ejercicio hecho (source 'plan', BE-20d): las dos van en la misma lista, ordenadas juntas.
+    // Gimnasio compartido (D6): cualquier coach o admin ve el historial de cualquier alumno
     async getTrainingHistory(
         userId: string,
         query: GetTrainingHistoryQueryDto,
@@ -1245,53 +1286,38 @@ export class RoutineService {
             // Las filas ya vienen en el orden final: se agrupa por asignacion respetandolo. Los
             // ejercicios de cada sesion quedan por el dia en que el alumno los hizo y, dentro del
             // mismo dia, en el orden en que los marco
-            const sessions = new Map<string, {
-                source: 'individual';
-                assignment_id: string;
-                date: string;
-                routine: { id: string; name: string };
-                exercises: unknown[];
-            }>();
+            const individualEntries = new Map<string, HistoryEntry>();
 
             for (const finished of finishedRows) {
                 const assignment = finished.routineAsignationUser;
+                let entry = individualEntries.get(assignment.id);
 
-                if (!sessions.has(assignment.id)) {
-                    sessions.set(assignment.id, {
-                        source: 'individual',
-                        assignment_id: assignment.id,
+                if (!entry) {
+                    entry = {
                         date: assignment.date,
-                        routine: { id: assignment.routine.id, name: assignment.routine.name },
-                        exercises: [],
-                    });
+                        routineName: assignment.routine.name,
+                        createdAt: [assignment.created_at.getTime(), 0],
+                        tieKey: assignment.id,
+                        session: {
+                            source: 'individual',
+                            assignment_id: assignment.id,
+                            date: assignment.date,
+                            routine: { id: assignment.routine.id, name: assignment.routine.name },
+                            exercises: [],
+                        },
+                    };
+                    individualEntries.set(assignment.id, entry);
                 }
 
-                // sets es la PRESCRIPCION del coach (D7): el modelo no registra la carga real
-                sessions.get(assignment.id)!.exercises.push({
-                    routine_exercise_id: finished.routine_exercise_id,
-                    exercise: {
-                        id: finished.routineExercise.exercise.id,
-                        name: finished.routineExercise.exercise.name,
-                    },
-                    user_note: finished.user_note ?? null,
-                    // El dia en que lo hizo (D25), no el momento en que lo marco
-                    finished_at: finished.finished_at,
-                    sets: finished.routineExercise.exerciseSets.map(exerciseSet => ({
-                        set_order: exerciseSet.set_order,
-                        set_count: exerciseSet.set_count,
-                        rep_count: exerciseSet.rep_count,
-                        weight: exerciseSet.weight ?? null,
-                        rm_perc: exerciseSet.rm_perc ?? null,
-                        rpe: exerciseSet.rpe ?? null,
-                        rir: exerciseSet.rir ?? null,
-                        amrap: exerciseSet.amrap,
-                        amrap_time: exerciseSet.amrap_time ?? null,
-                        rm: exerciseSet.rm,
-                    })),
-                });
+                entry.session.exercises.push(this.buildHistoryExercise(finished));
             }
 
-            return res.status(200).send([...sessions.values()]);
+            // Las sesiones del plan (BE-20d), y las dos fuentes en una sola lista
+            const planEntries = await this.findPlanHistoryEntries(user.id, query.exercise_id);
+
+            return res.status(200).send(
+                mergeHistoryEntries([...individualEntries.values()], planEntries).map(entry => entry.session)
+            );
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener el historial de entrenamientos.' });
@@ -1573,6 +1599,159 @@ export class RoutineService {
         }
     }
 
+    // CU-U-12, con U-13 incluido, por la via del plan (spec del bloque B, §5.7): lo mismo que
+    // markExerciseFinished, pero la marca cuelga del par (User_Planification, Routine_Asignation) y
+    // la rutina es la de esa Routine_Asignation. Las validaciones de la sesion son las del detalle
+    // (D39) y despues la asignacion quitada esta congelada (D24), tambien para editar una marca que
+    // ya existe. Una sola escritura (INSERT o UPDATE), sin transaccion: la carrera de dos marcas
+    // simultaneas la cierra el unico de la base. Sin ventana de fechas (D5)
+    async markPlanExerciseFinished(
+        userPlanificationId: string,
+        routineAsignationId: string,
+        markExerciseFinishedDto: MarkExerciseFinishedDto,
+        currentUser: AuthUser,
+        res: Response
+    ) {
+        try {
+            const session = await this.findPlanSession(userPlanificationId, routineAsignationId, currentUser);
+
+            if ('error' in session) {
+                return res.status(session.status).send({ error: session.error });
+            }
+
+            const { userPlanification, routineAsignation } = session;
+
+            if (!userPlanification.active) {
+                return res.status(400).send({ error: PLAN_REMOVED_ERROR });
+            }
+
+            const { sentNote, sentDay } = this.readMarkInput(markExerciseFinishedDto);
+
+            // Por los ids de las filas y no por los del path, que pueden venir en mayuscula
+            let finished = await this.findPlanFinishedRow(
+                userPlanification.id,
+                routineAsignation.id,
+                markExerciseFinishedDto.routine_exercise_id,
+            );
+
+            if (!finished) {
+                // Antes que la pertenencia: sin el dia no hay nada que crear (§5.7)
+                if (sentDay === undefined) {
+                    return res.status(400).send({ error: FINISHED_DAY_REQUIRED_ERROR });
+                }
+
+                // No estaba marcado: el ejercicio tiene que ser de la rutina del plan y seguir en ella
+                const markable = await this.checkExerciseIsMarkable(
+                    routineAsignation.routine_id,
+                    markExerciseFinishedDto.routine_exercise_id,
+                );
+
+                if ('error' in markable) {
+                    return res.status(400).send({ error: markable.error });
+                }
+
+                // La rutina que el coach quito del plan (E-12c) ya no admite marcas nuevas: despues
+                // de la pertenencia y del ejercicio, que tienen su propio texto
+                if (!routineAsignation.active) {
+                    return res.status(400).send({ error: ROUTINE_REMOVED_FROM_PLAN_ERROR });
+                }
+
+                try {
+                    const created = await this.routineExerciseFinishedRepository.save(
+                        this.routineExerciseFinishedRepository.create({
+                            user_planification_id: userPlanification.id,
+                            routine_asignation_id: routineAsignation.id,
+                            routine_exercise_id: markable.exerciseId,
+                            finished_at: sentDay,
+                            user_note: sentNote ?? null,
+                        })
+                    );
+
+                    return res.status(201).send(this.buildFinishedResponse(created));
+                } catch (error) {
+                    // Dos marcas simultaneas pasan las dos la lectura y la segunda choca con el
+                    // unico: se trata como "ya estaba marcado". Se mira el nombre del unico para no
+                    // disfrazar otro error, y si la fila no aparece se relanza
+                    if (!isDatabaseError(error, '23505', 'uk_ref_plan_asignation_exercise')) {
+                        throw error;
+                    }
+
+                    finished = await this.findPlanFinishedRow(
+                        userPlanification.id,
+                        routineAsignation.id,
+                        markExerciseFinishedDto.routine_exercise_id,
+                    );
+
+                    if (!finished) {
+                        throw error;
+                    }
+                }
+            }
+
+            // Ya estaba marcado: idempotente. Se escribe solo lo que vino y cambio, en un solo UPDATE
+            // (updated_at a mano, como en la via individual). Se edita tambien lo que el coach saco
+            // despues: forma parte de lo que el alumno hizo
+            const changes = this.diffFinishedChanges(finished, sentNote, sentDay);
+
+            if (Object.keys(changes).length > 0) {
+                const updatedAt = new Date();
+
+                await this.routineExerciseFinishedRepository.update(
+                    { id: finished.id },
+                    { ...changes, updated_at: updatedAt },
+                );
+
+                Object.assign(finished, changes, { updated_at: updatedAt });
+            }
+
+            return res.status(200).send(this.buildFinishedResponse(finished));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al marcar el ejercicio del plan.' });
+        }
+    }
+
+    // CU-U-12 por la via del plan (§5.8): borra la fila y, con ella, la nota. Idempotente: si no estaba
+    // marcado tambien responde 200. No mira si el ejercicio o la rutina siguen en el plan: se puede
+    // desmarcar lo que el coach saco despues. Si la asignacion esta quitada, 400 (D24)
+    async unmarkPlanExerciseFinished(
+        userPlanificationId: string,
+        routineAsignationId: string,
+        routineExerciseId: string,
+        currentUser: AuthUser,
+        res: Response
+    ) {
+        try {
+            const session = await this.findPlanSession(userPlanificationId, routineAsignationId, currentUser);
+
+            if ('error' in session) {
+                return res.status(session.status).send({ error: session.error });
+            }
+
+            const { userPlanification, routineAsignation } = session;
+
+            if (!userPlanification.active) {
+                return res.status(400).send({ error: PLAN_REMOVED_ERROR });
+            }
+
+            await this.routineExerciseFinishedRepository.delete({
+                user_planification_id: userPlanification.id,
+                routine_asignation_id: routineAsignation.id,
+                routine_exercise_id: routineExerciseId,
+            });
+
+            // Si no habia nada que borrar no hay fila de donde sacar el id: se devuelve el del path
+            // normalizado, en minuscula como el resto
+            return res.status(200).send({
+                routine_exercise_id: routineExerciseId.toLowerCase(),
+                finished: false,
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al desmarcar el ejercicio del plan.' });
+        }
+    }
+
     // ===================== EL HOME DEL ALUMNO (BE-20e) =====================
 
     // El home (CU-U-08, spec del home) en un solo pedido: week semanas enteras desde el lunes de la
@@ -1831,6 +2010,22 @@ export class RoutineService {
         });
     }
 
+    // La marca de un ejercicio en una sesion del plan: la fila que cuelga del par (User_Planification,
+    // Routine_Asignation). El equivalente de findFinishedRow en la via del plan
+    private async findPlanFinishedRow(
+        userPlanificationId: string,
+        routineAsignationId: string,
+        routineExerciseId: string
+    ): Promise<RoutineExerciseFinished | null> {
+        return this.routineExerciseFinishedRepository.findOne({
+            where: {
+                user_planification_id: userPlanificationId,
+                routine_asignation_id: routineAsignationId,
+                routine_exercise_id: routineExerciseId,
+            },
+        });
+    }
+
     // Si un ejercicio que todavia no estaba marcado se puede marcar (spec §4.5). Tiene que ser de
     // la rutina: algun Routine_Circuit de ESA rutina contiene su circuito, activo o no. Y tiene que
     // seguir en ella: el ejercicio activo y al menos un vinculo activo (con un circuito repetido,
@@ -1862,6 +2057,42 @@ export class RoutineService {
 
         // El id de la fila y no el del body: puede venir en mayuscula
         return { exerciseId: exercise.id };
+    }
+
+    // Lo que el body de marcar dice de la nota y del dia, igual en las dos vias. Solo un string cuenta
+    // como "viene": '' borra la nota (spec §4.5) y null o ausente significa no tocarla. Lo mismo con
+    // el dia: obligatorio para crear la marca y opcional para corregirla. El DTO ya garantizo que es
+    // un dia valido
+    private readMarkInput(markExerciseFinishedDto: MarkExerciseFinishedDto): { sentNote: string | null | undefined; sentDay: string | undefined } {
+        const sentNote = typeof markExerciseFinishedDto.user_note === 'string'
+            ? (markExerciseFinishedDto.user_note === '' ? null : markExerciseFinishedDto.user_note)
+            : undefined;
+
+        const sentDay = typeof markExerciseFinishedDto.finished_at === 'string'
+            ? markExerciseFinishedDto.finished_at
+            : undefined;
+
+        return { sentNote, sentDay };
+    }
+
+    // Que cambia en una marca que ya existe: solo lo que vino y es distinto de lo guardado. Sin
+    // cambios, el handler no escribe (marcar es idempotente y updated_at no se mueve)
+    private diffFinishedChanges(
+        finished: RoutineAsignExerciseFinished | RoutineExerciseFinished,
+        sentNote: string | null | undefined,
+        sentDay: string | undefined
+    ): { user_note?: string | null; finished_at?: string } {
+        const changes: { user_note?: string | null; finished_at?: string } = {};
+
+        if (sentNote !== undefined && sentNote !== (finished.user_note ?? null)) {
+            changes.user_note = sentNote;
+        }
+
+        if (sentDay !== undefined && sentDay !== finished.finished_at) {
+            changes.finished_at = sentDay;
+        }
+
+        return changes;
     }
 
     // Lo que el cliente cruza con el arbol de la rutina por routine_exercise_id. La misma forma en
@@ -1938,6 +2169,121 @@ export class RoutineService {
         }
 
         return { userPlanification, routineAsignation };
+    }
+
+    // ===================== HELPERS DEL HISTORIAL =====================
+
+    // Un ejercicio hecho del historial, igual en las dos vias. sets es la PRESCRIPCION del coach (D7):
+    // el modelo no registra la carga real. finished_at es el dia en que lo hizo (D25), no el momento
+    // en que lo marco. La fila tiene que venir con su routineExercise, su exercise y sus exerciseSets
+    private buildHistoryExercise(finished: RoutineAsignExerciseFinished | RoutineExerciseFinished) {
+        return {
+            routine_exercise_id: finished.routine_exercise_id,
+            exercise: {
+                id: finished.routineExercise.exercise.id,
+                name: finished.routineExercise.exercise.name,
+            },
+            user_note: finished.user_note ?? null,
+            finished_at: finished.finished_at,
+            sets: finished.routineExercise.exerciseSets.map(exerciseSet => ({
+                set_order: exerciseSet.set_order,
+                set_count: exerciseSet.set_count,
+                rep_count: exerciseSet.rep_count,
+                weight: exerciseSet.weight ?? null,
+                rm_perc: exerciseSet.rm_perc ?? null,
+                rpe: exerciseSet.rpe ?? null,
+                rir: exerciseSet.rir ?? null,
+                amrap: exerciseSet.amrap,
+                amrap_time: exerciseSet.amrap_time ?? null,
+                rm: exerciseSet.rm,
+            })),
+        };
+    }
+
+    // Las sesiones del plan del alumno con al menos un ejercicio hecho (spec del bloque B, §5.9). Una
+    // sesion es el par (User_Planification, Routine_Asignation). La misma consulta que la individual,
+    // pero parte de Routine_Exercise_Finished y el alumno es el de la asignacion. Sin ningun "active":
+    // las asignaciones quitadas (E-14), las plantillas dadas de baja y las rutinas quitadas del plan
+    // (E-12c) aparecen igual si el alumno hizo algo. userId es el de la fila del usuario, ya validado
+    private async findPlanHistoryEntries(userId: string, exerciseId?: string): Promise<HistoryEntry[]> {
+        const planQuery = this.routineExerciseFinishedRepository
+            .createQueryBuilder('finished')
+            .select(['finished.id', 'finished.routine_exercise_id', 'finished.user_note', 'finished.finished_at', 'finished.created_at'])
+            .innerJoin('finished.userPlanification', 'userPlanification')
+            .addSelect(['userPlanification.id', 'userPlanification.created_at'])
+            .innerJoin('userPlanification.planification', 'planification')
+            .addSelect(['planification.id', 'planification.name'])
+            .innerJoin('finished.routineAsignation', 'routineAsignation')
+            .addSelect(['routineAsignation.id', 'routineAsignation.week', 'routineAsignation.created_at'])
+            .innerJoin('routineAsignation.routine', 'routine')
+            .addSelect(['routine.id', 'routine.name'])
+            .innerJoin('finished.routineExercise', 'routineExercise')
+            .addSelect(['routineExercise.id'])
+            .innerJoin('routineExercise.exercise', 'exercise')
+            .addSelect(['exercise.id', 'exercise.name'])
+            .leftJoin('routineExercise.exerciseSets', 'exerciseSet')
+            .addSelect([
+                'exerciseSet.id', 'exerciseSet.set_order', 'exerciseSet.set_count', 'exerciseSet.rep_count',
+                'exerciseSet.weight', 'exerciseSet.rm_perc', 'exerciseSet.rpe', 'exerciseSet.rir',
+                'exerciseSet.amrap', 'exerciseSet.amrap_time', 'exerciseSet.rm',
+            ])
+            .where('userPlanification.user_id = :userId', { userId })
+            .orderBy('finished.finished_at', 'ASC')
+            .addOrderBy('finished.created_at', 'ASC')
+            .addOrderBy('finished.id', 'ASC')
+            .addOrderBy('exerciseSet.set_order', 'ASC');
+
+        // E-07: el ejercicio del CATALOGO, igual que en la via individual
+        if (exerciseId) {
+            planQuery.andWhere('exercise.id = :exerciseId', { exerciseId });
+        }
+
+        const finishedRows = await planQuery.getMany();
+
+        // El orden de las sesiones lo pone mergeHistoryEntries; el SQL solo ordena los ejercicios de
+        // cada una (dia en que los hizo y, dentro del dia, en que los marco)
+        const entries = new Map<string, HistoryEntry>();
+
+        for (const finished of finishedRows) {
+            const userPlanification = finished.userPlanification;
+            const routineAsignation = finished.routineAsignation;
+            const key = `${userPlanification.id}|${routineAsignation.id}`;
+            const entry = entries.get(key);
+
+            if (!entry) {
+                entries.set(key, {
+                    date: finished.finished_at,
+                    routineName: routineAsignation.routine.name,
+                    createdAt: [userPlanification.created_at.getTime(), routineAsignation.created_at.getTime()],
+                    tieKey: key,
+                    session: {
+                        source: 'plan',
+                        user_planification_id: userPlanification.id,
+                        routine_asignation_id: routineAsignation.id,
+                        week: routineAsignation.week,
+                        date: finished.finished_at,
+                        planification: {
+                            id: userPlanification.planification.id,
+                            name: userPlanification.planification.name ?? null,
+                        },
+                        routine: { id: routineAsignation.routine.id, name: routineAsignation.routine.name },
+                        exercises: [this.buildHistoryExercise(finished)],
+                    },
+                });
+
+                continue;
+            }
+
+            // La rutina del plan no tiene dia (D26): el de la sesion es el del ejercicio mas viejo
+            if (finished.finished_at < entry.date) {
+                entry.date = finished.finished_at;
+                entry.session.date = finished.finished_at;
+            }
+
+            entry.session.exercises.push(this.buildHistoryExercise(finished));
+        }
+
+        return [...entries.values()];
     }
 
     // ===================== HELPERS DE RUTINA =====================
