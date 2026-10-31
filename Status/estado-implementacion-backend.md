@@ -30,6 +30,29 @@
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
 > **Nota (31/10):** `CU-E-12` pasa a seis operaciones: `CU-E-12e` (reordenar las rutinas de una semana) y `CU-E-12f` (repetir una semana en otras) se suman al inventario y el total pasa de 75 a **77**. Nacen ✅ con BE-42, así que los ✅ suben de 73 a 75; la única 🟡 sigue siendo CU-U-04.
 
+## Cambios recientes (2026-10-31 · BE-43: formato del teléfono en el alta y en Mi cuenta)
+
+- **BE-43** (hallazgo VAL-05 de la tanda 3 de *Pruebas de mi cuenta*, 31/10; lo cubren además VAL-06 y REG-10). Plan: `Doc/plans/2026-10-31-be-43-formato-del-telefono-plan.md` (repo PowerApp-Docs); CU-U-06 y CU-U-01 reescritos el 31/10. **Sin cambios de estado de CU: sigue en 75 ✅ · 1 🟡 · 0 🔵 de 77 (1 sin backend).** U-01 y U-06 ya figuraban ✅; las specs nuevas del 31/10 (el teléfono es un número de verdad) los habrían vuelto 🟡 hasta esta tarea, y la tarea los deja ✅ de nuevo. **No cambia ninguna entidad, el esquema ni `Db Creator`** (sin diff en `entities/` ni en `Db Creator/`; los teléfonos del seed ya son sólo dígitos).
+- **Numeración:** el pedido llamaba BE-42 a este cambio, pero BE-42 es «las rutinas del plan por semana» (la entrada de abajo). El plan lo aclara en su primer párrafo: es **BE-43** (en el web, T54).
+- **El defecto:** `phone_prefix` y `phone_number` se validaban sólo por su largo (`@IsString` + `@MaxLength`), así que «abc» se guardaba, por el alta, por Mi cuenta (VAL-05) y por la API directa (VAL-06).
+- **Ahora**, en `POST /users/register` y `POST /users/edit`:
+  - `phone_prefix` cumple `^\+\d{1,4}$` («+» y de 1 a 4 dígitos: `+54`, `+1`, `+598`) y sigue con su tope de 10 caracteres.
+  - `phone_number` cumple `^\d+$` (sólo dígitos) y sigue con su tope de 20.
+  - Si no cumple: `400` del `ValidationPipe`, con la forma de siempre (`{ statusCode: 400, message: [...], error: 'Bad Request' }`) y los mensajes en español.
+  - **El back no limpia nada:** un «11 2345-6789» que llegue directo a la API es un `400`. Sacar los espacios y los guiones antes de enviar es de la web (T54).
+  - **En `edit` sólo se valida lo que viene en el body:** un pedido que no trae el teléfono (por ejemplo, sólo `last_name`) no cambia. En `register` el teléfono sigue siendo obligatorio.
+- **El largo se chequea antes que el formato.** El `ValidationPipe` global no corta en el primer error, así que si un valor falla las dos reglas (21 letras en el número, o un código de país de 11 caracteres) el `400` trae los dos mensajes, **el de largo primero**; con 21 dígitos viene sólo el de largo. Lo asegura el orden de los decoradores (se evalúan de abajo hacia arriba, y el `@MaxLength` va último). La web muestra uno solo y no compara el texto.
+- **Cómo quedó hecho:**
+  - **`dtos/user/phone_format.ts`** (nuevo): las dos expresiones y los dos mensajes. `CreateUserDto` y `EditUserDto` los usan con `@Matches(...)`, y el `@ApiProperty` de cada campo suma `pattern: REGEX.source`, así que **el validador y el Swagger salen de la misma expresión** y no pueden diverger.
+  - **Swagger:** `pattern` y una `description` del formato en los cuatro campos; el `400` de `/users/register` (ya existía) ahora nombra el teléfono sin perder lo del `role`, y `/users/edit` declara su `400`, que antes no tenía.
+- **Decisiones mías que el plan no fijaba** (vetables): los textos de los mensajes («El código de país debe ser "+" seguido de 1 a 4 dígitos, por ejemplo +54» y «El teléfono solo puede tener números, sin espacios ni guiones»); el nombre y el lugar de `phone_format.ts`; y la `description` de los campos en el Swagger.
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde.
+  - **Un script nuevo (103 chequeos), escrito antes del código y corrido en rojo (41 fallas: reproduce VAL-05 y VAL-06, la API aceptaba «abc» y «11 2345-6789»), después en verde:** los DTO con el `ValidationPipe` exacto de `main.ts` (los códigos `+1`, `+54`, `+598` y `+5412` y los números de 1 y de 20 dígitos pasan; «abc», sin «+», sólo «+», con espacio o guion, de 5 dígitos y con salto de línea final dan `400` en el código de país; letras, espacios, guiones, «+», paréntesis, punto, salto de línea, dígitos de ancho completo, vacío o numérico dan `400` en el número), la forma del `400`, el orden de los mensajes, que en `edit` pasan `{}` y `{ last_name }`, y el Swagger real (el `UsersController` en un Nest de prueba): `pattern`, topes, ejemplos, obligatorios y los dos `400`.
+  - **Regresión:** el cambio es sólo decoradores de dos DTO y de dos rutas del controller (sin diff en ningún service ni entidad). Los scripts de BE-41 (29 chequeos) y de BE-42 (130, 54, 67 y 51) que siguen en los scratchpads, **sin fallas**. Los de BE-12 a BE-30 ya no están, así que **no se volvieron a correr**. Quedan también dos scripts escritos «en rojo» para tareas pendientes (los topes de los DTO de ejercicios y músculos, BE-31, y el `active` en los listados de alumnos): fallan, pero por código que este cambio no toca y que ni nombra a usuarios ni teléfono.
+  - **Qué NO se verificó:** el runtime contra Postgres (BE-35) y las pantallas del web (VAL-05 y REG-10 necesitan la T54).
+- **Para el web (T54) y para Docs:** el contrato no cambia de forma (los mismos campos, ahora con formato). Del lado del backend ya está **VAL-06**; VAL-05 necesita además la T54, y REG-10 es sólo de la T54. Los avisos amarillos de los tres casos y la mención en «Antes de empezar» de los dos planes de prueba se sacan al cerrar las dos tareas (BE-43 y T54) y volver a correr esos casos (plan, sección 7).
+
 ## Cambios recientes (2026-10-31 · BE-42: las rutinas del plan por semana)
 
 - **BE-42** (hallazgos CRE-01, CRE-03 y ADD-02 de la corrida del 31/10 de *Pruebas de planificaciones*; decisiones de Fran del 31/10, variante C). Plan: `Doc/plans/2026-10-31-be-42-hallazgos-planificaciones-plan.md`; spec: `Doc/specs/2026-10-31-planificacion-por-semanas-design.md` (repo PowerApp-Docs). **Cambian los conteos: 73 → 75 ✅ de 77.** Entran al inventario **CU-E-12e** (reordenar las rutinas de una semana) y **CU-E-12f** (repetir una semana en otras) y nacen ✅; sigue 1 🟡 (U-04) · 0 🔵 · 1 sin backend, y el Entrenador pasa a **34 de 34**. **E-09 sigue ✅:** suma `weeks`, opcional. **No cambia ninguna entidad, el esquema ni `Db Creator`** (sin diff en `entities/` ni en `Db Creator/`).
@@ -984,7 +1007,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | ✅ cerrada el 18/10 (BE-10 y BE-10b el 17/10; BE-11 a BE-16 el 18/10) |
 | ⏱ | Regenerar la base de Render | BE-23 | 30/10 al 1/11 | La base nueva con el esquema y el seed completos, antes de que venza la vieja (≈ 2/11) | **runbook listo (23/10); lo ejecuta el usuario** |
 | **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | en curso: BE-17, BE-18, BE-18b, BE-19, BE-20, BE-20e, BE-20b, BE-20c, BE-20d y BE-21 hechas (20 a 23/10) |
-| **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | en curso: BE-24, BE-25 y BE-26 adelantadas (22/10), con dos de las FK de BE-22; BE-27, BE-28 y BE-30 (24/10); BE-41 y BE-42 (31/10) |
+| **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | en curso: BE-24, BE-25 y BE-26 adelantadas (22/10), con dos de las FK de BE-22; BE-27, BE-28 y BE-30 (24/10); BE-41, BE-42 y BE-43 (31/10) |
 | **5** | Verificación y cierre | BE-35 a BE-39 | 12 al 17/11 | **H5:** criterios de "backend terminado" cumplidos y código congelado | |
 
 > **Dependencias del usuario:** el diagrama de `Doc/` actualizado antes de BE-10 (el modelo manda), la fecha real de vencimiento de la base de Render (BE-23), la cuenta del proveedor de mail (BE-29) y la corrida del plan de pruebas (BE-35).
@@ -996,12 +1019,12 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 ### Administrar mi cuenta
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
-| CU-U-01 | Registrar usuario | ✅ Implementado | `POST /users/register` · siempre crea `role = user`; otro `role` en el body da `400` (16/10) |
+| CU-U-01 | Registrar usuario | ✅ Implementado | `POST /users/register` · siempre crea `role = user`; otro `role` en el body da `400` (16/10) · el teléfono es `+` y 1 a 4 dígitos de código de país y sólo dígitos en el número, o `400` (BE-43, 31/10) |
 | CU-U-02 | Login | ✅ Implementado | `POST /users/login` · `password_change_required` en el `200`: `true` si se entró con la temporal (16/10) |
 | CU-U-03 | Cerrar sesión | ✅ Implementado | `POST /users/logout` · ack 200, el cliente descarta el token |
 | CU-U-04 | Recuperar contraseña | 🟡 Parcial | `POST /users/recover-password` · genera la temporal pero **no envía el mail** que pide el camino principal; el stub de consola quedó detrás de `LOG_TEMP_PASSWORD` (17/10) · BE-29 |
 | CU-U-05 | Cambiar contraseña | ✅ Implementado | `POST /users/change-password` · acepta contraseña actual o temporal; anula `temp_password` |
-| CU-U-06 | Editar datos personales | ✅ Implementado | `POST /users/edit` · sobre el propio registro (`@CurrentUser`), campos opcionales; la lectura `GET /users/get/:id` con `@Owner` (16/10) |
+| CU-U-06 | Editar datos personales | ✅ Implementado | `POST /users/edit` · sobre el propio registro (`@CurrentUser`), campos opcionales; la lectura `GET /users/get/:id` con `@Owner` (16/10) · el teléfono, si viene, tiene el mismo formato que en el alta, o `400` (BE-43, 31/10) |
 | CU-U-07 | Obtener historial de pagos | ✅ Implementado | `GET /membership/payment/user/:id` · `@Owner`, orden por fecha DESC (16/10) |
 
 ### Mi entrenamiento

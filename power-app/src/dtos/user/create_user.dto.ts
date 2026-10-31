@@ -5,11 +5,13 @@ import {
   IsEmail,
   MinLength,
   MaxLength,
+  Matches,
   IsIn
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../../entities/user.entity';
+import { PHONE_NUMBER_MESSAGE, PHONE_NUMBER_REGEX, PHONE_PREFIX_MESSAGE, PHONE_PREFIX_REGEX } from './phone_format';
 
 export class CreateUserDto {
 
@@ -47,15 +49,19 @@ export class CreateUserDto {
     @IsIn([UserRole.user], { message: 'El registro sólo crea cuentas de alumno (role = user)' })
     role: UserRole = UserRole.user;
 
-    @ApiProperty({ example: '+54', maxLength: 10 })
+    // El @MaxLength va último: los decoradores se evalúan de abajo hacia arriba, así que el mensaje de
+    // largo sale antes que el de formato en el `message[]` del 400
+    @ApiProperty({ example: '+54', maxLength: 10, pattern: PHONE_PREFIX_REGEX.source, description: 'Código de país: "+" y de 1 a 4 dígitos' })
     @IsNotEmpty()
     @IsString()
+    @Matches(PHONE_PREFIX_REGEX, { message: PHONE_PREFIX_MESSAGE })
     @MaxLength(10)
     phone_prefix?: string;
 
-    @ApiProperty({ example: '1123456789', maxLength: 20 })
+    @ApiProperty({ example: '1123456789', maxLength: 20, pattern: PHONE_NUMBER_REGEX.source, description: 'Sólo dígitos, sin espacios ni guiones' })
     @IsNotEmpty()
     @IsString()
+    @Matches(PHONE_NUMBER_REGEX, { message: PHONE_NUMBER_MESSAGE })
     @MaxLength(20)
     phone_number?: string;
 }

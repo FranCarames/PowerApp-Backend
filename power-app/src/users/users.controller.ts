@@ -53,7 +53,7 @@ export class UsersController {
 
     @Post('/register')
     @ApiResponse({ status: 201, type: User, headers: { Authorization: { description: 'Bearer JWT token', schema: { type: 'string' } } } })
-    @ApiResponse({ status: 400, description: 'Datos inválidos, o un `role` distinto de `user`: el registro sólo crea alumnos' })
+    @ApiResponse({ status: 400, description: 'Datos inválidos (incluye un teléfono que no cumple el formato: el código de país es "+" y de 1 a 4 dígitos, y el número sólo tiene dígitos, sin espacios ni guiones), o un `role` distinto de `user`: el registro sólo crea alumnos' })
     @ApiResponse({ status: 409, description: 'Ya existe un usuario con ese email' })
     async createUser(
         @Body() createUserDto: CreateUserDto,
@@ -117,6 +117,7 @@ export class UsersController {
     @Post('/edit')
     @Auth()
     @ApiResponse({ status: 200, type: User })
+    @ApiResponse({ status: 400, description: 'Datos inválidos (incluye un teléfono que no cumple el formato: el código de país es "+" y de 1 a 4 dígitos, y el número sólo tiene dígitos, sin espacios ni guiones; sólo se valida el campo que viene en el body)' })
     @ApiResponse({ status: 409, description: 'El email ya está en uso por otro usuario' })
     async editUser(
         @CurrentUser() user: AuthUser,
