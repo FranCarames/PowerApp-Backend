@@ -15,6 +15,7 @@ import { isDatabaseError } from '../common/database_error';
 // Los textos de promote_user (CU-A-17). Los dos 409 salen por dos caminos: la consulta previa y el
 // unico de la base (uk_coach_email y uk_coach_cuil), por si dos altas chocan en el medio
 const PROMOTE_ADMIN_ERROR = 'No se puede convertir en entrenador a un administrador.';
+const PROMOTE_INACTIVE_ERROR = 'No se puede convertir en entrenador a una cuenta inactiva.';
 const DUPLICATE_COACH_EMAIL_ERROR = 'Ya existe un entrenador con ese email profesional';
 const DUPLICATE_COACH_CUIL_ERROR = 'Ya existe un entrenador con ese CUIL';
 
@@ -65,7 +66,8 @@ export class CoachService {
     // CU-A-17 y, por decision del 16/10, tambien CU-A-18: sobre un entrenador que ya existe (dado de
     // baja o activo) el mismo endpoint reactiva y edita sus datos profesionales. El rol y el Coach se
     // escriben juntos o ninguno de los dos (savePromotion). Un admin no se convierte en entrenador:
-    // perderia su acceso (decision del 24/10)
+    // perderia su acceso (decision del 24/10). Una cuenta de alumno inactiva tampoco: primero se
+    // reactiva desde Usuarios (BE-41)
     async promoteUserToCoach(
         promoteCoachDto: PromoteCoachDto,
         res: Response
@@ -79,6 +81,12 @@ export class CoachService {
 
             if (user.role === UserRole.admin) {
                 return res.status(400).send({ error: PROMOTE_ADMIN_ERROR });
+            }
+
+            // Un alumno con la cuenta dada de baja no se convierte: primero se reactiva desde Usuarios.
+            // Un entrenador con la cuenta inactiva (role coach) no entra aca: se sigue editando (CU-A-18)
+            if (user.role === UserRole.user && !user.active) {
+                return res.status(400).send({ error: PROMOTE_INACTIVE_ERROR });
             }
 
             // Si ya hay un Coach con este id (un entrenador dado de baja que vuelve, o uno activo que

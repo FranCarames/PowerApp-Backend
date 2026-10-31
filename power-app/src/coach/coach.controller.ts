@@ -42,7 +42,7 @@ export class CoachController {
     @Post('/promote_user')
     @Auth(UserRole.admin)
     @ApiResponse({ status: 200, type: User, description: 'El alumno quedó como entrenador. Sobre un entrenador dado de baja lo reactiva, y sobre uno activo edita su email profesional y su CUIL' })
-    @ApiResponse({ status: 400, description: 'Datos inválidos, o el usuario es un administrador (no se convierte en entrenador)' })
+    @ApiResponse({ status: 400, description: 'Datos inválidos; el usuario es un administrador (no se convierte en entrenador); o es un alumno con la cuenta inactiva (se reactiva primero desde Usuarios). Un entrenador con la cuenta inactiva sí se edita (CU-A-18)' })
     @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
     @ApiResponse({ status: 409, description: 'El email profesional o el CUIL ya son de otro entrenador (también de uno dado de baja)' })
     async promoteUserToCoach(
