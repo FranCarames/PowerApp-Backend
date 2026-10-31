@@ -2,13 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager, In, SelectQueryBuilder } from 'typeorm';
+import { Repository, DataSource, EntityManager, In, QueryRunner, SelectQueryBuilder } from 'typeorm';
 import { Planification } from '../entities/planification.entity';
 import { Routine } from '../entities/routine.entity';
 import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { GetPlanificationsQueryDto } from '../dtos/planification/get_planifications_query.dto';
 import { CreatePlanificationDto } from '../dtos/planification/create_planification.dto';
+import { CreatePlanificationWeekDto } from '../dtos/planification/create_planification_week.dto';
 import { EditPlanificationDto } from '../dtos/planification/edit_planification.dto';
+import { RepeatPlanificationWeekDto } from '../dtos/planification/repeat_planification_week.dto';
+import { ReorderPlanificationWeekDto } from '../dtos/planification/reorder_planification_week.dto';
 import { SetPlanificationActiveDto } from '../dtos/planification/set_planification_active.dto';
 import { AssignRoutineToPlanificationDto } from '../dtos/planification/assign_routine_to_planification.dto';
 import { AssignRoutinesToPlanificationDto } from '../dtos/planification/assign_routines_to_planification.dto';
@@ -22,6 +25,27 @@ import { User, UserRole } from '../entities/user.entity';
 import { Coach } from '../entities/coach.entity';
 import { AuthUser } from '../authentication/auth-user.interface';
 import { defaultPlanEndDate } from './plan_weeks';
+
+// Los textos que comparten las operaciones que arman el contenido de un plan: el alta con semanas, el
+// lote, repetir una semana y reordenarla. Para el mismo problema tienen que decir exactamente lo mismo
+// (plan BE-42, 3.5.1), asi que se definen una vez
+const PLANIFICATION_NOT_FOUND_ERROR = 'Planificación no encontrada';
+const PLANIFICATION_INACTIVE_ERROR = 'La planificación está dada de baja. Reactivala antes de asignarle rutinas.';
+const ROUTINES_NOT_FOUND_ERROR = 'Algunas rutinas no fueron encontradas';
+const WEEK_REPEATED_ERROR = 'Una semana aparece más de una vez.';
+const weekWithoutRoutinesError = (week: number) => `La semana ${week} no tiene rutinas para repetir.`;
+const weekListMismatchError = (week: number) =>
+    `La lista no coincide con las rutinas vigentes de la semana ${week}. Recargá la planificación.`;
+const inactiveRoutinesError = (routines: Routine[]) => {
+    const nombres = routines.map(routine => `'${routine.name}'`).join(', ');
+    return `Estas rutinas están dadas de baja y no pueden asignarse: ${nombres}.`;
+};
+
+// Un rechazo ya resuelto: el handler lo manda tal cual despues de deshacer la transaccion
+interface Rejection {
+    status: number;
+    error: string;
+}
 
 @Injectable()
 export class PlanificationService {
@@ -116,15 +140,39 @@ export class PlanificationService {
         }
     }
 
-    // Sin transaccion, a diferencia de createRoutine: se inserta UNA fila. Enganchar
-    // rutinas al plan es CU-E-12 y tiene su propio endpoint
+    // La cabecera y las rutinas de cada semana (weeks) se guardan en UNA transaccion: todo o nada
+    // (CU-E-09, regla 3). Sin weeks inserta solo la cabecera, como siempre. El orden de las
+    // validaciones es parte del contrato (plan BE-42, 3.5.1): semana repetida, primera semana fuera de
+    // la duracion, rutinas inexistentes y rutinas de baja
     async createPlanification(
         createPlanificationDto: CreatePlanificationDto,
         res: Response
     ) {
+        const weeks = createPlanificationDto.weeks ?? [];
+
+        // Las dos primeras no dependen de la base: se rechazan antes de abrir la transaccion
+        const weeksError = this.validateCreateWeeks(weeks, createPlanificationDto.duration);
+        if (weeksError) {
+            return res.status(400).send({ error: weeksError });
+        }
+
+        const queryRunner = this.dataSource.createQueryRunner();
+
         try {
-            const planification = await this.planificationRepository.save(
-                this.planificationRepository.create({
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
+            // Las rutinas de TODAS las semanas se validan juntas, con una sola consulta
+            const rejection = await this.checkRoutinesAssignable(
+                queryRunner.manager,
+                weeks.flatMap(week => week.routine_ids),
+            );
+            if (rejection) {
+                return this.rejectAndRollback(queryRunner, res, rejection);
+            }
+
+            const planification = await queryRunner.manager.save(
+                queryRunner.manager.create(Planification, {
                     name: createPlanificationDto.name,
                     number_of_routines: createPlanificationDto.number_of_routines,
                     description: createPlanificationDto.description ?? null,
@@ -133,12 +181,24 @@ export class PlanificationService {
                 })
             );
 
-            // Se recarga para devolver el mismo formato que GET /:id (con routines: [])
+            // La planificacion es nueva: cada semana empieza en 1
+            for (const week of weeks) {
+                await this.insertWeekRoutines(queryRunner.manager, planification.id, week.week, week.routine_ids, 1);
+            }
+
+            await queryRunner.commitTransaction();
+
+            // Se recarga para devolver el mismo formato que GET /:id
             const created = await this.findPlanificationDetail(planification.id);
             return res.status(201).send(this.buildPlanificationDetailResponse(created!));
         } catch (error) {
+            if (queryRunner.isTransactionActive) {
+                await queryRunner.rollbackTransaction();
+            }
             console.error(error);
             res.status(500).send({ error: 'Error al crear la planificación.' });
+        } finally {
+            await queryRunner.release();
         }
     }
 
@@ -235,13 +295,11 @@ export class PlanificationService {
             });
 
             if (!planification) {
-                return res.status(404).send({ error: 'Planificación no encontrada' });
+                return res.status(404).send({ error: PLANIFICATION_NOT_FOUND_ERROR });
             }
 
             if (!planification.active) {
-                return res.status(400).send({
-                    error: 'La planificación está dada de baja. Reactivala antes de asignarle rutinas.'
-                });
+                return res.status(400).send({ error: PLANIFICATION_INACTIVE_ERROR });
             }
 
             const weekError = this.weekOutOfDuration(assignRoutineDto.week, planification.duration);
@@ -305,61 +363,38 @@ export class PlanificationService {
             });
 
             if (!planification) {
-                await queryRunner.rollbackTransaction();
-                return res.status(404).send({ error: 'Planificación no encontrada' });
+                return this.rejectAndRollback(queryRunner, res, { status: 404, error: PLANIFICATION_NOT_FOUND_ERROR });
             }
 
             if (!planification.active) {
-                await queryRunner.rollbackTransaction();
-                return res.status(400).send({
-                    error: 'La planificación está dada de baja. Reactivala antes de asignarle rutinas.'
-                });
+                return this.rejectAndRollback(queryRunner, res, { status: 400, error: PLANIFICATION_INACTIVE_ERROR });
             }
 
             const weekError = this.weekOutOfDuration(assignRoutinesDto.week, planification.duration);
             if (weekError) {
-                await queryRunner.rollbackTransaction();
-                return res.status(400).send({ error: weekError });
+                return this.rejectAndRollback(queryRunner, res, { status: 400, error: weekError });
             }
 
-            // Se validan los ids UNICOS: el array puede traer repetidos a proposito,
-            // y cada repeticion crea su propia asignacion
-            const idsUnicos = [...new Set(assignRoutinesDto.routine_ids)];
-            const routines = await queryRunner.manager.find(Routine, {
-                where: { id: In(idsUnicos) },
-            });
-
-            if (routines.length !== idsUnicos.length) {
-                await queryRunner.rollbackTransaction();
-                return res.status(404).send({ error: 'Algunas rutinas no fueron encontradas' });
-            }
-
-            const inactivas = routines.filter(routine => !routine.active);
-            if (inactivas.length > 0) {
-                await queryRunner.rollbackTransaction();
-                const nombres = inactivas.map(routine => `'${routine.name}'`).join(', ');
-                return res.status(400).send({
-                    error: `Estas rutinas están dadas de baja y no pueden asignarse: ${nombres}.`
-                });
+            // Lo comparte con el alta con semanas y con repetir una semana: existen y estan vigentes
+            const rejection = await this.checkRoutinesAssignable(queryRunner.manager, assignRoutinesDto.routine_ids);
+            if (rejection) {
+                return this.rejectAndRollback(queryRunner, res, rejection);
             }
 
             // Consecutivas desde el final de la semana, en el orden del array
-            let order = await this.nextOrder(
+            const firstOrder = await this.nextOrder(
                 assignRoutinesDto.planification_id,
                 assignRoutinesDto.week,
                 queryRunner.manager,
             );
 
-            for (const routineId of assignRoutinesDto.routine_ids) {
-                await queryRunner.manager.save(
-                    queryRunner.manager.create(RoutineAsignation, {
-                        routine_id: routineId,
-                        planification_id: assignRoutinesDto.planification_id,
-                        week: assignRoutinesDto.week,
-                        order: order++,
-                    })
-                );
-            }
+            await this.insertWeekRoutines(
+                queryRunner.manager,
+                assignRoutinesDto.planification_id,
+                assignRoutinesDto.week,
+                assignRoutinesDto.routine_ids,
+                firstOrder,
+            );
 
             await queryRunner.commitTransaction();
 
@@ -501,6 +536,146 @@ export class PlanificationService {
             }
             console.error(error);
             res.status(500).send({ error: 'Error al actualizar el estado de las asignaciones.' });
+        } finally {
+            await queryRunner.release();
+        }
+    }
+
+    // CU-E-12f. Copia las rutinas VIGENTES de una semana, en su orden, al final de cada semana destino
+    // (consecutivas, aunque ya tenga rutinas). Todo o nada: una sola transaccion para todas las semanas
+    // destino. El orden de las validaciones es parte del contrato (plan BE-42, 3.5.1)
+    async repeatWeek(
+        repeatWeekDto: RepeatPlanificationWeekDto,
+        res: Response
+    ) {
+        const queryRunner = this.dataSource.createQueryRunner();
+
+        try {
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
+            const planification = await queryRunner.manager.findOne(Planification, {
+                where: { id: repeatWeekDto.planification_id },
+            });
+
+            if (!planification) {
+                return this.rejectAndRollback(queryRunner, res, { status: 404, error: PLANIFICATION_NOT_FOUND_ERROR });
+            }
+
+            if (!planification.active) {
+                return this.rejectAndRollback(queryRunner, res, { status: 400, error: PLANIFICATION_INACTIVE_ERROR });
+            }
+
+            // Primero la semana de origen y despues las destino, en el orden recibido
+            for (const week of [repeatWeekDto.from_week, ...repeatWeekDto.to_weeks]) {
+                const weekError = this.weekOutOfDuration(week, planification.duration);
+                if (weekError) {
+                    return this.rejectAndRollback(queryRunner, res, { status: 400, error: weekError });
+                }
+            }
+
+            // Solo las vigentes, en el orden en que el detalle las muestra (el order admite duplicados:
+            // desempata created_at). Las quitadas no se copian
+            const sourceAsignations = await queryRunner.manager.find(RoutineAsignation, {
+                where: { planification_id: planification.id, week: repeatWeekDto.from_week, active: true },
+                order: { order: 'ASC', created_at: 'ASC' },
+            });
+
+            if (sourceAsignations.length === 0) {
+                return this.rejectAndRollback(queryRunner, res, {
+                    status: 400,
+                    error: weekWithoutRoutinesError(repeatWeekDto.from_week),
+                });
+            }
+
+            // La rutina en si pudo darse de baja despues de asignarla: se copian solo rutinas vigentes
+            const routineIds = sourceAsignations.map(asignation => asignation.routine_id);
+            const rejection = await this.checkRoutinesAssignable(queryRunner.manager, routineIds);
+            if (rejection) {
+                return this.rejectAndRollback(queryRunner, res, rejection);
+            }
+
+            // Las copias son vinculos nuevos: no heredan nada de los originales. En cada destino van al
+            // final de sus vigentes (las quitadas no ocupan lugar), o desde 1 si no tiene ninguna
+            for (const week of repeatWeekDto.to_weeks) {
+                const firstOrder = await this.nextOrder(planification.id, week, queryRunner.manager);
+                await this.insertWeekRoutines(queryRunner.manager, planification.id, week, routineIds, firstOrder);
+            }
+
+            await queryRunner.commitTransaction();
+
+            const actualizada = await this.findPlanificationDetail(planification.id);
+            return res.status(201).send(this.buildPlanificationDetailResponse(actualizada!));
+        } catch (error) {
+            if (queryRunner.isTransactionActive) {
+                await queryRunner.rollbackTransaction();
+            }
+            console.error(error);
+            res.status(500).send({ error: 'Error al repetir la semana de la planificación.' });
+        } finally {
+            await queryRunner.release();
+        }
+    }
+
+    // CU-E-12e. La lista tiene que ser EXACTAMENTE las rutinas vigentes de la semana, en el orden nuevo:
+    // se renumeran 1..n en una transaccion. Las quitadas y las otras semanas no se tocan
+    async reorderWeek(
+        reorderWeekDto: ReorderPlanificationWeekDto,
+        res: Response
+    ) {
+        const queryRunner = this.dataSource.createQueryRunner();
+
+        try {
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
+            const planification = await queryRunner.manager.findOne(Planification, {
+                where: { id: reorderWeekDto.planification_id },
+            });
+
+            if (!planification) {
+                return this.rejectAndRollback(queryRunner, res, { status: 404, error: PLANIFICATION_NOT_FOUND_ERROR });
+            }
+
+            if (!planification.active) {
+                return this.rejectAndRollback(queryRunner, res, { status: 400, error: PLANIFICATION_INACTIVE_ERROR });
+            }
+
+            const asignations = await queryRunner.manager.find(RoutineAsignation, {
+                where: { planification_id: planification.id, week: reorderWeekDto.week, active: true },
+            });
+
+            // Sin faltantes, extras ni repetidos. Se compara en minuscula: el iOS manda los UUID en
+            // mayuscula y la base los devuelve en minuscula
+            const requestedIds = reorderWeekDto.routine_asignation_ids.map(id => id.toLowerCase());
+            const asignationById = new Map(asignations.map(asignation => [asignation.id.toLowerCase(), asignation]));
+
+            const sameList = requestedIds.length === asignations.length
+                && new Set(requestedIds).size === requestedIds.length
+                && requestedIds.every(id => asignationById.has(id));
+
+            if (!sameList) {
+                return this.rejectAndRollback(queryRunner, res, {
+                    status: 400,
+                    error: weekListMismatchError(reorderWeekDto.week),
+                });
+            }
+
+            requestedIds.forEach((id, index) => {
+                asignationById.get(id)!.order = index + 1;
+            });
+            await queryRunner.manager.save(asignations);
+
+            await queryRunner.commitTransaction();
+
+            const actualizada = await this.findPlanificationDetail(planification.id);
+            return res.status(200).send(this.buildPlanificationDetailResponse(actualizada!));
+        } catch (error) {
+            if (queryRunner.isTransactionActive) {
+                await queryRunner.rollbackTransaction();
+            }
+            console.error(error);
+            res.status(500).send({ error: 'Error al reordenar las rutinas de la semana.' });
         } finally {
             await queryRunner.release();
         }
@@ -747,6 +922,83 @@ export class PlanificationService {
             return null;
         }
         return `La semana ${week} supera la duración de la planificación (${duration} semanas).`;
+    }
+
+    // Las semanas del alta (weeks): primero la repetida, despues la PRIMERA, en el orden recibido, que
+    // supera la duracion. Devuelve el mensaje de error, o null si estan bien
+    private validateCreateWeeks(weeks: CreatePlanificationWeekDto[], duration: number): string | null {
+        const weekNumbers = weeks.map(week => week.week);
+
+        if (new Set(weekNumbers).size !== weekNumbers.length) {
+            return WEEK_REPEATED_ERROR;
+        }
+
+        for (const week of weekNumbers) {
+            const weekError = this.weekOutOfDuration(week, duration);
+            if (weekError) {
+                return weekError;
+            }
+        }
+
+        return null;
+    }
+
+    // Que las rutinas existan y esten vigentes para asignarlas a un plan. Lo comparten el lote, el alta
+    // con semanas y repetir una semana, para que no puedan decir cosas distintas del mismo problema.
+    // Se validan los ids UNICOS: el array puede traer repetidos a proposito, y cada repeticion crea su
+    // propia asignacion. Devuelve el rechazo ya resuelto, o null si estan todas bien
+    private async checkRoutinesAssignable(
+        manager: EntityManager,
+        routineIds: string[]
+    ): Promise<Rejection | null> {
+        if (routineIds.length === 0) {
+            return null;
+        }
+
+        const idsUnicos = [...new Set(routineIds)];
+        const routines = await manager.find(Routine, {
+            where: { id: In(idsUnicos) },
+        });
+
+        if (routines.length !== idsUnicos.length) {
+            return { status: 404, error: ROUTINES_NOT_FOUND_ERROR };
+        }
+
+        const inactivas = routines.filter(routine => !routine.active);
+        if (inactivas.length > 0) {
+            return { status: 400, error: inactiveRoutinesError(inactivas) };
+        }
+
+        return null;
+    }
+
+    // Una asignacion por id, consecutivas desde firstOrder y en el orden del array (un repetido crea una
+    // por cada vez). Escribe con el manager del llamador, dentro de su transaccion
+    private async insertWeekRoutines(
+        manager: EntityManager,
+        idPlanification: string,
+        week: number,
+        routineIds: string[],
+        firstOrder: number
+    ): Promise<void> {
+        await manager.save(
+            manager.create(
+                RoutineAsignation,
+                routineIds.map((routineId, index) => ({
+                    routine_id: routineId,
+                    planification_id: idPlanification,
+                    week,
+                    order: firstOrder + index,
+                })),
+            )
+        );
+    }
+
+    // Deshace la transaccion y responde el rechazo. Lo comparten las operaciones del contenido del plan,
+    // que validan todo antes de escribir
+    private async rejectAndRollback(queryRunner: QueryRunner, res: Response, rejection: Rejection) {
+        await queryRunner.rollbackTransaction();
+        return res.status(rejection.status).send({ error: rejection.error });
     }
 
     // max(order) + 1 sobre las asignaciones ACTIVAS de esa semana del plan, o 1 si no hay

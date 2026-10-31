@@ -23,6 +23,8 @@ import { PlanificationListItemResponseDto } from '../dtos/planification/planific
 import { PlanificationDetailResponseDto } from '../dtos/planification/planification_detail_response.dto';
 import { AssignRoutineToPlanificationDto } from '../dtos/planification/assign_routine_to_planification.dto';
 import { AssignRoutinesToPlanificationDto } from '../dtos/planification/assign_routines_to_planification.dto';
+import { RepeatPlanificationWeekDto } from '../dtos/planification/repeat_planification_week.dto';
+import { ReorderPlanificationWeekDto } from '../dtos/planification/reorder_planification_week.dto';
 import { SetRoutineAsignationActiveDto } from '../dtos/planification/set_routine_asignation_active.dto';
 import { SetRoutineAsignationsActiveDto } from '../dtos/planification/set_routine_asignations_active.dto';
 import { AssignPlanificationToUserDto } from '../dtos/planification/assign_planification_to_user.dto';
@@ -37,6 +39,15 @@ import { AssignedRoutinesParamsDto } from '../dtos/routine/assigned_routines_par
 // son del paquete "Administrar Rutinas" y viven en routine/ (POST /routine/assign-user y
 // DELETE /routine/assign-user/:id, desde BE-11). El listado GET /routine/assigned/:userId
 // es BE-12
+
+// Los errores del service son { error: string }; los de validacion del body (ValidationPipe) traen
+// ademas message[] y statusCode, pero tambien un error: string. Los textos exactos de cada caso van
+// en la descripcion de cada respuesta
+const errorBody = (example: string) => ({
+    type: 'object',
+    required: ['error'],
+    properties: { error: { type: 'string', example } },
+});
 
 @ApiTags('Planification')
 @Controller('planification')
@@ -78,10 +89,21 @@ export class PlanificationController {
         await this.planificationService.getPlanificationById(idPlanification.id, res);
     }
 
+    // Con weeks (CU-E-09) crea la cabecera y las rutinas de cada semana en una transaccion
     @Post('/create')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 201, type: PlanificationDetailResponseDto })
-    @ApiResponse({ status: 400, description: 'Datos inválidos (duration obligatoria, entero ≥ 0)' })
+    @ApiResponse({ status: 201, type: PlanificationDetailResponseDto, description: 'La planificación creada, con las rutinas de cada semana en routines (order 1, 2, 3… por semana). Sin weeks, routines es []' })
+    @ApiResponse({
+        status: 400,
+        description: 'Datos inválidos (duration obligatoria, entero ≥ 0; weeks: week ≥ 1 y de 1 a 50 routine_ids por semana). O: «Una semana aparece más de una vez.»; «La semana N supera la duración de la planificación (D semanas).» (la primera de weeks, en el orden recibido); «Estas rutinas están dadas de baja y no pueden asignarse: <nombres>.». No se crea nada: ni la planificación ni ninguna rutina',
+        schema: errorBody('Una semana aparece más de una vez.'),
+    })
+    @ApiResponse({
+        status: 404,
+        description: '«Algunas rutinas no fueron encontradas». No se crea nada',
+        schema: errorBody('Algunas rutinas no fueron encontradas'),
+    })
+    @ApiResponse({ status: 500, description: 'Error al crear la planificación. No se crea nada', schema: errorBody('Error al crear la planificación.') })
     async createPlanification(
         @Body() createPlanificationDto: CreatePlanificationDto,
         @Res() res: Response,
@@ -140,6 +162,50 @@ export class PlanificationController {
         @Res() res: Response,
     ) {
         await this.planificationService.assignRoutinesToPlanification(assignRoutinesDto, res);
+    }
+
+    // CU-E-12f. Crea vinculos nuevos, como assign y assign-bulk: 201
+    @Post('/routine/repeat-week')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 201, type: PlanificationDetailResponseDto, description: 'La planificación actualizada. La semana de origen no cambia; cada semana destino suma las copias al final' })
+    @ApiResponse({
+        status: 400,
+        description: 'Datos inválidos (to_weeks de 1 a 50 semanas distintas entre sí y distintas de from_week). O: «La planificación está dada de baja. Reactivala antes de asignarle rutinas.»; «La semana N supera la duración de la planificación (D semanas).» (primero from_week, después to_weeks en el orden recibido); «La semana N no tiene rutinas para repetir.»; «Estas rutinas están dadas de baja y no pueden asignarse: <nombres>.». No se copia nada',
+        schema: errorBody('La semana N no tiene rutinas para repetir.'),
+    })
+    @ApiResponse({
+        status: 404,
+        description: '«Planificación no encontrada». No se copia nada',
+        schema: errorBody('Planificación no encontrada'),
+    })
+    @ApiResponse({ status: 500, description: 'Error al repetir la semana de la planificación. No se copia nada', schema: errorBody('Error al repetir la semana de la planificación.') })
+    async repeatPlanificationWeek(
+        @Body() repeatWeekDto: RepeatPlanificationWeekDto,
+        @Res() res: Response,
+    ) {
+        await this.planificationService.repeatWeek(repeatWeekDto, res);
+    }
+
+    // CU-E-12e. Modifica vinculos que ya existen, como set-active: 200 y no 201
+    @Post('/routine/reorder')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: PlanificationDetailResponseDto, description: 'La planificación actualizada, con la semana renumerada 1, 2, 3… en el orden recibido. Las quitadas y las otras semanas no cambian' })
+    @ApiResponse({
+        status: 400,
+        description: 'Datos inválidos (al menos un id, todos UUID). O: «La planificación está dada de baja. Reactivala antes de asignarle rutinas.»; «La lista no coincide con las rutinas vigentes de la semana N. Recargá la planificación.» (falta alguna, sobra alguna o hay una repetida). No se cambia nada',
+        schema: errorBody('La lista no coincide con las rutinas vigentes de la semana N. Recargá la planificación.'),
+    })
+    @ApiResponse({
+        status: 404,
+        description: '«Planificación no encontrada». No se cambia nada',
+        schema: errorBody('Planificación no encontrada'),
+    })
+    @ApiResponse({ status: 500, description: 'Error al reordenar las rutinas de la semana. No se cambia nada', schema: errorBody('Error al reordenar las rutinas de la semana.') })
+    async reorderPlanificationWeek(
+        @Body() reorderWeekDto: ReorderPlanificationWeekDto,
+        @Res() res: Response,
+    ) {
+        await this.planificationService.reorderWeek(reorderWeekDto, res);
     }
 
     // Reemplaza al DELETE /planification/routine/:id del andamiaje: la baja del vinculo

@@ -1,6 +1,8 @@
-import { IsNotEmpty, IsString, IsOptional, MaxLength, IsInt, Min, Max } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, MaxLength, IsInt, Min, Max, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { INTEGER_MAX } from './planification_limits';
+import { CreatePlanificationWeekDto } from './create_planification_week.dto';
 
 export class CreatePlanificationDto {
 
@@ -10,7 +12,7 @@ export class CreatePlanificationDto {
     @MaxLength(50)
     name!: string;
 
-    @ApiProperty({ example: 3, minimum: 1, description: 'Rutinas que el entrenador declara para el plan. Es la intención del plan, no el conteo real: ese es routine_count, que sale de las rutinas efectivamente asignadas por CU-E-12' })
+    @ApiProperty({ example: 3, minimum: 1, description: 'Rutinas por semana: cuántas rutinas lleva cada semana del plan. Define los huecos de cada semana; no es un tope (una semana puede terminar con más o con menos, o vacía). Es la intención del plan, no el conteo real: ese es routine_count, que sale de las rutinas efectivamente asignadas por CU-E-12' })
     @IsNotEmpty()
     @IsInt()
     @Min(1)
@@ -36,4 +38,13 @@ export class CreatePlanificationDto {
     @Min(0)
     @Max(INTEGER_MAX)
     duration!: number;
+
+    // Solo del alta: al editar, las rutinas de un plan que ya existe se cambian con sus propios endpoints
+    // (EditPlanificationDto lo saca)
+    @ApiPropertyOptional({ type: [CreatePlanificationWeekDto], description: 'Rutinas de cada semana, para crear el plan ya armado (CU-E-09). Sin weeks o con [], el plan se crea sin rutinas. Solo las semanas que tienen rutinas (de 1 a 50 por semana); sin semanas repetidas. Todo o nada: la planificación y sus rutinas se guardan en una sola operación, y si algo falla no se crea ninguna de las dos' })
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => CreatePlanificationWeekDto)
+    weeks?: CreatePlanificationWeekDto[];
 }

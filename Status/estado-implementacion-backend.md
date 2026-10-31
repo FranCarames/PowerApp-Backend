@@ -1,20 +1,20 @@
 # PowerApp Backend — Estado de implementación vs. Casos de Uso
 
 > **Corte:** 2026-10-31 · **Fuente:** `Use Cases/` del repo PowerApp-Docs (fuente de verdad de los CU) comparado contra `power-app/src`
-> **Método:** mapeo 1:1 de los 75 CU contra los `controller` y `service` del código, con el criterio del inventario del [roadmap del 16/10](https://github.com/FranCarames/PowerApp-Docs/blob/main/Doc/plans/2026-10-16-roadmap-backend.md) (§9): un CU es ✅ sólo si **todos los caminos de su spec** se cumplen.
+> **Método:** mapeo 1:1 de los 77 CU contra los `controller` y `service` del código, con el criterio del inventario del [roadmap del 16/10](https://github.com/FranCarames/PowerApp-Docs/blob/main/Doc/plans/2026-10-16-roadmap-backend.md) (§9): un CU es ✅ sólo si **todos los caminos de su spec** se cumplen.
 
 ## Resumen
 
 | Estado | CU | % | Significado |
 |---|---:|---:|---|
-| ✅ Implementado | 73 | 97% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
+| ✅ Implementado | 75 | 97% | El endpoint existe, ejecuta lógica real y cumple todos los caminos de su spec |
 | 🟡 Parcial | 1 | 1% | Un camino de la spec no se cumple, o la lógica existe sin la ruta o el rol que pide el CU |
 | 🔵 Andamiaje | 0 | 0% | Ruta declarada sin lógica: con `@Res()`, **no responde** (cuelga) |
 | ⬜ No implementado | 0 | 0% | Sin endpoint |
 | — Sin backend | 1 | 1% | Por su spec es del cliente (CU-U-14) |
-| **Total** | **75** | | |
+| **Total** | **77** | | |
 
-**73 de los 74 CU con backend están completos (99%).** Falta 1, parcial (CU-U-04, BE-29): ya no queda ninguno sin endpoint ni en andamiaje. Uno de los ✅ tiene un defecto abierto (⚠): CU-A-04.
+**75 de los 76 CU con backend están completos (99%).** Falta 1, parcial (CU-U-04, BE-29): ya no queda ninguno sin endpoint ni en andamiaje. Uno de los ✅ tiene un defecto abierto (⚠): CU-A-04.
 > **Nota (17/10):** los ✅ bajan de 63 (corte del 4/9) a 57 porque **cambió el criterio, no porque se rompiera algo**. El de antes daba ✅ a todo endpoint con lógica real; el del roadmap exige además que se cumpla cada camino de la spec. Por eso pasaron a 🟡 CU-U-04 (no envía el mail), CU-A-10 y CU-A-15 (borran en cascada en vez de impedirlo), CU-A-13 y CU-A-14 (no validan el nombre único) y CU-A-17 (falta "ya es entrenador"). Ver los cambios del 17/10.
 > **Base de datos:** la de Render se recreó el 3/10 con el esquema vigente (dato del Status web). Es free tier y **vence alrededor del 2/11** (*sin verificar*), así que hay que regenerarla antes (BE-23). **Desde el 17/10 el esquema del bloque A ya está en `Db Creator`** (BE-10): al regenerar con `01` → `02` → `03` no hace falta el patch `patches/2026-10-17-be-10.sql`, que es para una base viva. **Desde el 23/10 el `03` también trae la cadena de entrenamiento** (BE-21: circuitos, rutinas, planificaciones, asignaciones y ejecuciones, con un escenario por alumno): sobre la base actual alcanza con volver a aplicar el `03`, que es idempotente.
 
@@ -23,11 +23,36 @@
 | Rol | CU | ✅ | 🟡 | 🔵 | ⬜ | Sin backend | % ✅ (sobre los CU con backend) |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Usuario | 20 | 18 | 1 | 0 | 0 | 1 | 95% |
-| Entrenador | 32 | 32 | 0 | 0 | 0 | 0 | 100% |
+| Entrenador | 34 | 34 | 0 | 0 | 0 | 0 | 100% |
 | Admin | 23 | 23 | 0 | 0 | 0 | 0 | 100% |
-| **Total** | **75** | **73** | **1** | **0** | **0** | **1** | **99%** |
+| **Total** | **77** | **75** | **1** | **0** | **0** | **1** | **99%** |
 
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
+> **Nota (31/10):** `CU-E-12` pasa a seis operaciones: `CU-E-12e` (reordenar las rutinas de una semana) y `CU-E-12f` (repetir una semana en otras) se suman al inventario y el total pasa de 75 a **77**. Nacen ✅ con BE-42, así que los ✅ suben de 73 a 75; la única 🟡 sigue siendo CU-U-04.
+
+## Cambios recientes (2026-10-31 · BE-42: las rutinas del plan por semana)
+
+- **BE-42** (hallazgos CRE-01, CRE-03 y ADD-02 de la corrida del 31/10 de *Pruebas de planificaciones*; decisiones de Fran del 31/10, variante C). Plan: `Doc/plans/2026-10-31-be-42-hallazgos-planificaciones-plan.md`; spec: `Doc/specs/2026-10-31-planificacion-por-semanas-design.md` (repo PowerApp-Docs). **Cambian los conteos: 73 → 75 ✅ de 77.** Entran al inventario **CU-E-12e** (reordenar las rutinas de una semana) y **CU-E-12f** (repetir una semana en otras) y nacen ✅; sigue 1 🟡 (U-04) · 0 🔵 · 1 sin backend, y el Entrenador pasa a **34 de 34**. **E-09 sigue ✅:** suma `weeks`, opcional. **No cambia ninguna entidad, el esquema ni `Db Creator`** (sin diff en `entities/` ni en `Db Creator/`).
+- **Numeración:** el pedido llamaba BE-41 a este cambio, pero BE-41 es «no convertir una cuenta inactiva» (la entrada de abajo). El plan lo aclara en su primer párrafo: es **BE-42** (en el web, T53).
+- **Contrato nuevo** (los errores reusan los textos del lote; el orden de las validaciones es el del plan, 3.5.1):
+  - `POST /planification/create` acepta además `weeks?: [{ week, routine_ids[] }]`: `week` de 1 a `duration` (sin tope si es 0), sin semanas repetidas; de 1 a 50 `routine_ids` por semana, con repetidos permitidos, que quedan con `order` 1..n. **Una sola transacción:** la cabecera y las rutinas se guardan juntas o no se guarda nada. Errores: `400` «Una semana aparece más de una vez.», `400` «La semana N supera la duración de la planificación (D semanas).» (la primera, en el orden recibido), `404` «Algunas rutinas no fueron encontradas», `400` «Estas rutinas están dadas de baja y no pueden asignarse: <nombres>.». Responde `201` con el detalle. Sin `weeks` o con `[]` se comporta como antes.
+  - `POST /planification/routine/repeat-week` `{ planification_id, from_week, to_weeks[] }` (**E-12f**): copia las rutinas **vigentes** de `from_week`, en su orden (`order` y después `created_at`), al final de las vigentes de cada semana destino (1 a 50, distintas, ninguna igual al origen); las quitadas no se copian ni cuentan para el final. Todo o nada. Errores: `404` plan inexistente, `400` plan de baja, `400` semana fuera de la duración (primero `from_week`, después `to_weeks`), `400` «La semana N no tiene rutinas para repetir.», `400` rutinas de origen dadas de baja. `201` con el detalle.
+  - `POST /planification/routine/reorder` `{ planification_id, week, routine_asignation_ids[] }` (**E-12e**): los ids tienen que ser **exactamente** las vigentes de la semana, sin faltantes, extras ni repetidos; quedan con `order` 1..n en una transacción, y las quitadas y las otras semanas no se tocan. `400` «La lista no coincide con las rutinas vigentes de la semana N. Recargá la planificación.»; `404` y `400` del plan como en `repeat-week`. `200` con el detalle.
+  - `number_of_routines` significa **rutinas por semana**: define los huecos y no es un tope. Cambia sólo su descripción en el Swagger, en crear y en editar; el tipo, el mínimo (1) y lo que valida no se tocan. La duración 0 se sigue aceptando (el web exige 1 o más).
+  - Los tres son para entrenador y admin, igual que `assign` y `set-active`.
+- **Cómo quedó hecho:**
+  - **Lo común se extrajo de `assign-bulk`** (`checkRoutinesAssignable`: existen y están vigentes; `insertWeekRoutines`: las asignaciones consecutivas; `rejectAndRollback`) y los textos compartidos son constantes del archivo. El alta con semanas, el lote y `repeat-week` usan lo mismo: no pueden diverger.
+  - **`assign-bulk` inserta ahora una semana en una sola sentencia** (antes, una por rutina). Mismo resultado en la base, menos viajes.
+  - **`EditPlanificationDto` deja de heredar `weeks`** (`OmitType`): editar con `weeks` es `400`, y el Swagger de editar no lo muestra. Hereda las demás validaciones.
+  - **Swagger:** las tres rutas declaran `201`/`200`, `400`, `404` y `500` con el cuerpo `{ error: string }` y los textos exactos en la descripción; `reorder` no declara un `201` de más.
+- **Decisiones mías que el plan no fijaba** (vetables): los `400` del DTO de `to_weeks` («Las semanas destino no pueden repetirse», «…no pueden incluir la semana de origen», «Hay que enviar al menos una semana destino», «No se pueden repetir más de 50 semanas por vez»); «No se pueden asignar más de 50 rutinas por semana» para `weeks`; los `500` («Error al repetir la semana de la planificación.», «Error al reordenar las rutinas de la semana.»); y que `reorder` compare los ids en minúscula, porque el iOS manda los UUID en mayúscula.
+- **Verificación, sin levantar el server.** Hecho:
+  - Build en verde.
+  - **Tres scripts nuevos, escritos antes del código y corridos en rojo (67, 30 y 25 fallas), después en verde:** las reglas de las tres operaciones (130 chequeos: el `PlanificationService` real sobre un mundo en memoria con transacción que restaura el estado, todo o nada con el estado idéntico, el orden de las validaciones, el ADD-10 exacto, las quitadas, la duración 0 y fallas inyectadas a mitad de camino), los DTO con el `ValidationPipe` de `main.ts` (54) y los controllers con el Swagger real (67). Tres mutaciones deliberadas del `dist` (el orden de las copias, el chequeo de rutinas de baja, el largo de la lista del reorden) las detectaron.
+  - **Un cuarto script, extremo a extremo, escrito después del código** (51 chequeos): el service real con **TypeORM real** sobre el seed en SQLite. Prueba el SQL que TypeORM arma de verdad (un `INSERT` multi-fila por semana; `UPDATE … SET "order", "updated_at" = CURRENT_TIMESTAMP` una sola vez por fila y sólo en las que cambian; el `MAX("order")` del destino contando sólo vigentes) y que el `ROLLBACK` deshace de verdad cuando la base falla a mitad de la creación, de la copia y de la renumeración.
+  - **Regresión:** el hallazgo es que los scripts de regresión anteriores **no ejercitan `assign`, `assign-bulk`, `set-active` ni `set-active-bulk`** (el plan suponía que sí), así que se sacó una «foto» de 32 escenarios de esas cuatro operaciones con el `dist` anterior y se exigió idéntica con el nuevo: **idéntica**. Además, los 31 scripts de BE-12 a BE-41 que seguían en los scratchpads, sin fallas.
+  - **Qué NO se verificó:** el runtime contra Postgres (BE-35: el SQL se corrió en SQLite, que no es Postgres), las carreras reales entre dos pestañas (se simulan) y las pantallas del web (T53).
+- **Para el web (T53) y para Docs:** el contrato queda disponible para `api:fetch` cuando el usuario despliegue en Render. Del lado del backend ya están CRE-01, CRE-03 y ADD-02 y los endpoints de CRE-05, ADD-09 y ADD-10; los avisos amarillos de esos casos más CRE-02, EDT-03 y FIL-01 se sacan del plan de pruebas cuando estén hechas **las dos** tareas (BE-42 y T53), no antes.
 
 ## Cambios recientes (2026-10-31 · BE-41: `promote_user` no convierte una cuenta inactiva)
 
@@ -959,7 +984,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | **2** | Bloque A: rutina puntual y ejecución | BE-09 a BE-16 | 20 al 27/10 | **H2:** el flujo puntual de punta a punta: asignar → ver → marcar → nota → historial | ✅ cerrada el 18/10 (BE-10 y BE-10b el 17/10; BE-11 a BE-16 el 18/10) |
 | ⏱ | Regenerar la base de Render | BE-23 | 30/10 al 1/11 | La base nueva con el esquema y el seed completos, antes de que venza la vieja (≈ 2/11) | **runbook listo (23/10); lo ejecuta el usuario** |
 | **3** | Bloque B: asignar planificaciones | BE-17 a BE-23 | 28/10 al 5/11 | **H3:** los 74 CU con backend tienen código | en curso: BE-17, BE-18, BE-18b, BE-19, BE-20, BE-20e, BE-20b, BE-20c, BE-20d y BE-21 hechas (20 a 23/10) |
-| **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | en curso: BE-24, BE-25 y BE-26 adelantadas (22/10), con dos de las FK de BE-22; BE-27, BE-28 y BE-30 (24/10); BE-41 (31/10) |
+| **4** | Brechas de CU y deuda | BE-24 a BE-34 | 3 al 12/11 | **H4:** ningún 🟡 y el Swagger completo | en curso: BE-24, BE-25 y BE-26 adelantadas (22/10), con dos de las FK de BE-22; BE-27, BE-28 y BE-30 (24/10); BE-41 y BE-42 (31/10) |
 | **5** | Verificación y cierre | BE-35 a BE-39 | 12 al 17/11 | **H5:** criterios de "backend terminado" cumplidos y código congelado | |
 
 > **Dependencias del usuario:** el diagrama de `Doc/` actualizado antes de BE-10 (el modelo manda), la fecha real de vencimiento de la base de Render (BE-23), la cuenta del proveedor de mail (BE-29) y la corrida del plan de pruebas (BE-35).
@@ -1002,7 +1027,7 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 
 ---
 
-## Detalle — Rol Entrenador (32 CU · 100%)
+## Detalle — Rol Entrenador (34 CU · 100%)
 
 ### Administrar alumnos
 | CU | Caso de uso | Estado | Endpoint / nota |
@@ -1019,14 +1044,16 @@ Alineación de las entidades con el modelo vigente de `Doc/` (spec: `Doc/specs/2
 | CU | Caso de uso | Estado | Endpoint / nota |
 |---|---|---|---|
 | CU-E-08 | Obtener planificaciones sistémicas | ✅ Implementado | `GET /planification/all` · keyword/type/include_inactive + routine_count |
-| CU-E-09 | Crear planificación sistémica | ✅ Implementado | `POST /planification/create` · 201 con el detalle · `duration` en semanas, obligatoria (17/10) |
+| CU-E-09 | Crear planificación sistémica | ✅ Implementado | `POST /planification/create` · 201 con el detalle · `duration` en semanas, obligatoria (17/10) · `weeks` opcional: crea la cabecera y las rutinas de cada semana en **una transacción**, todo o nada; `400` por semana repetida, fuera de la duración o rutinas de baja, `404` por rutinas inexistentes (BE-42, 31/10) |
 | CU-E-10 | Editar planificación sistémica | ✅ Implementado | `POST /planification/edit/:id` · 400 si está de baja · el opcional omitido borra · `duration` obligatoria; 400 si queda por debajo de una semana en uso (17/10) · `updated_at` nuevo al editar (24/10, BE-30) |
 | CU-E-11 | Eliminar planificación sistémica (lógico) | ✅ Implementado | `POST /planification/set-active/:id` · baja y reactivación |
-| CU-E-12 | Gestionar rutinas de una planificación | — *agrupador* | no se cuenta: agrupa a E-12a → E-12d |
+| CU-E-12 | Gestionar rutinas de una planificación | — *agrupador* | no se cuenta: agrupa a E-12a → E-12f |
 | CU-E-12a | Asignar una rutina a planificación | ✅ Implementado | `POST /planification/routine/assign` · `week` obligatoria (≤ `duration` si es > 0); `order` opcional, al final **de esa semana** si se omite (17/10) |
 | CU-E-12b | Asignar rutinas en lote | ✅ Implementado | `POST /planification/routine/assign-bulk` · transaccional, una semana por lote, consecutivas al final de la semana (17/10) |
 | CU-E-12c | Quitar o reincorporar una rutina (lógico) | ✅ Implementado | `POST /planification/routine/set-active/:id` · la baja conserva semana y orden; `week` y `order` opcionales al reincorporar (17/10) |
 | CU-E-12d | Quitar o reincorporar rutinas en lote (lógico) | ✅ Implementado | `POST /planification/routine/set-active-bulk` · transaccional; cada una vuelve a su lugar, 400 si alguna queda fuera de la duración (17/10) |
+| CU-E-12e | Reordenar las rutinas de una semana | ✅ Implementado | `POST /planification/routine/reorder` · la lista tiene que ser exactamente las vigentes de la semana (`400` «La lista no coincide…» si no); las renumera 1..n en una transacción; las quitadas y las otras semanas no se tocan · `200` con el detalle (BE-42, 31/10) |
+| CU-E-12f | Repetir una semana en otras semanas | ✅ Implementado | `POST /planification/routine/repeat-week` · copia las vigentes de `from_week`, en su orden, al final de cada semana de `to_weeks` (1 a 50, distintas) · todo o nada, en una transacción · `201` con el detalle (BE-42, 31/10) |
 | CU-E-13 | Asignar planificación a alumno | ✅ Implementado | `POST /planification/user/assign` · sólo coach (`coach_id` del token; `403` si no tiene su fila activa en `Coach`) · el fin por defecto es el domingo de la semana `duration` (obligatorio con duración 0) · `409` con las asignaciones activas que se pisan, salvo `confirm_overlap: true` · 400 → 403 → 404 → 400 → 400 → 400 → 404 → 400 → 409 (BE-18b, 21/10) |
 | CU-E-14 | Eliminar planificación a alumno | ✅ Implementado | `POST /planification/user/set-active/:id` · quitar y reincorporar (`{ active }`), coach y admin · `400` si ya está en ese estado · quitar sólo apaga la asignación (sin cascada); reincorporar no vuelve a chequear el solapamiento · 404 → 400 · el paso 1 es `GET /planification/user/:userId?include_inactive=` (BE-19, 21/10) |
 
