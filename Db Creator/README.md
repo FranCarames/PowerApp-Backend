@@ -4,7 +4,8 @@ Genera **tres** scripts SQL para levantar la base de datos desde cero:
 
 1. `01_estructura.sql`      → DDL: tablas, ENUMs, foreign keys, índices.
 2. `02_datos_estaticos.sql` → catálogo que la app **siempre** necesita:
-   `Muscle_Group`, `Muscle`, `Exercise`, `Exercised_Muscle`.
+   `Muscle_Group`, `Muscle`, `Exercise`, `Exercised_Muscle` y `Circuit_Type` (los cinco
+   tipos de circuito: sin uno activo no se puede crear ningún circuito).
 3. `03_datos_dinamicos.sql`  → datos de **prueba** para testear:
    `User`, `Coach`, `Membership`, `Membership_Payment`, `User_RM` y la **cadena de
    entrenamiento** (circuitos, rutinas, planificaciones, asignaciones y ejecuciones,
@@ -37,7 +38,7 @@ necesitan), y al final los dinámicos (usuarios, pagos, etc.).
 |--------------------|-------------------------------------------------------------------|
 | `build_sql.py`     | **Orquestador**. Es el único que ejecutás. Arma los 3 `.sql`.     |
 | `ddl.py`           | El DDL completo (estructura de la base).                          |
-| `gen_seed.py`      | Grupos musculares y 35 músculos (18 existentes + 6 nuevos).       |
+| `gen_seed.py`      | Grupos musculares, 35 músculos (18 existentes + 6 nuevos) y los 5 tipos de circuito (`CIRCUIT_TYPES`). |
 | `static_extra.py`  | Los 2 ejercicios "Sentadilla" originales y sus vínculos.          |
 | `catalogo_ejercicios.py` | Catálogo de los 206 ejercicios en una lista única `EXERCISES`, organizada por secciones (disciplina). |
 | `dynamic_data.py`  | Datos de prueba: usuarios, coaches, membresías, pagos, RMs y la cadena de entrenamiento. |
@@ -56,7 +57,9 @@ Después volvé a correr `python3 build_sql.py`.
 
 ## La cadena de entrenamiento (BE-21)
 
-`dynamic_data.py` termina con la sección «Cadena de entrenamiento»: 7 circuitos, 6 rutinas,
+`dynamic_data.py` termina con la sección «Cadena de entrenamiento»: 7 circuitos (5 Principal, 1
+Superserie y 1 AMRAP: el tipo de cada uno es el nombre de un tipo de `gen_seed.CIRCUIT_TYPES`, y
+`_build_training()` corta la generación si no lo es), 6 rutinas,
 4 planificaciones (27 rutinas en semanas), 5 planes asignados, 7 rutinas individuales y las
 ejecuciones de los alumnos (17 en la vía individual, 27 en la del plan), con un escenario por
 alumno para poder demostrar cada flujo de U-08 a E-07 sin cargar nada a mano:
@@ -96,7 +99,7 @@ con una marca.
   `name` con el nombre de la membresía referenciada.
 - Validado ejecutando los 3 scripts en un PostgreSQL real desde cero, sin errores.
   Conteos actuales que imprime `build_sql.py`: 8 grupos, 35 músculos,
-  207 ejercicios, 10 usuarios, 3 coaches, 3 membresías, 43 pagos, 83 RMs, y la cadena
+  207 ejercicios, 5 tipos de circuito, 10 usuarios, 3 coaches, 3 membresías, 43 pagos, 83 RMs, y la cadena
   de entrenamiento descripta arriba.
   *(Los conteos dinámicos que figuraban antes acá — 3 usuarios, 1 coach, 1 pago,
   3 RMs — quedaron viejos: `dynamic_data.py` creció desde entonces.)*
@@ -104,3 +107,14 @@ con una marca.
   las claves foráneas activas (sin violaciones, y el `03` se puede re-aplicar sin duplicar), las
   invariantes de dominio, y el service real de la API ejecutando sus consultas sobre ese seed.
   **No** se aplicó en un Postgres.
+- **Tipos de circuito (BE-44):** el `type` libre de `Circuit` pasó a una tabla `Circuit_Type`
+  (`circuit_type_id` NOT NULL, FK `RESTRICT`). El `02` siembra Entrada en calor, Principal,
+  Superserie, AMRAP y Enfriamiento con UUID v5 de `circuit_type:<nombre>` (`gen_seed.circuit_type_uuid`).
+  **Sobre una base viva**, el patch `patches/2026-11-04-be-44.sql` crea la tabla, siembra los mismos
+  cinco tipos con los mismos ids, pasa `normal` a Principal, crea un tipo por cada otro valor y borra
+  `type`. Es idempotente y aborta sin tocar nada si encuentra algo inesperado. Alternativa
+  equivalente: recrear la base con `01` → `02` → `03`.
+  Se probó en un **PostgreSQL 16 local** (4/11): los tres `.sql` nuevos desde cero y volviendo a
+  aplicar el `02` y el `03`; y el patch sobre una base creada con los `.sql` anteriores, con tipos
+  sucios (`Core`, `core `, `''`, `amrap`, `principal`…), dos veces seguidas y con cada una de sus
+  guardas. La base vieja parchada queda con los mismos datos que una creada con los `.sql` nuevos.

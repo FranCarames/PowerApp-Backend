@@ -1,7 +1,7 @@
 -- =============================================================
 --  PowerApp DB - DATOS ESTATICOS
 --  Catalogo base que la app necesita SIEMPRE para funcionar:
---  Muscle_Group, Muscle, Exercise, Exercised_Muscle
+--  Muscle_Group, Muscle, Exercise, Exercised_Muscle, Circuit_Type
 --  Ejecutar DESPUES de 01_estructura.sql
 -- =============================================================
 
@@ -1004,3 +1004,12 @@ INSERT INTO public."Exercised_Muscle" (id, exercise_id, muscle_id, created_at, u
     ('72317433-24f3-5839-8ef3-aafbe8fa8159'::uuid, 'fda70bee-d6f9-5d54-bf57-dea338281ae9'::uuid, '870a269b-205c-4f8d-83db-7b557e819744'::uuid, '2026-06-14 12:00:00-03', '2026-06-14 12:00:00-03'),
     ('1e1c88a4-b91d-55df-a4b1-5fc62c67ee3b'::uuid, 'fda70bee-d6f9-5d54-bf57-dea338281ae9'::uuid, '95f831db-8dd3-4477-b02f-4f675de81550'::uuid, '2026-06-14 12:00:00-03', '2026-06-14 12:00:00-03')
 ON CONFLICT (exercise_id, muscle_id) DO NOTHING;
+
+-- Tipos de circuito (BE-44): sin uno activo no se puede crear ningun circuito
+INSERT INTO public."Circuit_Type" (id, type, description, active, created_at, updated_at) VALUES
+    ('7b4c3dcb-5024-5a2c-81f0-acdb200d16a2'::uuid, 'Entrada en calor', 'Movilidad y activación antes del trabajo principal', true, '2026-06-14 12:00:00-03', '2026-06-14 12:00:00-03'),
+    ('49f793de-7681-5c05-a171-371baa69e9eb'::uuid, 'Principal', 'El bloque central de la sesión', true, '2026-06-14 12:00:00-03', '2026-06-14 12:00:00-03'),
+    ('5dc3b269-cc31-5ba1-9da9-a2373d707c46'::uuid, 'Superserie', 'Dos o más ejercicios seguidos, sin descanso entre ellos', true, '2026-06-14 12:00:00-03', '2026-06-14 12:00:00-03'),
+    ('ce44ec22-1de2-5b7b-8df0-fb66b945d2bc'::uuid, 'AMRAP', 'Tantas repeticiones o rondas como se pueda en un tiempo dado', true, '2026-06-14 12:00:00-03', '2026-06-14 12:00:00-03'),
+    ('58af9d1e-3235-5ede-9fc2-67efab8db0de'::uuid, 'Enfriamiento', 'Vuelta a la calma y estiramientos al final de la sesión', true, '2026-06-14 12:00:00-03', '2026-06-14 12:00:00-03')
+ON CONFLICT (id) DO NOTHING;

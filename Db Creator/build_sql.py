@@ -3,7 +3,7 @@
 Orquestador del seed de PowerApp.
 Genera TRES archivos SQL:
   1. 01_estructura.sql      -> DDL (tablas, ENUMs, FKs, indices)
-  2. 02_datos_estaticos.sql -> Muscle_Group, Muscle, Exercise, Exercised_Muscle
+  2. 02_datos_estaticos.sql -> Muscle_Group, Muscle, Exercise, Exercised_Muscle, Circuit_Type
   3. 03_datos_dinamicos.sql -> User, Coach, Membership, Membership_Payment, User_RM y la cadena
                                de entrenamiento (circuitos, rutinas, planificaciones, asignaciones
                                y ejecuciones)
@@ -11,7 +11,7 @@ Genera TRES archivos SQL:
 Uso:  python3 build_sql.py
 """
 import gen_seed
-from gen_seed import MUSCLES, GROUPS, NEW_GROUPS, U, esc, TS
+from gen_seed import MUSCLES, GROUPS, NEW_GROUPS, CIRCUIT_TYPES, circuit_type_uuid, U, esc, TS
 import catalogo_ejercicios
 import static_extra as SX
 import dynamic_data as DD
@@ -47,7 +47,7 @@ def build_estaticos():
     w("-- =============================================================")
     w("--  PowerApp DB - DATOS ESTATICOS")
     w("--  Catalogo base que la app necesita SIEMPRE para funcionar:")
-    w("--  Muscle_Group, Muscle, Exercise, Exercised_Muscle")
+    w("--  Muscle_Group, Muscle, Exercise, Exercised_Muscle, Circuit_Type")
     w("--  Ejecutar DESPUES de 01_estructura.sql")
     w("-- =============================================================")
     w("")
@@ -112,6 +112,15 @@ def build_estaticos():
             link_id = U("em:" + name + ":" + mkey)
             rows.append("    ('{}'::uuid, '{}'::uuid, '{}'::uuid, {}, {})".format(link_id, eid, mid, TS, TS))
     w(",\n".join(rows) + "\nON CONFLICT (exercise_id, muscle_id) DO NOTHING;")
+    w("")
+
+    # ---------- CIRCUIT_TYPE (BE-44) ----------
+    w("-- Tipos de circuito (BE-44): sin uno activo no se puede crear ningun circuito")
+    w('INSERT INTO public."Circuit_Type" (id, type, description, active, created_at, updated_at) VALUES')
+    rows = []
+    for name, desc in CIRCUIT_TYPES:
+        rows.append("    ('{}'::uuid, {}, {}, true, {}, {})".format(circuit_type_uuid(name), esc(name), esc(desc), TS, TS))
+    w(",\n".join(rows) + "\nON CONFLICT (id) DO NOTHING;")
     w("")
 
     return "\n".join(out)
@@ -223,7 +232,7 @@ def build_dinamicos():
     w("")
 
     w("-- Circuitos")
-    w(_insert("Circuit", [("id", "uuid"), ("name", "str"), ("description", "str"), ("type", "str"), ("active", "bool")] + _TS_COLS,
+    w(_insert("Circuit", [("id", "uuid"), ("name", "str"), ("description", "str"), ("circuit_type_id", "uuid"), ("active", "bool")] + _TS_COLS,
               DD.CIRCUITS))
     w("")
 
@@ -298,6 +307,7 @@ if __name__ == "__main__":
     print("  - Grupos musculares :", len(GROUPS))
     print("  - Musculos          :", len(MUSCLES))
     print("  - Ejercicios        :", n_ex)
+    print("  - Tipos de circuito :", len(CIRCUIT_TYPES))
     print("Resumen datos dinamicos:")
     print("  - Usuarios          :", len(DD.USERS))
     print("  - Coaches           :", len(DD.COACHES))
@@ -305,7 +315,8 @@ if __name__ == "__main__":
     print("  - Pagos             :", len(DD.MEMBERSHIP_PAYMENTS))
     print("  - User_RM           :", len(DD.USER_RMS))
     print("  Cadena de entrenamiento:")
-    print("  - Circuitos         :", len(DD.CIRCUITS))
+    print("  - Circuitos         :", len(DD.CIRCUITS), "(" + ", ".join(
+        "{} {}".format(name, n) for name, n in DD.CIRCUITS_PER_TYPE.items() if n) + ")")
     print("  - Rutinas           :", len(DD.ROUTINES))
     print("  - Ejercicios/series :", len(DD.ROUTINE_EXERCISES), "/", len(DD.EXERCISE_SETS))
     print("  - Planificaciones   :", len(DD.PLANIFICATIONS), "con", len(DD.ROUTINE_ASIGNATIONS), "rutinas en semanas")

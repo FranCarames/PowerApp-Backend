@@ -4,6 +4,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { CIRCUIT_TYPE_ID_UUID_ERROR } from '../circuit_type/circuit_type_messages';
 
 export class CreateCircuitSetDto {
 
@@ -103,11 +104,12 @@ export class CreateCircuitDto {
     @MaxLength(100)
     description?: string;
 
-    @ApiProperty({ example: 'entrada en calor', maxLength: 30 })
+    // Reemplaza al type de texto libre (BE-44). Que exista y que este activo lo controla el service
+    // (404 y 400), despues de las reglas del payload y antes que los ejercicios
+    @ApiProperty({ example: '49f793de-7681-5c05-a171-371baa69e9eb', format: 'uuid', description: 'Id de un tipo de circuito activo (`GET /routine/circuit-type/all`). Al editar, puede ser el tipo que el circuito ya tiene aunque esté dado de baja' })
     @IsNotEmpty()
-    @IsString()
-    @MaxLength(30)
-    type!: string;
+    @IsUUID('all', { message: CIRCUIT_TYPE_ID_UUID_ERROR })
+    circuit_type_id!: string;
 
     @ApiProperty({ type: [CreateCircuitExerciseDto], description: 'Ejercicios del circuito, en orden. Al menos uno' })
     @IsArray()

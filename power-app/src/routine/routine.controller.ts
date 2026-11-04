@@ -9,11 +9,15 @@ import {
     Res,
 } from '@nestjs/common';
 import { ApiTags, ApiResponse, ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
-import { RoutineService } from './routine.service';
+import {
+    RoutineService,
+    CIRCUIT_TYPE_NOT_FOUND_ERROR,
+    CIRCUIT_TYPE_DUPLICATE_NAME_ERROR,
+    CIRCUIT_TYPE_INACTIVE_ERROR,
+} from './routine.service';
 import { Response } from 'express';
 import { ParameterIdDto } from '../dtos/parameter_id.dto';
 import { Routine } from '../entities/routine.entity';
-import { Circuit } from '../entities/circuit.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
 import { CreateCircuitDto } from '../dtos/circuit/create_circuit.dto';
@@ -27,6 +31,13 @@ import { RoutineListItemResponseDto } from '../dtos/routine/routine_list_item_re
 import { RoutineListItemPlusResponseDto } from '../dtos/routine/routine_list_item_plus_response.dto';
 import { RoutineDetailResponseDto } from '../dtos/routine/routine_detail_response.dto';
 import { CircuitDetailResponseDto } from '../dtos/circuit/circuit_detail_response.dto';
+import { CircuitResponseDto } from '../dtos/circuit/circuit_response.dto';
+import { GetCircuitTypesQueryDto } from '../dtos/circuit_type/get_circuit_types_query.dto';
+import { CreateCircuitTypeDto } from '../dtos/circuit_type/create_circuit_type.dto';
+import { EditCircuitTypeDto } from '../dtos/circuit_type/edit_circuit_type.dto';
+import { SetCircuitTypeActiveDto } from '../dtos/circuit_type/set_circuit_type_active.dto';
+import { CircuitTypeResponseDto } from '../dtos/circuit_type/circuit_type_response.dto';
+import { CIRCUIT_TYPE_ID_UUID_ERROR } from '../dtos/circuit_type/circuit_type_messages';
 import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
 import { SetRoutineActiveDto } from '../dtos/routine/set_routine_active.dto';
@@ -50,6 +61,31 @@ import { RoutineHomeWeekResponseDto } from '../dtos/routine/routine_home_respons
 import { PlanSessionParamsDto } from '../dtos/routine/plan_session_params.dto';
 import { PlanSessionFinishedParamsDto } from '../dtos/routine/plan_session_finished_params.dto';
 import { RoutinePlanSessionDetailResponseDto } from '../dtos/routine/routine_plan_session_detail_response.dto';
+
+// Los errores del service son { error: string } (como en el controller de planificaciones). Los del
+// ValidationPipe (400 del DTO) y los de los guards (403) tienen la forma de las excepciones de Nest:
+// { statusCode, message, error }. Donde un codigo puede venir de los dos lados, el schema es un oneOf
+const errorBody = (example: string) => ({
+    type: 'object',
+    required: ['error'],
+    properties: { error: { type: 'string', example } },
+});
+
+const nestErrorBody = (statusCode: number, message: string | string[], error: string) => ({
+    type: 'object',
+    required: ['statusCode', 'message', 'error'],
+    properties: {
+        statusCode: { type: 'number', example: statusCode },
+        message: Array.isArray(message)
+            ? { type: 'array', items: { type: 'string' }, example: message }
+            : { type: 'string', example: message },
+        error: { type: 'string', example: error },
+    },
+});
+
+const validationBody = (...messages: string[]) => nestErrorBody(400, messages, 'Bad Request');
+
+const FORBIDDEN_BODY = nestErrorBody(403, 'Acceso denegado. Permisos insuficientes.', 'Forbidden');
 
 @ApiTags('Routine')
 @Controller('routine')
@@ -128,10 +164,24 @@ export class RoutineController {
     }
 
     // ===================== CIRCUITOS (CU-E-21, CU-E-22, CU-E-23, CU-E-24) =====================
+    // Desde BE-44 el tipo de un circuito es un Circuit_Type: el alta y la edicion reciben
+    // circuit_type_id, los listados filtran por circuit_type_id y las respuestas traen circuit_type
 
     @Post('circuit/create')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 201, type: CircuitDetailResponseDto })
+    @ApiResponse({ status: 201, type: CircuitDetailResponseDto, description: 'El circuito creado, con su tipo en circuit_type' })
+    @ApiResponse({
+        status: 400,
+        description: `En este orden: el cuerpo inválido (el del ValidationPipe: circuit_type_id obligatorio y UUID, «${CIRCUIT_TYPE_ID_UUID_ERROR}»; un cuerpo que todavía trae type también es 400); las reglas del payload (ejercicio repetido, amrap_time sin amrap, rpe con rir, rm con más de una serie); y el tipo dado de baja, «${CIRCUIT_TYPE_INACTIVE_ERROR}» (después del 404 del tipo). No se crea nada`,
+        schema: { oneOf: [validationBody(CIRCUIT_TYPE_ID_UUID_ERROR), errorBody(CIRCUIT_TYPE_INACTIVE_ERROR)] },
+    })
+    @ApiResponse({ status: 403, description: 'El rol no es entrenador ni admin, o la cuenta está deshabilitada', schema: FORBIDDEN_BODY })
+    @ApiResponse({
+        status: 404,
+        description: `«${CIRCUIT_TYPE_NOT_FOUND_ERROR}» (antes que el 400 del tipo dado de baja) o, con el tipo bien, «Algunos ejercicios no fueron encontrados». No se crea nada`,
+        schema: errorBody(CIRCUIT_TYPE_NOT_FOUND_ERROR),
+    })
+    @ApiResponse({ status: 500, description: 'Error al crear el circuito. No se crea nada', schema: errorBody('Error al crear el circuito.') })
     async createCircuit(
         @Body() createCircuitDto: CreateCircuitDto,
         @Res() res: Response,
@@ -143,7 +193,19 @@ export class RoutineController {
     // dos segmentos despues de circuit, asi que no matchea el patron 'circuit/:id'
     @Post('circuit/edit/:id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: CircuitDetailResponseDto })
+    @ApiResponse({ status: 200, type: CircuitDetailResponseDto, description: 'El circuito editado, con su tipo en circuit_type. Conservar el tipo que ya tenía está permitido aunque esté dado de baja' })
+    @ApiResponse({
+        status: 400,
+        description: `En este orden: el id que no es UUID o el cuerpo inválido (el del ValidationPipe, con «${CIRCUIT_TYPE_ID_UUID_ERROR}»; un cuerpo con type también es 400); las reglas del payload; el circuito dado de baja («El circuito "<nombre>" está dado de baja y no se puede editar. Reactivalo primero.», después del 404 del circuito); y, sólo si circuit_type_id cambia, el tipo nuevo dado de baja, «${CIRCUIT_TYPE_INACTIVE_ERROR}». No se guarda nada`,
+        schema: { oneOf: [validationBody(CIRCUIT_TYPE_ID_UUID_ERROR), errorBody(CIRCUIT_TYPE_INACTIVE_ERROR)] },
+    })
+    @ApiResponse({ status: 403, description: 'El rol no es entrenador ni admin, o la cuenta está deshabilitada', schema: FORBIDDEN_BODY })
+    @ApiResponse({
+        status: 404,
+        description: `En este orden: «Circuito no encontrado»; sólo si circuit_type_id cambia, «${CIRCUIT_TYPE_NOT_FOUND_ERROR}»; y «Algunos ejercicios no fueron encontrados». No se guarda nada`,
+        schema: errorBody(CIRCUIT_TYPE_NOT_FOUND_ERROR),
+    })
+    @ApiResponse({ status: 500, description: 'Error al editar el circuito. No se guarda nada', schema: errorBody('Error al editar el circuito.') })
     async editCircuit(
         @Param() idCircuit: ParameterIdDto,
         @Body() editCircuitDto: EditCircuitDto,
@@ -154,7 +216,10 @@ export class RoutineController {
 
     @Get('circuit/all')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [CircuitListItemResponseDto] })
+    @ApiResponse({ status: 200, type: [CircuitListItemResponseDto], description: 'Por nombre. Con circuit_type_id, sólo los de ese tipo; un id que no es de ningún tipo devuelve []' })
+    @ApiResponse({ status: 400, description: `Query inválido: circuit_type_id que no es UUID («${CIRCUIT_TYPE_ID_UUID_ERROR}»), keyword de más de 100, include_inactive que no es true/false, u otro parámetro (type ya no existe)`, schema: validationBody(CIRCUIT_TYPE_ID_UUID_ERROR) })
+    @ApiResponse({ status: 403, description: 'El rol no es entrenador ni admin, o la cuenta está deshabilitada', schema: FORBIDDEN_BODY })
+    @ApiResponse({ status: 500, description: 'Error al obtener los circuitos', schema: errorBody('Error al obtener los circuitos.') })
     async getAllCircuits(
         @Query() query: GetCircuitsQueryDto,
         @Res() res: Response,
@@ -166,7 +231,10 @@ export class RoutineController {
     // y si quedara declarado despues caeria ahi y devolveria 400 por UUID invalido
     @Get('circuit/all-plus')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: [CircuitListItemPlusResponseDto] })
+    @ApiResponse({ status: 200, type: [CircuitListItemPlusResponseDto], description: 'Por nombre, con los ejercicios. Con circuit_type_id, sólo los de ese tipo; un id que no es de ningún tipo devuelve []' })
+    @ApiResponse({ status: 400, description: `Query inválido: circuit_type_id que no es UUID («${CIRCUIT_TYPE_ID_UUID_ERROR}»), keyword de más de 100, include_inactive que no es true/false, u otro parámetro (type ya no existe)`, schema: validationBody(CIRCUIT_TYPE_ID_UUID_ERROR) })
+    @ApiResponse({ status: 403, description: 'El rol no es entrenador ni admin, o la cuenta está deshabilitada', schema: FORBIDDEN_BODY })
+    @ApiResponse({ status: 500, description: 'Error al obtener los circuitos', schema: errorBody('Error al obtener los circuitos.') })
     async getAllCircuitsPlus(
         @Query() query: GetCircuitsQueryDto,
         @Res() res: Response,
@@ -186,13 +254,82 @@ export class RoutineController {
 
     @Post('circuit/set-active/:id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: Circuit })
+    @ApiResponse({ status: 200, type: CircuitResponseDto, description: 'El circuito con su estado nuevo y su tipo en circuit_type' })
+    @ApiResponse({ status: 400, description: 'El id no es un UUID válido, o falta active o no es booleano', schema: validationBody('active must be a boolean value') })
+    @ApiResponse({ status: 403, description: 'El rol no es entrenador ni admin, o la cuenta está deshabilitada', schema: FORBIDDEN_BODY })
+    @ApiResponse({ status: 404, description: '«Circuito no encontrado»', schema: errorBody('Circuito no encontrado') })
+    @ApiResponse({ status: 500, description: 'Error al actualizar el estado del circuito', schema: errorBody('Error al actualizar el estado del circuito.') })
     async setCircuitActive(
         @Param() idCircuit: ParameterIdDto,
         @Body() setCircuitActiveDto: SetCircuitActiveDto,
         @Res() res: Response,
     ) {
         await this.routineService.setCircuitActive(idCircuit.id, setCircuitActiveDto, res);
+    }
+
+    // ===================== TIPOS DE CIRCUITO (CU-A-24 a CU-A-27) =====================
+
+    // Las cuatro rutas tienen 'circuit-type' como primer segmento: no compiten con 'GET /:id' ni con
+    // 'circuit/:id'. El catalogo es del Admin (D60): el entrenador solo lo lee, para elegir un tipo
+    // al armar un circuito y para filtrar
+    @Get('circuit-type/all')
+    @Auth(UserRole.coach, UserRole.admin)
+    @ApiResponse({ status: 200, type: [CircuitTypeResponseDto], description: 'Por type ascendente. Sin include_inactive, sólo los activos; con true, también los dados de baja. circuit_count cuenta los circuitos activos de cada tipo' })
+    @ApiResponse({ status: 400, description: 'include_inactive que no es true/false, u otro parámetro', schema: validationBody('include_inactive must be a boolean value') })
+    @ApiResponse({ status: 403, description: 'El rol no es entrenador ni admin (el alumno), o la cuenta está deshabilitada', schema: FORBIDDEN_BODY })
+    @ApiResponse({ status: 500, description: 'Error al obtener los tipos de circuito', schema: errorBody('Error al obtener los tipos de circuito.') })
+    async getAllCircuitTypes(
+        @Query() query: GetCircuitTypesQueryDto,
+        @Res() res: Response,
+    ) {
+        await this.routineService.getAllCircuitTypes(query, res);
+    }
+
+    @Post('circuit-type/create')
+    @Auth(UserRole.admin)
+    @ApiResponse({ status: 201, type: CircuitTypeResponseDto, description: 'El tipo creado: activo, con circuit_count 0, el nombre y la descripción recortados (la descripción vacía queda en null)' })
+    @ApiResponse({ status: 400, description: 'Cuerpo inválido: falta type o tiene sólo espacios, type de más de 50 o description de más de 100 (ya recortados), u otro campo', schema: validationBody('type should not be empty') })
+    @ApiResponse({ status: 403, description: 'Sólo el admin: el entrenador y el alumno reciben 403 (también una cuenta deshabilitada)', schema: FORBIDDEN_BODY })
+    @ApiResponse({ status: 409, description: `«${CIRCUIT_TYPE_DUPLICATE_NAME_ERROR}»: el nombre recortado y en minúsculas coincide con el de otro tipo, activo o dado de baja. No se crea nada`, schema: errorBody(CIRCUIT_TYPE_DUPLICATE_NAME_ERROR) })
+    @ApiResponse({ status: 500, description: 'Error al crear el tipo de circuito', schema: errorBody('Error al crear el tipo de circuito.') })
+    async createCircuitType(
+        @Body() createCircuitTypeDto: CreateCircuitTypeDto,
+        @Res() res: Response,
+    ) {
+        await this.routineService.createCircuitType(createCircuitTypeDto, res);
+    }
+
+    @Post('circuit-type/edit/:id')
+    @Auth(UserRole.admin)
+    @ApiResponse({ status: 200, type: CircuitTypeResponseDto, description: 'El tipo editado, con su circuit_count. Pisa los dos campos: sin description, la descripción queda en null. No cambia active: un tipo dado de baja sigue de baja' })
+    @ApiResponse({ status: 400, description: 'El id no es un UUID válido, o el cuerpo es inválido (las reglas del alta). Va antes que el 404', schema: validationBody('type should not be empty') })
+    @ApiResponse({ status: 403, description: 'Sólo el admin: el entrenador y el alumno reciben 403 (también una cuenta deshabilitada)', schema: FORBIDDEN_BODY })
+    @ApiResponse({ status: 404, description: `«${CIRCUIT_TYPE_NOT_FOUND_ERROR}». Va antes que el 409`, schema: errorBody(CIRCUIT_TYPE_NOT_FOUND_ERROR) })
+    @ApiResponse({ status: 409, description: `«${CIRCUIT_TYPE_DUPLICATE_NAME_ERROR}»: sólo si el nombre cambia (recortado y en minúsculas; cambiar sólo las mayúsculas no es un conflicto) y coincide con el de otro tipo, activo o dado de baja. No se guarda nada`, schema: errorBody(CIRCUIT_TYPE_DUPLICATE_NAME_ERROR) })
+    @ApiResponse({ status: 500, description: 'Error al editar el tipo de circuito', schema: errorBody('Error al editar el tipo de circuito.') })
+    async editCircuitType(
+        @Param() idCircuitType: ParameterIdDto,
+        @Body() editCircuitTypeDto: EditCircuitTypeDto,
+        @Res() res: Response,
+    ) {
+        await this.routineService.editCircuitType(idCircuitType.id, editCircuitTypeDto, res);
+    }
+
+    // Baja logica y reactivar en el mismo endpoint, como circuit/set-active y membership/set-active.
+    // Sin borrado fisico (D61)
+    @Post('circuit-type/set-active/:id')
+    @Auth(UserRole.admin)
+    @ApiResponse({ status: 200, type: CircuitTypeResponseDto, description: 'El tipo con su estado nuevo. Un tipo con circuitos se da de baja igual (los circuitos lo conservan), y mandar el valor que ya tiene responde 200 sin cambios' })
+    @ApiResponse({ status: 400, description: 'El id no es un UUID válido, o falta active o no es booleano', schema: validationBody('active must be a boolean value') })
+    @ApiResponse({ status: 403, description: 'Sólo el admin: el entrenador y el alumno reciben 403 (también una cuenta deshabilitada)', schema: FORBIDDEN_BODY })
+    @ApiResponse({ status: 404, description: `«${CIRCUIT_TYPE_NOT_FOUND_ERROR}»`, schema: errorBody(CIRCUIT_TYPE_NOT_FOUND_ERROR) })
+    @ApiResponse({ status: 500, description: 'Error al actualizar el estado del tipo de circuito', schema: errorBody('Error al actualizar el estado del tipo de circuito.') })
+    async setCircuitTypeActive(
+        @Param() idCircuitType: ParameterIdDto,
+        @Body() setCircuitTypeActiveDto: SetCircuitTypeActiveDto,
+        @Res() res: Response,
+    ) {
+        await this.routineService.setCircuitTypeActive(idCircuitType.id, setCircuitTypeActiveDto, res);
     }
 
     // ===================== ASIGNACION INDIVIDUAL A UN ALUMNO (CU-E-19, CU-E-20) =====================
