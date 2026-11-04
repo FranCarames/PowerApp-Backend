@@ -279,38 +279,39 @@ def _at(day, hhmm="19:30"):
 
 
 # Circuitos: (clave, nombre, descripcion, tipo, activo, [(ejercicio, nota del coach, activo, [series])]).
+# El tipo es el NOMBRE de un tipo de gen_seed.CIRCUIT_TYPES (BE-44): el circuito guarda su id.
 # Una fila de series es un bloque: set_count 3 con rep_count 8 es "3x8".
 _CIRCUITS = [
-    ("piernas_fuerza", "Piernas - Fuerza", "Sentadilla y bisagra de cadera pesadas", "normal", True, [
+    ("piernas_fuerza", "Piernas - Fuerza", "Sentadilla y bisagra de cadera pesadas", "Principal", True, [
         ("Sentadilla", "Bajá controlado y subí explosivo", True, [_set(1, 5, rm_perc=60), _set(3, 5, rm_perc=75, rpe=7)]),
         ("Peso Muerto Rumano", "Espalda neutra todo el recorrido", True, [_set(3, 8, weight=60, rir=2)]),
         ("Zancadas con Mancuernas", None, True, [_set(3, 10, weight=14)]),
     ]),
-    ("piernas_hipertrofia", "Piernas - Hipertrofia", "Volumen para cuádriceps y gemelos", "normal", True, [
+    ("piernas_hipertrofia", "Piernas - Hipertrofia", "Volumen para cuádriceps y gemelos", "Principal", True, [
         ("Prensa de Piernas 45 Grados", "Sin bloquear las rodillas", True, [_set(3, 12, weight=120, rpe=8)]),
         ("Curl de Piernas Tumbado", None, True, [_set(3, 12, weight=35, rir=2)]),
         ("Elevación de Talones de Pie", "Pausa de un segundo arriba", True, [_set(4, 15, weight=50)]),
     ]),
-    ("empuje", "Empuje", "Pecho y hombros", "normal", True, [
+    ("empuje", "Empuje", "Pecho y hombros", "Principal", True, [
         ("Press de Banca Plano", "Escápulas retraídas", True, [_set(4, 6, rm_perc=75, rpe=7), _set(1, 8, rm_perc=70, amrap=True)]),
         ("Press Militar con Barra", None, True, [_set(3, 8, weight=30, rpe=8)]),
         ("Fondos en Paralelas", None, False, [_set(3, 10)]),
     ]),
-    ("traccion", "Tracción", "Espalda y hombro posterior", "normal", True, [
+    ("traccion", "Tracción", "Espalda y hombro posterior", "Principal", True, [
         ("Remo con Barra Inclinado", "Pecho al frente, sin balanceo", True, [_set(4, 8, weight=40, rir=2)]),
         ("Dominadas Pronas", None, True, [_set(3, 6)]),
         ("Face Pull en Polea", "Codos altos", True, [_set(3, 15, weight=15)]),
     ]),
-    ("core", "Core", "Abdomen en superserie", "superserie", True, [
+    ("core", "Core", "Abdomen en superserie", "Superserie", True, [
         ("Plancha Abdominal", "Cuerpo en línea", True, [_set(3, 1, amrap=True, amrap_time=45)]),
         ("Elevación de Piernas Colgado", None, True, [_set(3, 10)]),
         ("Crunch Abdominal", None, True, [_set(3, 15)]),
     ]),
-    ("metabolico", "Metabólico", "Cierre cronometrado", "amrap", True, [
+    ("metabolico", "Metabólico", "Cierre cronometrado", "AMRAP", True, [
         ("Burpee", "Al ritmo que puedas sostener", True, [_set(1, 10, amrap=True, amrap_time=300)]),
         ("Remo en Ergómetro", None, True, [_set(1, 1, amrap=True, amrap_time=300)]),
     ]),
-    ("desuso", "Circuito en desuso", "Dado de baja", "normal", False, [
+    ("desuso", "Circuito en desuso", "Dado de baja", "Principal", False, [
         ("Curl con Barra", None, True, [_set(3, 10, weight=20)]),
     ]),
 ]
@@ -380,10 +381,12 @@ def _build_training():
     circuits, routine_exercises, exercise_sets = [], [], []
     re_id = {}          # (circuito, ejercicio) -> id del Routine_Exercise
     circuit_items = {}  # circuito -> [(ejercicio, activo)]
+    type_names = [type_name for type_name, _ in gen_seed.CIRCUIT_TYPES]
     for key, name, desc, ctype, active, exercises in _CIRCUITS:
-        assert len(name) <= 100 and len(desc) <= 100 and len(ctype) <= 30
+        assert len(name) <= 100 and len(desc) <= 100
+        assert ctype in type_names, "el tipo del circuito es uno de gen_seed.CIRCUIT_TYPES: " + key
         cid = U("circuit:" + key)
-        circuits.append((cid, name, desc, ctype, active, t0, t0))
+        circuits.append((cid, name, desc, gen_seed.circuit_type_uuid(ctype), active, t0, t0))
         circuit_items[key] = []
         names = [e[0] for e in exercises]
         assert len(set(names)) == len(names), "un ejercicio no se repite dentro del circuito: " + key
@@ -527,6 +530,8 @@ def _build_training():
 
 _TRAINING = _build_training()
 CIRCUITS = _TRAINING["circuits"]
+# Cuantos circuitos del seed tiene cada tipo (lo imprime el resumen de build_sql.py)
+CIRCUITS_PER_TYPE = {name: sum(1 for c in _CIRCUITS if c[3] == name) for name, _ in gen_seed.CIRCUIT_TYPES}
 ROUTINES = _TRAINING["routines"]
 ROUTINE_EXERCISES = _TRAINING["routine_exercises"]
 EXERCISE_SETS = _TRAINING["exercise_sets"]

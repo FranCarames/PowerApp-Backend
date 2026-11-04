@@ -23,6 +23,23 @@ def esc(s):
 TS = "'2026-06-14 12:00:00-03'"
 
 # ------------------------------------------------------------------
+# TIPOS DE CIRCUITO (BE-44): (nombre, descripcion), en este orden.
+# Van en el 02 porque sin un tipo activo no se puede crear ningun circuito. Los ids
+# son UUID v5 de "circuit_type:<nombre>": los mismos que siembra el patch de BE-44.
+# ------------------------------------------------------------------
+CIRCUIT_TYPES = [
+    ("Entrada en calor", "Movilidad y activación antes del trabajo principal"),
+    ("Principal", "El bloque central de la sesión"),
+    ("Superserie", "Dos o más ejercicios seguidos, sin descanso entre ellos"),
+    ("AMRAP", "Tantas repeticiones o rondas como se pueda en un tiempo dado"),
+    ("Enfriamiento", "Vuelta a la calma y estiramientos al final de la sesión"),
+]
+
+def circuit_type_uuid(name):
+    """Id determinista de un tipo de circuito del seed."""
+    return U("circuit_type:" + name)
+
+# ------------------------------------------------------------------
 # GRUPOS MUSCULARES
 # Los 6 existentes conservan su UUID real del seed actual.
 # ------------------------------------------------------------------

@@ -173,14 +173,14 @@ ON CONFLICT (id) DO NOTHING;
 -- =============================================================
 
 -- Circuitos
-INSERT INTO public."Circuit" (id, name, description, type, active, created_at, updated_at) VALUES
-    ('b4bc8877-ce2b-5460-a981-c1eb79a998ff'::uuid, 'Piernas - Fuerza', 'Sentadilla y bisagra de cadera pesadas', 'normal', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
-    ('5bc76477-9b6d-5cc8-baec-eb2ef7f4a4df'::uuid, 'Piernas - Hipertrofia', 'Volumen para cuádriceps y gemelos', 'normal', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
-    ('25f11067-f78b-55f1-84ef-36f63f11c50a'::uuid, 'Empuje', 'Pecho y hombros', 'normal', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
-    ('6e6a9787-d9ec-5e5a-844b-08dc5107e194'::uuid, 'Tracción', 'Espalda y hombro posterior', 'normal', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
-    ('1add7a71-fae2-587f-a9fc-8fe901a99adb'::uuid, 'Core', 'Abdomen en superserie', 'superserie', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
-    ('3f562512-8d47-57bd-96fb-5f5737e11d9a'::uuid, 'Metabólico', 'Cierre cronometrado', 'amrap', true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
-    ('a2958226-3fc2-56ce-90ed-811e71ccba73'::uuid, 'Circuito en desuso', 'Dado de baja', 'normal', false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03')
+INSERT INTO public."Circuit" (id, name, description, circuit_type_id, active, created_at, updated_at) VALUES
+    ('b4bc8877-ce2b-5460-a981-c1eb79a998ff'::uuid, 'Piernas - Fuerza', 'Sentadilla y bisagra de cadera pesadas', '49f793de-7681-5c05-a171-371baa69e9eb'::uuid, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('5bc76477-9b6d-5cc8-baec-eb2ef7f4a4df'::uuid, 'Piernas - Hipertrofia', 'Volumen para cuádriceps y gemelos', '49f793de-7681-5c05-a171-371baa69e9eb'::uuid, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('25f11067-f78b-55f1-84ef-36f63f11c50a'::uuid, 'Empuje', 'Pecho y hombros', '49f793de-7681-5c05-a171-371baa69e9eb'::uuid, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('6e6a9787-d9ec-5e5a-844b-08dc5107e194'::uuid, 'Tracción', 'Espalda y hombro posterior', '49f793de-7681-5c05-a171-371baa69e9eb'::uuid, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('1add7a71-fae2-587f-a9fc-8fe901a99adb'::uuid, 'Core', 'Abdomen en superserie', '5dc3b269-cc31-5ba1-9da9-a2373d707c46'::uuid, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('3f562512-8d47-57bd-96fb-5f5737e11d9a'::uuid, 'Metabólico', 'Cierre cronometrado', 'ce44ec22-1de2-5b7b-8df0-fb66b945d2bc'::uuid, true, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03'),
+    ('a2958226-3fc2-56ce-90ed-811e71ccba73'::uuid, 'Circuito en desuso', 'Dado de baja', '49f793de-7681-5c05-a171-371baa69e9eb'::uuid, false, '2026-10-12 09:00:00-03', '2026-10-12 09:00:00-03')
 ON CONFLICT DO NOTHING;
 
 -- Rutinas

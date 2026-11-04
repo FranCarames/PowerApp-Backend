@@ -93,19 +93,32 @@ CREATE TABLE public."Planification" (
 
 CREATE INDEX idx_planification_active ON public."Planification"(active);
 
--- Circuit es una pieza global reutilizable: no depende de Routine
-CREATE TABLE public."Circuit" (
+-- Tipos de circuito (BE-44): catalogo cerrado que administra el Admin.
+-- El nombre es unico sin mayusculas ni espacios de los bordes: lo controla el service
+CREATE TABLE public."Circuit_Type" (
     id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    name        VARCHAR(100) NOT NULL,
+    type        VARCHAR(50)  NOT NULL,
     description VARCHAR(100),
-    type        VARCHAR(30)  NOT NULL,
     active      BOOLEAN      NOT NULL DEFAULT true,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_circuit_active ON public."Circuit"(active);
-CREATE INDEX idx_circuit_type   ON public."Circuit"(type);
+-- Circuit es una pieza global reutilizable: no depende de Routine
+CREATE TABLE public."Circuit" (
+    id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    name            VARCHAR(100) NOT NULL,
+    description     VARCHAR(100),
+    circuit_type_id UUID         NOT NULL,
+    active          BOOLEAN      NOT NULL DEFAULT true,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_circuit_circuit_type
+        FOREIGN KEY (circuit_type_id) REFERENCES public."Circuit_Type"(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_circuit_active          ON public."Circuit"(active);
+CREATE INDEX idx_circuit_circuit_type_id ON public."Circuit"(circuit_type_id);
 
 CREATE TABLE public."Routine" (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

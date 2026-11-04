@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, DataSource, In, SelectQueryBuilder } from 'typeorm';
+import { Repository, DataSource, In, SelectQueryBuilder, EntityManager } from 'typeorm';
 import { Circuit } from '../entities/circuit.entity';
+import { CircuitType } from '../entities/circuit_type.entity';
 import { Exercise } from '../entities/exercise.entity';
 import { Routine } from '../entities/routine.entity';
 import { RoutineCircuit } from '../entities/routine_circuit.entity';
@@ -19,6 +20,10 @@ import { GetCircuitsQueryDto } from '../dtos/circuit/get_circuits_query.dto';
 import { SetCircuitActiveDto } from '../dtos/circuit/set_circuit_active.dto';
 import { CreateCircuitDto } from '../dtos/circuit/create_circuit.dto';
 import { EditCircuitDto } from '../dtos/circuit/edit_circuit.dto';
+import { GetCircuitTypesQueryDto } from '../dtos/circuit_type/get_circuit_types_query.dto';
+import { CreateCircuitTypeDto } from '../dtos/circuit_type/create_circuit_type.dto';
+import { EditCircuitTypeDto } from '../dtos/circuit_type/edit_circuit_type.dto';
+import { SetCircuitTypeActiveDto } from '../dtos/circuit_type/set_circuit_type_active.dto';
 import { GetRoutinesQueryDto } from '../dtos/routine/get_routines_query.dto';
 import { CreateRoutineDto } from '../dtos/routine/create_routine.dto';
 import { EditRoutineDto } from '../dtos/routine/edit_routine.dto';
@@ -56,6 +61,14 @@ const ROUTINE_REMOVED_FROM_PLAN_ERROR = 'La rutina fue quitada de la planificaci
 // sumo 8 semanas (BE-20e), asi que solo lo toca con mas de 65 planes que conviven. 520 semanas son 10 años
 const PLAN_WEEKS_LIMIT = 520;
 const PLAN_WEEKS_LIMIT_ERROR = `Hay más de ${PLAN_WEEKS_LIMIT} semanas de plan para mostrar: pedí un rango más corto con from y to.`;
+
+// Los textos de los tipos de circuito (BE-44, plan 3.8). El web compara los tres literales: el editor
+// de circuitos distingue el 404 del tipo de «Circuito no encontrado» y de «Algunos ejercicios no fueron
+// encontrados». No cambiarlos sin tocar el web. Se exportan para que el Swagger del controller use los
+// mismos. El 400 de circuit_type_id que no es UUID es del DTO (CIRCUIT_TYPE_ID_UUID_ERROR)
+export const CIRCUIT_TYPE_NOT_FOUND_ERROR = 'Tipo de circuito no encontrado';
+export const CIRCUIT_TYPE_DUPLICATE_NAME_ERROR = 'Ya existe un tipo de circuito con ese nombre';
+export const CIRCUIT_TYPE_INACTIVE_ERROR = 'El tipo de circuito está dado de baja.';
 
 // La zona del "hoy" del home cuando no llega date (D32). El servidor corre en UTC: los domingos de 21
 // a 24 h de Argentina ya es lunes, y con su reloj el home saltaria a la semana siguiente
@@ -118,6 +131,8 @@ export class RoutineService {
     constructor(
         @InjectRepository(Circuit)
         private circuitRepository: Repository<Circuit>,
+        @InjectRepository(CircuitType)
+        private circuitTypeRepository: Repository<CircuitType>,
         @InjectRepository(Routine)
         private routineRepository: Repository<Routine>,
         @InjectDataSource()
@@ -451,6 +466,7 @@ export class RoutineService {
             const routines = await this.buildRoutinesQuery(query)
                 .leftJoinAndSelect('routine.routineCircuits', 'routineCircuit', 'routineCircuit.active = true')
                 .leftJoinAndSelect('routineCircuit.circuit', 'circuit')
+                .leftJoinAndSelect('circuit.circuitType', 'circuitType')
                 .addOrderBy('routineCircuit.order', 'ASC')
                 .getMany();
 
@@ -468,7 +484,7 @@ export class RoutineService {
                     circuit: {
                         id: routineCircuit.circuit.id,
                         name: routineCircuit.circuit.name,
-                        type: routineCircuit.circuit.type,
+                        circuit_type: this.buildCircuitTypeRef(routineCircuit.circuit.circuitType),
                         active: routineCircuit.circuit.active,
                     },
                 })),
@@ -546,6 +562,15 @@ export class RoutineService {
             await queryRunner.connect();
             await queryRunner.startTransaction();
 
+            // El tipo, antes que los ejercicios (CU-E-22, regla 1): que exista y que este activo.
+            // Un tipo dado de baja no se ofrece para circuitos nuevos (D61)
+            const circuitTypeError = await this.checkCircuitTypeAssignable(queryRunner.manager, createCircuitDto.circuit_type_id);
+
+            if (circuitTypeError) {
+                await queryRunner.rollbackTransaction();
+                return res.status(circuitTypeError.status).send({ error: circuitTypeError.error });
+            }
+
             // Todos los ejercicios tienen que existir en el catálogo
             const exercises = await queryRunner.manager.find(Exercise, {
                 where: { id: In(exerciseIds) },
@@ -561,7 +586,7 @@ export class RoutineService {
                 queryRunner.manager.create(Circuit, {
                     name: createCircuitDto.name,
                     description: createCircuitDto.description,
-                    type: createCircuitDto.type,
+                    circuit_type_id: createCircuitDto.circuit_type_id,
                     active: true,
                 })
             );
@@ -653,6 +678,21 @@ export class RoutineService {
                 return res.status(400).send({
                     error: `El circuito "${circuit.name}" está dado de baja y no se puede editar. Reactivalo primero.`
                 });
+            }
+
+            // El tipo se controla SOLO si cambia (CU-E-23, regla 1): conservar uno dado de baja esta
+            // permitido (D61), elegir otro de baja no. Va despues del circuito porque saber si cambio
+            // necesita el circuito cargado (plan, 3.9.1). Se compara en minuscula: Postgres devuelve
+            // el uuid en minuscula y el iOS lo manda en mayuscula
+            const circuitTypeChanged = editCircuitDto.circuit_type_id.toLowerCase() !== circuit.circuit_type_id.toLowerCase();
+
+            if (circuitTypeChanged) {
+                const circuitTypeError = await this.checkCircuitTypeAssignable(queryRunner.manager, editCircuitDto.circuit_type_id);
+
+                if (circuitTypeError) {
+                    await queryRunner.rollbackTransaction();
+                    return res.status(circuitTypeError.status).send({ error: circuitTypeError.error });
+                }
             }
 
             const exerciseIds = editCircuitDto.exercises.map(exercise => exercise.exercise_id);
@@ -751,13 +791,16 @@ export class RoutineService {
                 }
             }
 
-            // La cabecera se pisa entera. updated_at se fuerza a mano aunque sea una
+            // La cabecera se pisa entera, tipo incluido. updated_at se fuerza a mano aunque sea una
             // @UpdateDateColumn: TypeORM no escribe una fila sin cambios, y editar solo los ejercicios
             // y las series (que se reemplazan arriba) deja la cabecera igual. Sin esto, esa edicion no
-            // moveria la fecha del circuito
+            // moveria la fecha del circuito. Si el tipo no cambio se deja el guardado, para no
+            // escribir el mismo id con otras mayusculas
             circuit.name = editCircuitDto.name;
             circuit.description = editCircuitDto.description ?? null;
-            circuit.type = editCircuitDto.type;
+            if (circuitTypeChanged) {
+                circuit.circuit_type_id = editCircuitDto.circuit_type_id;
+            }
             circuit.updated_at = new Date();
             await queryRunner.manager.save(Circuit, circuit);
 
@@ -795,7 +838,20 @@ export class RoutineService {
                 )
                 .getMany();
 
-            res.status(200).send(circuits);
+            // Se arma a mano (BE-44): hasta entonces devolvia la entidad, y ahora traeria
+            // circuit_type_id suelto y la relacion. Misma forma que all-plus, sin los ejercicios
+            const response = circuits.map(circuit => ({
+                id: circuit.id,
+                name: circuit.name,
+                description: circuit.description,
+                circuit_type: this.buildCircuitTypeRef(circuit.circuitType),
+                active: circuit.active,
+                exercise_count: (circuit as Circuit & { exercise_count: number }).exercise_count,
+                created_at: circuit.created_at,
+                updated_at: circuit.updated_at,
+            }));
+
+            res.status(200).send(response);
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener los circuitos.' });
@@ -826,7 +882,7 @@ export class RoutineService {
                 id: circuit.id,
                 name: circuit.name,
                 description: circuit.description,
-                type: circuit.type,
+                circuit_type: this.buildCircuitTypeRef(circuit.circuitType),
                 active: circuit.active,
                 exercise_count: circuit.routineExercises.length,
                 created_at: circuit.created_at,
@@ -872,7 +928,7 @@ export class RoutineService {
         res: Response
     ) {
         try {
-            const circuit = await this.circuitRepository.findOne({ where: { id: idCircuit } });
+            const circuit = await this.circuitRepository.findOne({ where: { id: idCircuit }, relations: ['circuitType'] });
 
             if (!circuit) {
                 return res.status(404).send({ error: 'Circuito no encontrado' });
@@ -881,10 +937,146 @@ export class RoutineService {
             circuit.active = setCircuitActiveDto.active;
             await this.circuitRepository.save(circuit);
 
-            res.status(200).send(circuit);
+            // Se arma a mano (BE-44, plan 3.7): la entidad traeria circuit_type_id suelto
+            res.status(200).send({
+                id: circuit.id,
+                name: circuit.name,
+                description: circuit.description,
+                circuit_type: this.buildCircuitTypeRef(circuit.circuitType),
+                active: circuit.active,
+                created_at: circuit.created_at,
+                updated_at: circuit.updated_at,
+            });
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al actualizar el estado del circuito.' });
+        }
+    }
+
+    // ===================== TIPOS DE CIRCUITO (CU-A-24 a CU-A-27, BE-44) =====================
+
+    // El Admin los ve todos (include_inactive=true); el editor de circuitos, solo los activos. Por type
+    // ascendente, con la collation de la base (como los circuitos por nombre)
+    async getAllCircuitTypes(
+        query: GetCircuitTypesQueryDto,
+        res: Response
+    ) {
+        try {
+            // circuit_count en una sola consulta para todo el listado (no una por tipo), y solo con
+            // los circuitos activos: los dados de baja no suman (CU-A-24, regla 2). El alias del
+            // parametro no es active para no pisar el del filtro de los tipos
+            const queryBuilder = this.circuitTypeRepository
+                .createQueryBuilder('circuitType')
+                .loadRelationCountAndMap(
+                    'circuitType.circuit_count',
+                    'circuitType.circuits',
+                    'circuit',
+                    qb => qb.andWhere('circuit.active = :activeCircuit', { activeCircuit: true }),
+                )
+                .orderBy('circuitType.type', 'ASC');
+
+            if (!query.include_inactive) {
+                queryBuilder.andWhere('circuitType.active = :active', { active: true });
+            }
+
+            const circuitTypes = await queryBuilder.getMany();
+
+            res.status(200).send(circuitTypes.map(circuitType => this.buildCircuitTypeResponse(
+                circuitType,
+                (circuitType as CircuitType & { circuit_count: number }).circuit_count,
+            )));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al obtener los tipos de circuito.' });
+        }
+    }
+
+    // El nombre llega recortado del DTO, y la descripcion vacia como undefined: se guarda NULL
+    async createCircuitType(
+        createCircuitTypeDto: CreateCircuitTypeDto,
+        res: Response
+    ) {
+        try {
+            // Contra todos los tipos, tambien los dados de baja: reactivar uno nunca puede dejar dos
+            // con el mismo nombre (CU-A-25, regla 2). Mismo criterio que las membresias
+            const circuitTypes = await this.circuitTypeRepository.find();
+
+            if (this.isTypeNameTaken(circuitTypes, createCircuitTypeDto.type)) {
+                return res.status(409).send({ error: CIRCUIT_TYPE_DUPLICATE_NAME_ERROR });
+            }
+
+            const saved = await this.circuitTypeRepository.save(
+                this.circuitTypeRepository.create({
+                    type: createCircuitTypeDto.type,
+                    description: createCircuitTypeDto.description ?? null,
+                    active: true,
+                })
+            );
+
+            res.status(201).send(this.buildCircuitTypeResponse(saved, 0));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al crear el tipo de circuito.' });
+        }
+    }
+
+    // Pisa los dos campos (sin description, la borra) y no toca active: un tipo dado de baja se
+    // edita y sigue de baja (CU-A-26). El nombre nuevo se ve en todos sus circuitos sin tocarlos
+    async editCircuitType(
+        idCircuitType: string,
+        editCircuitTypeDto: EditCircuitTypeDto,
+        res: Response
+    ) {
+        try {
+            const circuitType = await this.circuitTypeRepository.findOne({ where: { id: idCircuitType } });
+
+            if (!circuitType) {
+                return res.status(404).send({ error: CIRCUIT_TYPE_NOT_FOUND_ERROR });
+            }
+
+            // Solo se controla si el nombre cambia (como editMembership): «principal» → «Principal»
+            // no es un conflicto. Contra los demas tipos, activos y dados de baja
+            if (this.normalizeName(editCircuitTypeDto.type) !== this.normalizeName(circuitType.type)) {
+                const others = (await this.circuitTypeRepository.find()).filter(other => other.id !== circuitType.id);
+
+                if (this.isTypeNameTaken(others, editCircuitTypeDto.type)) {
+                    return res.status(409).send({ error: CIRCUIT_TYPE_DUPLICATE_NAME_ERROR });
+                }
+            }
+
+            circuitType.type = editCircuitTypeDto.type;
+            circuitType.description = editCircuitTypeDto.description ?? null;
+
+            const saved = await this.circuitTypeRepository.save(circuitType);
+            res.status(200).send(this.buildCircuitTypeResponse(saved, await this.countActiveCircuitsOfType(saved.id)));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al editar el tipo de circuito.' });
+        }
+    }
+
+    // Baja logica y reactivar, sin restricciones (D61, plan 3.9.5): un tipo con circuitos se da de
+    // baja igual (los circuitos lo conservan), el mismo valor responde 200 sin cambios y no hay
+    // guarda para el ultimo tipo activo
+    async setCircuitTypeActive(
+        idCircuitType: string,
+        setCircuitTypeActiveDto: SetCircuitTypeActiveDto,
+        res: Response
+    ) {
+        try {
+            const circuitType = await this.circuitTypeRepository.findOne({ where: { id: idCircuitType } });
+
+            if (!circuitType) {
+                return res.status(404).send({ error: CIRCUIT_TYPE_NOT_FOUND_ERROR });
+            }
+
+            circuitType.active = setCircuitTypeActiveDto.active;
+
+            const saved = await this.circuitTypeRepository.save(circuitType);
+            res.status(200).send(this.buildCircuitTypeResponse(saved, await this.countActiveCircuitsOfType(saved.id)));
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ error: 'Error al actualizar el estado del tipo de circuito.' });
         }
     }
 
@@ -2317,6 +2509,7 @@ export class RoutineService {
             relations: [
                 'routineCircuits',
                 'routineCircuits.circuit',
+                'routineCircuits.circuit.circuitType',
                 'routineCircuits.circuit.routineExercises',
                 'routineCircuits.circuit.routineExercises.exercise',
                 'routineCircuits.circuit.routineExercises.exerciseSets',
@@ -2386,18 +2579,21 @@ export class RoutineService {
     // ===================== HELPERS DE CIRCUITO =====================
 
     // Filtros compartidos por el listado y el listado con ejercicios: si mañana cambia
-    // alguno (por ejemplo, cuando type deje de ser string libre), se toca en un solo lugar
+    // alguno, se toca en un solo lugar. Desde BE-44 el tipo es un Circuit_Type: los dos listados
+    // traen la relacion para armar circuit_type, y el filtro es por id (un id que no es de ningun
+    // tipo da [], plan 3.9.9)
     private buildCircuitsQuery(query: GetCircuitsQueryDto): SelectQueryBuilder<Circuit> {
         const queryBuilder = this.circuitRepository
             .createQueryBuilder('circuit')
+            .leftJoinAndSelect('circuit.circuitType', 'circuitType')
             .orderBy('circuit.name', 'ASC');
 
         if (!query.include_inactive) {
             queryBuilder.andWhere('circuit.active = :active', { active: true });
         }
 
-        if (query.type) {
-            queryBuilder.andWhere('LOWER(circuit.type) = LOWER(:type)', { type: query.type });
+        if (query.circuit_type_id) {
+            queryBuilder.andWhere('circuit.circuit_type_id = :circuit_type_id', { circuit_type_id: query.circuit_type_id });
         }
 
         if (query.keyword) {
@@ -2443,7 +2639,7 @@ export class RoutineService {
     private async findCircuitDetail(idCircuit: string): Promise<Circuit | null> {
         return this.circuitRepository.findOne({
             where: { id: idCircuit },
-            relations: ['routineExercises', 'routineExercises.exercise', 'routineExercises.exerciseSets'],
+            relations: ['circuitType', 'routineExercises', 'routineExercises.exercise', 'routineExercises.exerciseSets'],
             order: {
                 routineExercises: {
                     exercise_order: 'ASC',
@@ -2471,7 +2667,7 @@ export class RoutineService {
             id: circuit.id,
             name: circuit.name,
             description: circuit.description,
-            type: circuit.type,
+            circuit_type: this.buildCircuitTypeRef(circuit.circuitType),
             active: circuit.active,
             created_at: circuit.created_at,
             updated_at: circuit.updated_at,
@@ -2508,5 +2704,66 @@ export class RoutineService {
                 })),
             })),
         };
+    }
+
+    // ===================== HELPERS DE TIPOS DE CIRCUITO =====================
+
+    // La forma de un tipo en las cuatro respuestas de circuit-type/* (plan, 3.1)
+    private buildCircuitTypeResponse(circuitType: CircuitType, circuitCount: number) {
+        return {
+            id: circuitType.id,
+            type: circuitType.type,
+            description: circuitType.description ?? null,
+            active: circuitType.active,
+            circuit_count: circuitCount,
+            created_at: circuitType.created_at,
+            updated_at: circuitType.updated_at,
+        };
+    }
+
+    // El tipo dentro de cada circuito (plan, 3.7): el id va aca adentro, nunca circuit_type_id suelto
+    private buildCircuitTypeRef(circuitType: CircuitType) {
+        return {
+            id: circuitType.id,
+            type: circuitType.type,
+            active: circuitType.active,
+        };
+    }
+
+    private async countActiveCircuitsOfType(idCircuitType: string): Promise<number> {
+        return this.circuitRepository.count({ where: { circuit_type_id: idCircuitType, active: true } });
+    }
+
+    // Si el tipo se puede poner en un circuito: que exista (404) y que este activo (400). Lo usan el
+    // alta y, solo si el tipo cambia, la edicion. Recibe el manager de la transaccion del circuito
+    private async checkCircuitTypeAssignable(
+        manager: EntityManager,
+        idCircuitType: string,
+    ): Promise<{ status: number; error: string } | null> {
+        const circuitType = await manager.findOne(CircuitType, { where: { id: idCircuitType } });
+
+        if (!circuitType) {
+            return { status: 404, error: CIRCUIT_TYPE_NOT_FOUND_ERROR };
+        }
+
+        if (!circuitType.active) {
+            return { status: 400, error: CIRCUIT_TYPE_INACTIVE_ERROR };
+        }
+
+        return null;
+    }
+
+    private normalizeName(name: string): string {
+        return name.trim().toLowerCase();
+    }
+
+    /**
+     * Si algun tipo de la lista ya tiene ese nombre, sin mayusculas ni espacios de los bordes. En
+     * memoria a proposito, como MembershipService: hay un puñado de tipos, y asi la comparacion no
+     * depende del collation ni del LOWER de la base
+     */
+    private isTypeNameTaken(circuitTypes: CircuitType[], name: string): boolean {
+        const wanted = this.normalizeName(name);
+        return circuitTypes.some(circuitType => this.normalizeName(circuitType.type) === wanted);
     }
 }

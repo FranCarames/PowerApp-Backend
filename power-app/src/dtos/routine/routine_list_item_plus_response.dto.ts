@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { CircuitTypeRefDto } from '../circuit_type/circuit_type_ref.dto';
 
 export class RoutineListItemCircuitRefDto {
 
@@ -8,8 +9,8 @@ export class RoutineListItemCircuitRefDto {
     @ApiProperty({ example: 'Entrada en calor - Tren inferior' })
     name!: string;
 
-    @ApiProperty({ example: 'entrada en calor' })
-    type!: string;
+    @ApiProperty({ type: CircuitTypeRefDto, description: 'El tipo del circuito. Puede estar dado de baja (active: false): el circuito lo conserva' })
+    circuit_type!: CircuitTypeRefDto;
 
     @ApiProperty({ example: true, description: 'Una rutina puede referenciar un circuito dado de baja' })
     active!: boolean;

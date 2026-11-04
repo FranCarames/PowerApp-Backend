@@ -4,6 +4,7 @@ import { RoutineController } from './routine.controller';
 import { RoutineService } from './routine.service';
 import { Routine } from '../entities/routine.entity';
 import { Circuit } from '../entities/circuit.entity';
+import { CircuitType } from '../entities/circuit_type.entity';
 import { RoutineCircuit } from '../entities/routine_circuit.entity';
 import { RoutineExercise } from '../entities/routine_exercise.entity';
 import { ExerciseSet } from '../entities/exercise_set.entity';
@@ -19,6 +20,7 @@ import { AuthModule } from '../authentication/auth.module';
   imports: [TypeOrmModule.forFeature([
     Routine,
     Circuit,
+    CircuitType,
     RoutineCircuit,
     RoutineExercise,
     ExerciseSet,
