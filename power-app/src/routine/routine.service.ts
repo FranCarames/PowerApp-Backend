@@ -406,14 +406,18 @@ export class RoutineService {
                 }
             }
 
-            // La cabecera se pisa entera. updated_at se fuerza a mano aunque sea una
-            // @UpdateDateColumn: TypeORM no escribe una fila sin cambios, y editar solo los circuitos
-            // (los vinculos de arriba) deja la cabecera igual. Sin esto, esa edicion no moveria la
+            // La cabecera se pisa entera, pero con update() y NO con save(). La lista de
+            // routine.routineCircuits se leyo al empezar y no trae los vinculos que se insertaron
+            // arriba: save() los toma por huerfanos y los desvincula (UPDATE ... SET routine_id =
+            // NULL -> 23502 y un 500). update() escribe solo la cabecera y no mira las relaciones.
+            // updated_at se pasa a mano aunque sea una @UpdateDateColumn: editar solo los circuitos
+            // (los vinculos de arriba) deja la cabecera igual, y sin esto esa edicion no moveria la
             // fecha de la rutina
-            routine.name = editRoutineDto.name;
-            routine.coach_note = editRoutineDto.coach_note ?? null;
-            routine.updated_at = new Date();
-            await queryRunner.manager.save(Routine, routine);
+            await queryRunner.manager.update(Routine, routine.id, {
+                name: editRoutineDto.name,
+                coach_note: editRoutineDto.coach_note ?? null,
+                updated_at: new Date(),
+            });
 
             await queryRunner.commitTransaction();
 
@@ -791,18 +795,20 @@ export class RoutineService {
                 }
             }
 
-            // La cabecera se pisa entera, tipo incluido. updated_at se fuerza a mano aunque sea una
-            // @UpdateDateColumn: TypeORM no escribe una fila sin cambios, y editar solo los ejercicios
-            // y las series (que se reemplazan arriba) deja la cabecera igual. Sin esto, esa edicion no
-            // moveria la fecha del circuito. Si el tipo no cambio se deja el guardado, para no
-            // escribir el mismo id con otras mayusculas
-            circuit.name = editCircuitDto.name;
-            circuit.description = editCircuitDto.description ?? null;
-            if (circuitTypeChanged) {
-                circuit.circuit_type_id = editCircuitDto.circuit_type_id;
-            }
-            circuit.updated_at = new Date();
-            await queryRunner.manager.save(Circuit, circuit);
+            // La cabecera se pisa entera, tipo incluido, pero con update() y NO con save(). La lista
+            // de circuit.routineExercises se leyo al empezar y no trae los ejercicios que se
+            // insertaron arriba: save() los toma por huerfanos y los desvincula (UPDATE ... SET
+            // circuit_id = NULL -> 23502 y un 500). update() escribe solo la cabecera y no mira las
+            // relaciones. updated_at se pasa a mano aunque sea una @UpdateDateColumn: editar solo los
+            // ejercicios y las series (que se reemplazan arriba) deja la cabecera igual, y sin esto esa
+            // edicion no moveria la fecha del circuito. Si el tipo no cambio no se escribe, para no
+            // guardar el mismo id con otras mayusculas
+            await queryRunner.manager.update(Circuit, circuit.id, {
+                name: editCircuitDto.name,
+                description: editCircuitDto.description ?? null,
+                updated_at: new Date(),
+                ...(circuitTypeChanged ? { circuit_type_id: editCircuitDto.circuit_type_id } : {}),
+            });
 
             await queryRunner.commitTransaction();
 
