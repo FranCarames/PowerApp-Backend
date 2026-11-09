@@ -7,6 +7,7 @@ import { Planification } from '../entities/planification.entity';
 import { Routine } from '../entities/routine.entity';
 import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { GetPlanificationsQueryDto } from '../dtos/planification/get_planifications_query.dto';
+import { GetPlanificationDetailQueryDto } from '../dtos/planification/get_planification_detail_query.dto';
 import { CreatePlanificationDto } from '../dtos/planification/create_planification.dto';
 import { CreatePlanificationWeekDto } from '../dtos/planification/create_planification_week.dto';
 import { EditPlanificationDto } from '../dtos/planification/edit_planification.dto';
@@ -121,9 +122,11 @@ export class PlanificationService {
         }
     }
 
-    // Responde tambien para planificaciones inactivas, espejo del detalle de rutina
+    // Responde tambien para planificaciones inactivas, espejo del detalle de rutina. Es el unico
+    // lugar que pasa include_inactive al builder: las demas respuestas con esta forma no lo suman
     async getPlanificationById(
         idPlanification: string,
+        query: GetPlanificationDetailQueryDto,
         res: Response
     ) {
         try {
@@ -133,7 +136,7 @@ export class PlanificationService {
                 return res.status(404).send({ error: 'Planificación no encontrada' });
             }
 
-            res.status(200).send(this.buildPlanificationDetailResponse(planification));
+            res.status(200).send(this.buildPlanificationDetailResponse(planification, query.include_inactive));
         } catch (error) {
             console.error(error);
             res.status(500).send({ error: 'Error al obtener la planificación.' });
@@ -1081,15 +1084,19 @@ export class PlanificationService {
 
     // Compartido por el detalle, el alta, la edicion y cada fila de /all-plus, para que
     // el formato no se duplique
-    private buildPlanificationDetailResponse(planification: Planification) {
-        // Los vinculos dados de baja no se muestran ni cuentan: una rutina que el entrenador
-        // saco del plan no reaparece. findPlanificationDetail carga con relations, que no
-        // admite condicion, asi que el filtro va aca — mismo patron que
+    private buildPlanificationDetailResponse(planification: Planification, includeInactive = false) {
+        // Los vinculos dados de baja (las rutinas que el entrenador saco del plan) nunca se cuentan:
+        // routine_count es de vigentes. Y solo se listan si includeInactive, que unicamente pasa el
+        // detalle (GET /planification/:id?include_inactive=true, CU-E-12c); entonces van mezclados
+        // con los vigentes, en el mismo orden, y cada uno dice en active si lo esta. En el resto de
+        // las respuestas active vale siempre true. findPlanificationDetail carga con relations, que
+        // no admite condicion, asi que el filtro va aca — mismo patron que
         // buildRoutineDetailResponse. En /all-plus el join ya filtro y esto es redundante
         // a proposito: el builder es el unico lugar que decide que se ve
-        const asignaciones = planification.routineAsignations.filter(
+        const vigentes = planification.routineAsignations.filter(
             routineAsignation => routineAsignation.active
         );
+        const asignaciones = includeInactive ? planification.routineAsignations : vigentes;
 
         return {
             id: planification.id,
@@ -1099,13 +1106,15 @@ export class PlanificationService {
             type: planification.type,
             duration: planification.duration,
             active: planification.active,
-            routine_count: asignaciones.length,
+            routine_count: vigentes.length,
             created_at: planification.created_at,
             updated_at: planification.updated_at,
             routines: asignaciones.map(routineAsignation => ({
                 id: routineAsignation.id,
                 week: routineAsignation.week,
                 order: routineAsignation.order,
+                // El del vinculo, no el de la rutina (ese va en routine.active)
+                active: routineAsignation.active,
                 routine: {
                     id: routineAsignation.routine.id,
                     name: routineAsignation.routine.name,

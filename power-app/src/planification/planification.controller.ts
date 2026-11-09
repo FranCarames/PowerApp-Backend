@@ -16,6 +16,7 @@ import { RoutineAsignation } from '../entities/routine_asignation.entity';
 import { UserRole } from '../entities/user.entity';
 import { Auth } from '../authentication/decorators/auth.decorator';
 import { GetPlanificationsQueryDto } from '../dtos/planification/get_planifications_query.dto';
+import { GetPlanificationDetailQueryDto } from '../dtos/planification/get_planification_detail_query.dto';
 import { CreatePlanificationDto } from '../dtos/planification/create_planification.dto';
 import { EditPlanificationDto } from '../dtos/planification/edit_planification.dto';
 import { SetPlanificationActiveDto } from '../dtos/planification/set_planification_active.dto';
@@ -79,14 +80,18 @@ export class PlanificationController {
         await this.planificationService.getAllPlanificationsPlus(query, res);
     }
 
+    // Con include_inactive=true trae tambien las rutinas quitadas del plan (CU-E-12c), mezcladas
+    // con las vigentes: cada una dice en active si lo esta
     @Get('/:id')
     @Auth(UserRole.coach, UserRole.admin)
-    @ApiResponse({ status: 200, type: PlanificationDetailResponseDto })
+    @ApiResponse({ status: 200, type: PlanificationDetailResponseDto, description: 'Sin include_inactive, sólo las rutinas vigentes; con true, también las quitadas (active: false), en el mismo orden. routine_count cuenta sólo las vigentes' })
+    @ApiResponse({ status: 400, description: 'El id no es un UUID válido («El ID debe ser un UUID válido en formato PostgreSQL»), o include_inactive no es true ni false («include_inactive must be a boolean value»)' })
     async getPlanificationById(
         @Param() idPlanification: ParameterIdDto,
+        @Query() query: GetPlanificationDetailQueryDto,
         @Res() res: Response,
     ) {
-        await this.planificationService.getPlanificationById(idPlanification.id, res);
+        await this.planificationService.getPlanificationById(idPlanification.id, query, res);
     }
 
     // Con weeks (CU-E-09) crea la cabecera y las rutinas de cada semana en una transaccion

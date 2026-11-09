@@ -27,6 +27,9 @@ export class PlanificationAsignationResponseDto {
     @ApiProperty({ example: 1, description: 'Posición dentro de la semana. Etiqueta de orden: puede repetirse' })
     order!: number;
 
+    @ApiProperty({ example: true, description: 'Estado del vínculo (Routine_Asignation.active), no el de la rutina (ese es routine.active). false = quitada del plan (CU-E-12c): sólo viene en GET /planification/{id}?include_inactive=true. En las demás respuestas vale siempre true' })
+    active!: boolean;
+
     @ApiProperty({ type: PlanificationRoutineResponseDto })
     routine!: PlanificationRoutineResponseDto;
 }
@@ -37,6 +40,6 @@ export class PlanificationAsignationResponseDto {
 // hace falta un DTO aparte. Si el detalle algun dia baja a los circuitos, ahi se separan
 export class PlanificationDetailResponseDto extends PlanificationListItemResponseDto {
 
-    @ApiProperty({ type: [PlanificationAsignationResponseDto], description: 'Rutinas vigentes del plan, ordenadas por week, order y fecha de asignación. La lista es plana: el cliente agrupa por semana. Vacía si no tiene ninguna' })
+    @ApiProperty({ type: [PlanificationAsignationResponseDto], description: 'Rutinas del plan, ordenadas por week, order y fecha de asignación. Por defecto sólo las vigentes; con include_inactive=true en GET /planification/{id}, también las quitadas (active: false). La lista es plana: el cliente agrupa por semana. Vacía si no tiene ninguna' })
     routines!: PlanificationAsignationResponseDto[];
 }
