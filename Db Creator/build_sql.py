@@ -15,6 +15,7 @@ from gen_seed import MUSCLES, GROUPS, NEW_GROUPS, CIRCUIT_TYPES, circuit_type_uu
 import catalogo_ejercicios
 import static_extra as SX
 import dynamic_data as DD
+import imagenes as IMG
 
 ALL_EX = catalogo_ejercicios.EXERCISES
 
@@ -59,9 +60,11 @@ def build_estaticos():
     rows = []
     for name, gid in EXISTING_GROUPS.items():
         c, u = SX.GROUP_TIMESTAMPS.get(gid, (TS.strip("'"), TS.strip("'")))
-        rows.append("    ('{}'::uuid, {}, NULL, NULL, '{}', '{}')".format(gid, esc(name), c, u))
+        img = esc(IMG.group_image(gid))
+        rows.append("    ('{}'::uuid, {}, {}, {}, '{}', '{}')".format(gid, esc(name), img, img, c, u))
     for name, gid in NEW_GROUPS.items():
-        rows.append("    ('{}'::uuid, {}, NULL, NULL, {}, {})".format(gid, esc(name), TS, TS))
+        img = esc(IMG.group_image(gid))
+        rows.append("    ('{}'::uuid, {}, {}, {}, {}, {})".format(gid, esc(name), img, img, TS, TS))
     w(",\n".join(rows) + "\nON CONFLICT (id) DO NOTHING;")
     w("")
 
@@ -70,8 +73,9 @@ def build_estaticos():
     w('INSERT INTO public."Muscle" (id, muscle_group_id, name, description, image_url, preview_image, created_at, updated_at) VALUES')
     rows = []
     for k, m in MUSCLES.items():
-        rows.append("    ('{}'::uuid, '{}'::uuid, {}, {}, NULL, NULL, {}, {})".format(
-            m["id"], m["group"], esc(m["name"]), esc(m["desc"]), TS, TS))
+        img = esc(IMG.muscle_image(m["id"]))
+        rows.append("    ('{}'::uuid, '{}'::uuid, {}, {}, {}, {}, {}, {})".format(
+            m["id"], m["group"], esc(m["name"]), esc(m["desc"]), img, img, TS, TS))
     w(",\n".join(rows) + "\nON CONFLICT (id) DO NOTHING;")
     w("")
 
@@ -81,8 +85,9 @@ def build_estaticos():
     rows = []
     # Originales primero (textos y timestamps reales)
     for eid, name, desc, safety, activation, c, u in SX.ORIGINAL_EXERCISES:
-        rows.append("    ('{}'::uuid, {}, {}, {}, {}, NULL, NULL, NULL, '{}', '{}')".format(
-            eid, esc(name), esc(desc), esc(safety), esc(activation), c, u))
+        rows.append("    ('{}'::uuid, {}, {}, {}, {}, NULL, {}, {}, '{}', '{}')".format(
+            eid, esc(name), esc(desc), esc(safety), esc(activation),
+            esc(IMG.exercise_preview(eid)), esc(IMG.exercise_bg(eid)), c, u))
     # Nuevos
     ex_id_map = dict(EXISTING_EX_UUID)
     for name, muscles, desc, safety, activation in ALL_EX:
@@ -90,8 +95,9 @@ def build_estaticos():
             continue
         eid = ex_uuid(name)
         ex_id_map[name] = eid
-        rows.append("    ('{}'::uuid, {}, {}, {}, {}, NULL, NULL, NULL, {}, {})".format(
-            eid, esc(name), esc(desc), esc(safety), esc(activation), TS, TS))
+        rows.append("    ('{}'::uuid, {}, {}, {}, {}, NULL, {}, {}, {}, {})".format(
+            eid, esc(name), esc(desc), esc(safety), esc(activation),
+            esc(IMG.exercise_preview(eid)), esc(IMG.exercise_bg(eid)), TS, TS))
     w(",\n".join(rows) + "\nON CONFLICT (id) DO NOTHING;")
     w("")
 
@@ -289,6 +295,88 @@ def build_dinamicos():
 
 
 # =============================================================
+#  PATCH BE-47: imagenes del catalogo sobre una base viva
+# =============================================================
+PATCH_IMAGENES = "patches/2026-11-14-be-47.sql"
+
+
+def _all_exercise_ids():
+    ids = [row[0] for row in SX.ORIGINAL_EXERCISES]
+    ids += [ex_uuid(e[0]) for e in ALL_EX if e[0] not in EXISTING_EXERCISE_NAMES]
+    return ids
+
+
+def build_patch_imagenes():
+    group_ids = list(GROUPS.values())
+    muscle_ids = [m["id"] for m in MUSCLES.values()]
+    exercise_ids = _all_exercise_ids()
+    with_photo = [eid for eid in exercise_ids if IMG.exercise_bg(eid)]
+
+    # (tabla, columna, [(id, url)])
+    updates = [
+        ("Muscle_Group", "image_url", [(g, IMG.group_image(g)) for g in group_ids]),
+        ("Muscle_Group", "preview_image", [(g, IMG.group_image(g)) for g in group_ids]),
+        ("Muscle", "image_url", [(m, IMG.muscle_image(m)) for m in muscle_ids]),
+        ("Muscle", "preview_image", [(m, IMG.muscle_image(m)) for m in muscle_ids]),
+        ("Exercise", "preview_image", [(e, IMG.exercise_preview(e)) for e in exercise_ids]),
+        ("Exercise", "bg_image", [(e, IMG.exercise_bg(e)) for e in with_photo]),
+    ]
+
+    out = []
+    w = out.append
+    w("-- =============================================================")
+    w("--  Patch 2026-11-14 - BE-47 (imagenes del catalogo)")
+    w("--")
+    w("--  ARCHIVO GENERADO por build_sql.py (build_patch_imagenes): no editar a mano.")
+    w("--")
+    w("--  Lleva una base YA CREADA a tener las imagenes del catalogo, sin recrearla desde cero.")
+    w("--  Equivale a las URL que build_sql.py escribe ahora en 02_datos_estaticos.sql. Hace falta")
+    w("--  porque el 02 inserta con ON CONFLICT (id) DO NOTHING: volver a correrlo no actualiza")
+    w("--  las filas que ya existen.")
+    w("--")
+    w("--  QUE HACE")
+    w("--    Completa, SOLO DONDE ESTAN EN NULL:")
+    w("--      - Muscle_Group.image_url y preview_image   ({} grupos)".format(len(group_ids)))
+    w("--      - Muscle.image_url y preview_image         ({} musculos)".format(len(muscle_ids)))
+    w("--      - Exercise.preview_image                   ({} ejercicios)".format(len(exercise_ids)))
+    w("--      - Exercise.bg_image                        ({} ejercicios con foto; los otros {} quedan en NULL)".format(
+        len(with_photo), len(exercise_ids) - len(with_photo)))
+    w("--    Avisa (NOTICE) cuantas filas completo en cada columna.")
+    w("--    No toca video_url ni updated_at: completar una imagen del seed no es una edicion.")
+    w("--")
+    w("--  QUE NO HACE")
+    w("--    - No pisa una imagen que ya este cargada (por ejemplo, por un Admin desde el formulario).")
+    w("--    - No toca filas que no sean del seed (ejercicios, musculos o grupos creados en la app).")
+    w("--")
+    w("--  Es idempotente: corrido por segunda vez completa 0 filas.")
+    w("--  Va todo en una transaccion: si algo falla, no queda nada a medias.")
+    w("--")
+    w("--  COMO SE CORRE")
+    w('--    psql "<cadena de conexion>" -v ON_ERROR_STOP=1 -f patches/2026-11-14-be-47.sql')
+    w("-- =============================================================")
+    w("")
+    w("BEGIN;")
+    w("")
+    w("DO $$")
+    w("DECLARE")
+    w("    n integer;")
+    w("BEGIN")
+    for table, column, pairs in updates:
+        w('    UPDATE public."{}" t SET {} = v.url'.format(table, column))
+        w("      FROM (VALUES")
+        w(",\n".join("        ('{}'::uuid, {})".format(i, esc(url)) for i, url in pairs))
+        w("      ) AS v(id, url)")
+        w("     WHERE t.id = v.id AND t.{} IS NULL;".format(column))
+        w("    GET DIAGNOSTICS n = ROW_COUNT;")
+        w("    RAISE NOTICE '{}.{}: % de {} filas completadas', n;".format(table, column, len(pairs)))
+        w("")
+    w("END $$;")
+    w("")
+    w("COMMIT;")
+    return "\n".join(out) + "\n"
+
+
+# =============================================================
 #  MAIN
 # =============================================================
 if __name__ == "__main__":
@@ -296,6 +384,7 @@ if __name__ == "__main__":
         "01_estructura.sql": build_estructura(),
         "02_datos_estaticos.sql": build_estaticos(),
         "03_datos_dinamicos.sql": build_dinamicos(),
+        PATCH_IMAGENES: build_patch_imagenes(),
     }
     for fname, content in archivos.items():
         with open(fname, "w", encoding="utf-8") as f:

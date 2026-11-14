@@ -1,6 +1,6 @@
 # PowerApp Backend — Estado de implementación vs. Casos de Uso
 
-> **Corte:** 2026-11-09 · **Fuente:** `Use Cases/` del repo PowerApp-Docs (fuente de verdad de los CU) comparado contra `power-app/src`
+> **Corte:** 2026-11-14 · **Fuente:** `Use Cases/` del repo PowerApp-Docs (fuente de verdad de los CU) comparado contra `power-app/src`
 > **Método:** mapeo 1:1 de los 82 CU contra los `controller` y `service` del código, con el criterio del inventario del [roadmap del 16/10](https://github.com/FranCarames/PowerApp-Docs/blob/main/Doc/plans/2026-10-16-roadmap-backend.md) (§9): un CU es ✅ sólo si **todos los caminos de su spec** se cumplen.
 
 ## Resumen
@@ -30,6 +30,16 @@
 > **Nota (4/9):** `CU-E-12` es un CU **agrupador** y no se cuenta a sí mismo; cuentan sus cuatro operaciones anidadas (`CU-E-12a` a `CU-E-12d`). Por eso el total pasó de 72 a **75** sin que haya funcionalidad nueva respecto del corte anterior.
 > **Nota (31/10):** `CU-E-12` pasa a seis operaciones: `CU-E-12e` (reordenar las rutinas de una semana) y `CU-E-12f` (repetir una semana en otras) se suman al inventario y el total pasa de 75 a **77**. Nacen ✅ con BE-42, así que los ✅ suben de 73 a 75; la única 🟡 sigue siendo CU-U-04.
 > **Nota (4/11):** el total pasa de 77 a **82**, como el índice de `Use Cases/`. Entran **CU-A-24 a CU-A-27** (tipos de circuito, un paquete nuevo del Admin), que nacen ✅ con BE-44, y **CU-E-30** (consultar la wiki de ejercicios desde el Entrenador), que Docs sumó el 4/11 sin tarea de backend: ya lo cubren `GET /exercise/all` y `GET /exercise/:id`, así que también entra ✅. Los ✅ suben de 75 a 80; la única 🟡 sigue siendo CU-U-04.
+
+## Cambios recientes (2026-11-14 · BE-47: imágenes del catálogo)
+
+- **BE-47** (pedido de Fran del 14/11: poblar de imágenes la aplicación). Spec: `Doc/specs/2026-11-14-imagenes-del-catalogo-design.md` (D65 a D77); planes: `Doc/plans/2026-11-14-imagenes-del-catalogo-generador-y-piloto-plan.md`, `…-resto-de-ejercicios-y-fotos-plan.md` y `2026-11-14-be-47-imagenes-del-catalogo-en-la-base-plan.md` (repo PowerApp-Docs). **Sin cambios de conteo: sigue en 80 ✅ · 1 🟡 · 0 🔵 de 82 (1 sin backend).** **No cambia ningún CU, ninguna entidad, el esquema, el `01`, el `03` ni `power-app/src`**: sólo se llenan columnas que ya existían y estaban en `NULL`.
+- **Qué hay ahora:** los 207 ejercicios tienen `preview_image` (una ilustración SVG) y 161 tienen `bg_image` (una foto; los otros 46 quedan en `NULL`); los 35 músculos y los 8 grupos tienen `image_url` y `preview_image` (el mismo SVG). `video_url` no se toca. Son 411 URL distintas.
+- **De dónde salen:** un repo nuevo, **PowerApp-Assets** (`https://github.com/FranCarames/PowerApp-Assets`), que se publica con GitHub Pages. Las ilustraciones las genera su código (el músculo en naranja sale de `Exercised_Muscle`); las fotos son de `free-exercise-db` (The Unlicense). Cada archivo se llama como el `id` de la fila.
+- **En `Db Creator`:** `imagenes.py` (nuevo) tiene la URL base en una sola constante (`https://francarames.github.io/PowerApp-Assets`) y arma cada URL a partir del id; `imagenes_manifiesto.py` (nuevo, **generado** por el repo de assets) lista los ids con foto; `build_sql.py` escribe las URL en los tres `INSERT` del `02` y genera el patch. `Db Creator` no importa el repo de assets.
+- **Sobre una base viva:** `patches/2026-11-14-be-47.sql` completa esas columnas **sólo donde están en `NULL`** (no pisa lo que un Admin haya cargado a mano), en una transacción, sin cambiar `updated_at`. Hace falta porque el `02` inserta con `ON CONFLICT (id) DO NOTHING`. **Lo corre Fran en Render.**
+- **Verificación.** `build_sql.py` corrido dos veces deja los mismos bytes; el `01` y el `03` no cambian. Las URL miden a lo sumo 103 caracteres (las columnas son `VARCHAR(150)`). Contra un Postgres 17 **descartable** (puerto 55433, sólo localhost, en el scratchpad; no se tocó la instancia de Fran ni Render): sobre una base creada con el `02` anterior, el patch completó 8 + 8, 35 + 35, 206 de 207 y 161 de 161 (el que faltó es un ejercicio al que se le había puesto una imagen a mano para probarlo, y la conservó), no cambió ningún `updated_at`, y corrido de nuevo completó 0; el resultado es idéntico al de una base creada con el `02` nuevo. `npm --prefix power-app run build` sin errores.
+- **Pendiente, sin verificar:** al 14/11 el repo de assets todavía no estaba pusheado y Pages no respondía, así que **no se comprobó que las 411 URL respondan**. Hasta que Fran haga el push y active Pages, las URL del `02` dan 404 y la web cae en su ícono de siempre. Falta también el duotono de las fotos en la web (T62).
 
 ## Cambios recientes (2026-11-09 · BE-46: guardar un circuito o un ejercicio nuevo)
 

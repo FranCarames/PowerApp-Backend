@@ -39,6 +39,8 @@ necesitan), y al final los dinámicos (usuarios, pagos, etc.).
 | `build_sql.py`     | **Orquestador**. Es el único que ejecutás. Arma los 3 `.sql`.     |
 | `ddl.py`           | El DDL completo (estructura de la base).                          |
 | `gen_seed.py`      | Grupos musculares, 35 músculos (18 existentes + 6 nuevos) y los 5 tipos de circuito (`CIRCUIT_TYPES`). |
+| `imagenes.py`      | URLs de las imágenes del catálogo (BE-47): la constante `ASSETS_BASE` y una función por columna. |
+| `imagenes_manifiesto.py` | **Generado** por el repo PowerApp-Assets: los ids de los ejercicios que tienen foto. No se edita a mano. |
 | `static_extra.py`  | Los 2 ejercicios "Sentadilla" originales y sus vínculos.          |
 | `catalogo_ejercicios.py` | Catálogo de los 206 ejercicios en una lista única `EXERCISES`, organizada por secciones (disciplina). |
 | `dynamic_data.py`  | Datos de prueba: usuarios, coaches, membresías, pagos, RMs y la cadena de entrenamiento. |
@@ -118,3 +120,25 @@ con una marca.
   aplicar el `02` y el `03`; y el patch sobre una base creada con los `.sql` anteriores, con tipos
   sucios (`Core`, `core `, `''`, `amrap`, `principal`…), dos veces seguidas y con cada una de sus
   guardas. La base vieja parchada queda con los mismos datos que una creada con los `.sql` nuevos.
+
+## Imágenes del catálogo (BE-47)
+
+Las imágenes de ejercicios, músculos y grupos viven en el repo **PowerApp-Assets**, publicado con
+GitHub Pages. Cada archivo se llama como el `id` de su fila, así que la URL sale del id:
+
+| Columna | URL |
+|---|---|
+| `Exercise.preview_image` | `<base>/exercise/preview/<id>.svg` |
+| `Exercise.bg_image` | `<base>/exercise/bg/<id>.jpg`, sólo si el ejercicio tiene foto; si no, `NULL` |
+| `Muscle.image_url` y `preview_image` | `<base>/muscle/<id>.svg` |
+| `Muscle_Group.image_url` y `preview_image` | `<base>/muscle-group/<id>.svg` |
+
+- **La URL base** está en un solo lugar: `ASSETS_BASE`, en `imagenes.py`. Si el repo se muda, se cambia
+  ahí y se regenera.
+- **Qué ejercicios tienen foto** lo dice `imagenes_manifiesto.py`. Lo escribe el repo de assets con
+  `py generator/export_manifest.py`; `Db Creator` no importa ese repo, así la base se puede regenerar
+  sin tenerlo clonado. Hay que volver a exportarlo cada vez que cambia la tabla de fotos.
+- **Sobre una base viva**, el patch `patches/2026-11-14-be-47.sql` completa esas columnas **sólo donde
+  están en `NULL`**: no pisa una imagen cargada a mano y se puede correr más de una vez. Lo genera
+  `build_sql.py` (`build_patch_imagenes`), junto con los tres `.sql`; no se edita a mano. Hace falta
+  porque el `02` inserta con `ON CONFLICT (id) DO NOTHING`.
